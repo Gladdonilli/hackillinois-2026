@@ -2,19 +2,19 @@ import { Trail, CatmullRomLine } from '@react-three/drei'
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Line2 } from 'three-stdlib'
+
 import { useLarynxStore } from '@/store/useLarynxStore'
 
 // Typing helper to avoid 'any' when setting color natively
-type Line2Mesh = THREE.Mesh & { 
+type Line2Mesh = {
   geometry: { setPositions: (positions: number[]) => void },
-  material: THREE.Material & { linewidth: number, lineWidth: number, color: THREE.Color, transparent: boolean, opacity: number }
+  material: { color: THREE.Color; transparent: boolean; opacity: number; linewidth: number; lineWidth: number }
 }
 
 export function VelocityRibbons() {
   const meshRef = useRef<THREE.Mesh>(null!)
   const trailGroupRef = useRef<THREE.Group>(null!)
-  const lineRef = useRef<Line2>(null!)
+  const lineRef = useRef<THREE.Mesh>(null!)
 
   // Pre-allocate values outside useFrame to avoid allocations
   const _normalColor = useRef(new THREE.Color('#00FFFF'))
@@ -95,7 +95,7 @@ export function VelocityRibbons() {
     }
 
     if (lineRef.current) {
-      const mat = lineRef.current.material as unknown as { color: THREE.Color; transparent: boolean; opacity: number; linewidth: number; lineWidth: number }
+      const mat = (lineRef.current as unknown as Line2Mesh).material
       if (mat) {
         if (mat.color) mat.color.copy(currentColor.current)
         mat.transparent = true
@@ -121,7 +121,7 @@ export function VelocityRibbons() {
         </Trail>
       </group>
       <CatmullRomLine
-        ref={lineRef}
+        ref={lineRef as unknown as React.RefObject<never>}
         points={[[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]}
         color="#00FFFF"
         lineWidth={1}

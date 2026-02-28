@@ -157,8 +157,15 @@ def load_samples() -> tuple:
 
     for npy_file in sorted(EMA_DIR.glob("*.npy")):
         # Map .npy filename back to .wav filename
-        stem = npy_file.stem  # e.g., "cmu-arctic-16k"
-        wav_name = stem + ".wav"
+        stem = npy_file.stem  # e.g., "deepfake_aria-neural-16k"
+        # Strip real_ / deepfake_ prefix to match results JSON filenames
+        if stem.startswith("real_"):
+            bare = stem[len("real_"):]
+        elif stem.startswith("deepfake_"):
+            bare = stem[len("deepfake_"):]
+        else:
+            bare = stem
+        wav_name = bare + ".wav"
 
         if wav_name not in label_map:
             print(f"  SKIP {wav_name} — not in results JSON")
