@@ -7,7 +7,7 @@ import * as THREE from 'three';
 export function TongueModel() {
   const meshRef = useRef<THREE.Mesh>(null);
   const matRef = useRef<any>(null); // MeshDistortMaterial ref
-  const colorObj = useRef(new THREE.Color('#00FFFF'));
+  const colorObj = useRef(new THREE.Color('#38BDF8'));
   const scalePulseRef = useRef(1.0);
   const wasAbove80Ref = useRef(false);
 
@@ -27,23 +27,23 @@ export function TongueModel() {
     let targetDistort = 0.1;
     let targetSpeed = 2;
     let targetEmissive = 0.3;
-    let targetHex = '#00FFFF'; // cyan
+    let targetHex = '#38BDF8'; // sky-300 cyan
 
     if (velocity > 80) {
         targetDistort = 0.9;
         targetSpeed = 25;
         targetEmissive = 4.0;
-        targetHex = '#FF0000'; // bright red
+        targetHex = '#DC2626'; // red-600
     } else if (velocity > 50) {
         targetDistort = 0.6;
         targetSpeed = 15;
         targetEmissive = 2.0;
-        targetHex = '#FFA500'; // orange
+        targetHex = '#EA580C'; // orange-600
     } else if (velocity > 22) {
         targetDistort = 0.3;
         targetSpeed = 8;
         targetEmissive = 1.0;
-        targetHex = '#FFFF00'; // yellow
+        targetHex = '#FDE047'; // yellow-300
     }
 
     matRef.current.distort += (targetDistort - matRef.current.distort) * 10 * delta;
@@ -72,7 +72,8 @@ export function TongueModel() {
         <capsuleGeometry args={[0.15, 0.5, 8, 16]} />
         <MeshDistortMaterial
           ref={matRef}
-          color="#00FFFF"
+          color="#38BDF8"
+          emissive="#38BDF8"
           emissive="#00FFFF"
           emissiveIntensity={0.5}
           roughness={0.3}

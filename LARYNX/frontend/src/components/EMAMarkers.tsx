@@ -8,8 +8,8 @@ import { VELOCITY_THRESHOLDS } from '@/types/larynx';
 const SENSOR_NAMES = ['UL', 'LL', 'JAW', 'T1', 'T2', 'T3'] as const;
 type SensorNameType = typeof SENSOR_NAMES[number];
 
-const NORMAL_COLOR = new THREE.Color('#00FFFF');
-const WARN_COLOR = new THREE.Color('#FF3366');
+const NORMAL_COLOR = new THREE.Color('#38BDF8');
+const WARN_COLOR = new THREE.Color('#DC2626');
 
 export function EMAMarkers() {
   const meshRef = useRef<THREE.InstancedMesh>(null);
@@ -60,7 +60,7 @@ export function EMAMarkers() {
         <sphereGeometry args={[0.04, 16, 16]} />
         <meshStandardMaterial
           color="#ffffff"
-          emissive="#00FFFF"
+          emissive="#38BDF8"
           emissiveIntensity={2.0}
           toneMapped={false}
         />

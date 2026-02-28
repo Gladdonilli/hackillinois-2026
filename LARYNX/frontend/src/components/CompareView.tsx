@@ -280,7 +280,7 @@ export const CompareView = () => {
             )}
           </div>
 
-          <div className="h-[160px] border-t border-[#ff3366]/20 bg-black/60 relative">
+          <div className="h-[160px] border-t border-[#DC2626]/20 bg-black/60 relative">
             <VelocityGraph isFake={isFakeB} frames={hasRealData ? comparison.channelFrames[1] : undefined} />
           </div>
         </div>

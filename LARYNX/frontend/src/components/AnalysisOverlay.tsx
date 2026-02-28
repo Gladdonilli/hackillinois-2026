@@ -99,8 +99,8 @@ export function AnalysisOverlay() {
             exit={{ opacity: 0, y: -20, filter: 'blur(8px)', transition: { duration: 0.5 } }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
-          <div className="hud-panel p-4 w-[320px] mx-auto opacity-100 !bg-black/90 backdrop-blur-md border border-[#333]">
-            <div className="font-mono text-[11px] text-[#666] tracking-[0.2em] mb-4 uppercase text-center border-b border-[#333] pb-2">
+          <div className="hud-panel p-4 w-[320px] mx-auto opacity-100 !bg-black/90 backdrop-blur-md border border-surface-elevated">
+            <div className="font-mono text-[11px] text-dim tracking-[0.2em] mb-4 uppercase text-center border-b border-surface-elevated pb-2">
               ANALYSIS PIPELINE
             </div>
             
@@ -144,7 +144,7 @@ export function AnalysisOverlay() {
                         </div>
                       )}
                       {isPending && (
-                        <span className="text-[#444]">○</span>
+                        <span className="text-dim/60">○</span>
                       )}
                     </div>
                     <div className={cn(
@@ -164,7 +164,7 @@ export function AnalysisOverlay() {
             </div>
 
             <div className="flex items-center gap-3 mb-3">
-              <div className="flex-1 h-1.5 gauge-track relative bg-[#111] rounded overflow-hidden">
+              <div className="flex-1 h-1.5 gauge-track relative bg-surface rounded-sm overflow-hidden">
                  <div 
                    className="absolute top-0 left-0 h-full bg-cyan transition-all duration-300 flex justify-end overflow-hidden" 
                    style={{ width: `${Math.max(0, p)}%` }}
@@ -173,18 +173,18 @@ export function AnalysisOverlay() {
                    <div className="w-4 h-full bg-white opacity-80 blur-[2px] shadow-[0_0_12px_#fff]" />
                  </div>
               </div>
-              <div className="font-mono text-[11px] text-[#888] w-8 text-right">
+              <div className="font-mono text-[11px] text-dim w-8 text-right">
                 {Math.floor(p)}%
               </div>
             </div>
 
-            <div className="flex justify-between items-center font-mono text-[10px] pt-2 border-t border-[#333]">
-              <div className={cn("transition-colors duration-150", frameBlink ? "text-cyan text-glow-cyan" : "text-[#555]")}>
+            <div className="flex justify-between items-center font-mono text-[10px] pt-2 border-t border-surface-elevated">
+              <div className={cn("transition-colors duration-150", frameBlink ? "text-cyan text-glow-cyan" : "text-dim/60")}>
                 {status === 'analyzing' && frames.length > 0 
                   ? `Frame ${Math.max(0, currentFrame)} / ${frames.length}`
                   : 'Processing...'}
               </div>
-              <div className={cn("font-bold tracking-wider", isVisible ? "text-cyan text-glow-cyan" : "text-[#555]")}>
+              <div className={cn("font-bold tracking-wider", isVisible ? "text-cyan text-glow-cyan" : "text-dim/60")}>
                 T+{formatTime(elapsed)}
               </div>
           </div>

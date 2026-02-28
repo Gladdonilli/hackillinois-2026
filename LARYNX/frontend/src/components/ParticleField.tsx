@@ -33,7 +33,7 @@ export function ParticleField() {
   }, [])
 
   const dummy = useMemo(() => new THREE.Object3D(), [])
-  const colorTarget = useMemo(() => new THREE.Color('#00FFFF'), [])
+  const colorTarget = useMemo(() => new THREE.Color('#38BDF8'), [])
 
   useFrame((_, delta) => {
     if (!meshRef.current) return
@@ -42,19 +42,19 @@ export function ParticleField() {
     const { status, verdict, tongueVelocity } = storeState
     const velocity = tongueVelocity || 0
 
-    let targetHex = '#00FFFF'
+    let targetHex = '#38BDF8'
     let targetIntensity = 1.0
     let baseSpeed = 0.002
 
     if (velocity > 80) {
-        targetHex = '#FF0000'
+        targetHex = '#DC2626'
         targetIntensity = 4.0
         baseSpeed = 0.05
     } else if (status === 'analyzing') {
         baseSpeed = 0.008 
         targetIntensity = 2.0 
     } else if (status === 'complete') {
-        targetHex = verdict?.isGenuine ? '#00FF88' : '#FF3366'
+        targetHex = verdict?.isGenuine ? '#2DD4BF' : '#DC2626'
     }
 
     if (velocity > 80 && !wasAbove80Ref.current) {
@@ -117,7 +117,7 @@ export function ParticleField() {
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, COUNT]}>
       <sphereGeometry args={[1, 16, 16]} />
-      <meshStandardMaterial transparent opacity={0.3} color="#00FFFF" emissive="#00FFFF" toneMapped={false} />
+      <meshStandardMaterial transparent opacity={0.3} color="#38BDF8" emissive="#38BDF8" toneMapped={false} />
     </instancedMesh>
   )
 }

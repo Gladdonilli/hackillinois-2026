@@ -230,7 +230,7 @@ export default function App() {
               animate={{ scale: 1, y: "-50%" }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 20 }}
             >
-              <div className="shadow-[0_0_100px_rgba(0,255,255,0.15)] rounded-lg">
+              <div className="shadow-[0_0_100px_rgba(56,189,248,0.15)] rounded-sm">
                 <VerdictPanel />
               </div>
             </motion.div>

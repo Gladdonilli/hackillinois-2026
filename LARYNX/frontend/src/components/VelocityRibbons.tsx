@@ -17,11 +17,11 @@ export function VelocityRibbons() {
   const lineRef = useRef<THREE.Mesh>(null!)
 
   // Pre-allocate values outside useFrame to avoid allocations
-  const _normalColor = useRef(new THREE.Color('#00FFFF'))
-  const _warnColor = useRef(new THREE.Color('#FFAA00'))
-  const _dangerColor = useRef(new THREE.Color('#FF3366'))
-  const currentColor = useRef(new THREE.Color('#00FFFF'))
-  const targetColor = useRef(new THREE.Color('#00FFFF'))
+  const _normalColor = useRef(new THREE.Color('#38BDF8'))
+  const _warnColor = useRef(new THREE.Color('#EA580C'))
+  const _dangerColor = useRef(new THREE.Color('#DC2626'))
+  const currentColor = useRef(new THREE.Color('#38BDF8'))
+  const targetColor = useRef(new THREE.Color('#38BDF8'))
   const curve = useMemo(() => new THREE.CatmullRomCurve3([
     new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()
   ]), [])
@@ -123,7 +123,7 @@ export function VelocityRibbons() {
       <CatmullRomLine
         ref={lineRef as unknown as React.RefObject<never>}
         points={[[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]}
-        color="#00FFFF"
+        color="#38BDF8"
         lineWidth={1}
         transparent
         opacity={0.2}

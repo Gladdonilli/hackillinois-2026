@@ -261,18 +261,31 @@ def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
     return results
 
 
-@app.function(image=image, timeout=1200)
+@app.function(image=image, timeout=1200, volumes={"/model-cache": model_cache})
 def download_librispeech() -> list[tuple[str, bytes]]:
-    """Download LibriSpeech dev-clean and return (filename, wav_bytes) pairs."""
+    """Download LibriSpeech dev-clean and return (filename, wav_bytes) pairs.
+    Caches converted WAVs to /model-cache/librispeech/ for instant reuse."""
     import subprocess
     import soundfile as sf
     import random
+    import pickle
     from pathlib import Path
 
+    cache_dir = Path("/model-cache/librispeech")
+    cache_file = cache_dir / "dev_clean_2700.pkl"
+
+    # Check volume cache first
+    if cache_file.exists():
+        print("Loading LibriSpeech from volume cache...")
+        with open(cache_file, "rb") as f:
+            items = pickle.load(f)
+        print(f"  Loaded {len(items)} cached WAV files (skipped 337MB download)")
+        return items
+
+    # Fresh download
     work_dir = Path("/tmp/librispeech")
     work_dir.mkdir(exist_ok=True)
 
-    # Download and extract
     tar_path = work_dir / "dev-clean.tar.gz"
     if not tar_path.exists():
         print("Downloading LibriSpeech dev-clean (337MB)...")
@@ -283,16 +296,13 @@ def download_librispeech() -> list[tuple[str, bytes]]:
     print("Extracting...")
     subprocess.run(["tar", "xzf", str(tar_path), "-C", str(work_dir)], check=True)
 
-    # Find all FLAC files
     flac_files = sorted(work_dir.rglob("*.flac"))
     print(f"Found {len(flac_files)} FLAC files")
 
-    # Random sample N_REAL_SAMPLES
     random.seed(42)
     selected = random.sample(flac_files, min(N_REAL_SAMPLES, len(flac_files)))
 
-    # Convert to WAV bytes (already 16kHz mono)
-    items = []
+    items: list[tuple[str, bytes]] = []
     for flac_path in selected:
         audio, sr = sf.read(str(flac_path))
         buf = io.BytesIO()
@@ -301,7 +311,12 @@ def download_librispeech() -> list[tuple[str, bytes]]:
         filename = f"libri_{flac_path.stem}.wav"
         items.append((filename, buf.read()))
 
-    print(f"Prepared {len(items)} real speech WAV files")
+    # Cache to volume for future runs
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    with open(cache_file, "wb") as f:
+        pickle.dump(items, f)
+    model_cache.commit()
+    print(f"Prepared {len(items)} real WAVs (cached to volume for next run)")
     return items
 
 

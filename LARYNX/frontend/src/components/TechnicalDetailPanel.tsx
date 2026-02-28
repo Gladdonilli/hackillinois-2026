@@ -104,8 +104,8 @@ export const TechnicalDetailPanel: React.FC = () => {
       ctx.clearRect(0, 0, width, height);
 
       // Draw grid
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
       ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
       
       // Horizontal lines
       for (let i = 0; i < 5; i++) {
@@ -130,10 +130,10 @@ export const TechnicalDetailPanel: React.FC = () => {
 
       // Draw Formant 1 (Cyan - Lowest frequency)
       ctx.beginPath();
-      ctx.strokeStyle = '#00FFFF'; // cyan
       ctx.lineWidth = 3;
-      ctx.shadowColor = '#00FFFF';
+      ctx.strokeStyle = '#38BDF8'; // cyan
       ctx.shadowBlur = 10;
+      ctx.shadowColor = '#38BDF8';
       
       for (let x = 0; x < currentWidth; x++) {
         // Base y is near the bottom (high value = lower physically on canvas)
@@ -148,10 +148,10 @@ export const TechnicalDetailPanel: React.FC = () => {
 
       // Draw Formant 2 (Green - Mid frequency)
       ctx.beginPath();
-      ctx.strokeStyle = '#00FF88'; // green
       ctx.lineWidth = 3;
-      ctx.shadowColor = '#00FF88';
+      ctx.strokeStyle = '#2DD4BF'; // green
       ctx.shadowBlur = 10;
+      ctx.shadowColor = '#2DD4BF';
       
       for (let x = 0; x < currentWidth; x++) {
         // Higher up
@@ -224,25 +224,24 @@ export const TechnicalDetailPanel: React.FC = () => {
 
   return (
     <motion.div 
-      className="hud-panel absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[1000px] bg-[#050510]/90 backdrop-blur-md border border-cyan-500/30 rounded-xl p-8 flex flex-col gap-8 shadow-[0_0_50px_rgba(0,255,255,0.1)] z-50 overflow-hidden"
+      className="hud-panel absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[1000px] bg-[#09090B]/90 backdrop-blur-md border border-cyan/30 rounded-sm p-8 flex flex-col gap-8 shadow-[0_0_50px_rgba(56,189,248,0.1)] z-50 overflow-hidden"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
     >
       {/* Background grid overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none" />
 
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(56, 189, 248, 0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(56, 189, 248, 0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none" />
       {/* Top Split: Formants vs Inversion */}
       <div className="flex flex-row space-x-8 w-full h-[300px] relative z-10">
         
         {/* Left: Formant Analysis */}
-        <motion.div variants={itemVariants} className="flex-1 flex flex-col bg-black/40 border border-cyan-900/50 rounded-lg p-5">
+        <motion.div variants={itemVariants} className="flex-1 flex flex-col bg-black/40 border border-cyan-900/50 rounded-sm p-5">
           <div className="flex items-center space-x-2 mb-4">
-            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <h2 className="text-cyan-400 font-mono tracking-widest text-sm font-bold text-glow-cyan">FORMANT EXTRACTION</h2>
+            <div className="w-2 h-2 rounded-full bg-cyan animate-pulse" />
+            <h2 className="text-cyan font-mono tracking-widest text-sm font-bold text-glow-cyan">FORMANT EXTRACTION</h2>
           </div>
-          
-          <div className="relative flex-1 rounded overflow-hidden border border-cyan-500/20 bg-black/60 isolate">
+          <div className="relative flex-1 rounded overflow-hidden border border-cyan/20 bg-black/60 isolate">
             <canvas 
               ref={canvasRef} 
               className="absolute inset-0 w-full h-full"
@@ -254,32 +253,31 @@ export const TechnicalDetailPanel: React.FC = () => {
             <div className="absolute left-4 top-[40%] text-[10px] font-mono text-green-400/90 font-bold bg-black/50 px-1 rounded">
               F2: 800-2400 Hz
             </div>
-            <div className="absolute left-4 top-[70%] text-[10px] font-mono text-cyan-400/90 font-bold bg-black/50 px-1 rounded">
+            <div className="absolute left-4 top-[70%] text-[10px] font-mono text-cyan/90 font-bold bg-black/50 px-1 rounded">
               F1: 300-900 Hz
             </div>
           </div>
         </motion.div>
 
-        {/* Right: Articulatory Mapping */}
-        <motion.div variants={itemVariants} className="flex-1 flex flex-col bg-black/40 border border-cyan-900/50 rounded-lg p-5">
-           <div className="flex items-center space-x-2 mb-4">
-            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <h2 className="text-cyan-400 font-mono tracking-widest text-sm font-bold text-glow-cyan">ARTICULATORY INVERSION</h2>
+        <motion.div variants={itemVariants} className="flex-1 flex flex-col bg-black/40 border border-cyan-900/50 rounded-sm p-5">
+          <div className="flex items-center space-x-2 mb-4">
+            <div className="w-2 h-2 rounded-full bg-cyan animate-pulse" />
+            <h2 className="text-cyan font-mono tracking-widest text-sm font-bold text-glow-cyan">ARTICULATORY INVERSION</h2>
           </div>
 
           <div className="flex-1 flex flex-col justify-center relative">
             {/* The Pipeline diagram */}
             <motion.div 
               className="flex justify-between items-center w-full"
-              variants={containerVariants} // Stagger the boxes
+              variants={containerVariants}
               initial="hidden"
               animate="visible"
             >
               {[
                 { label: "AUDIO", color: "text-white" },
                 { label: "MEL SPEC", color: "text-white" },
-                { label: "AAI MODEL", color: "text-cyan-400 font-bold glow-cyan border-cyan-500 shadow-[0_0_15px_rgba(0,255,255,0.3)]" },
                 { label: "12D EMA", color: "text-green-400" },
+                { label: "AAI MODEL", color: "text-cyan font-bold glow-cyan border-cyan shadow-[0_0_15px_rgba(56,189,248,0.3)]" },
                 { label: "VELOCITY", color: "text-rose-500 font-bold" }
               ].map((step, i, arr) => (
                 <React.Fragment key={step.label}>
@@ -291,15 +289,15 @@ export const TechnicalDetailPanel: React.FC = () => {
                   </motion.div>
                   {i < arr.length - 1 && (
                     <motion.div 
+                      className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-cyan/50 to-transparent mx-1 relative"
                       variants={{
                         hidden: { width: 0, opacity: 0 },
                         visible: { width: 'auto', opacity: 1, transition: { duration: 0.5 } }
                       }}
-                      className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent mx-1 relative"
                     >
                       {/* Animated dot on line */}
                       <motion.div 
-                        className="absolute top-1/2 -mt-[2px] w-1 h-1 rounded-full bg-cyan-400 shadow-[0_0_5px_#00FFFF]"
+                        className="absolute top-1/2 -mt-[2px] w-1 h-1 rounded-full bg-cyan shadow-[0_0_5px_#38BDF8]"
                         animate={{ left: ["0%", "100%"] }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear", delay: i * 0.2 }}
                       />
@@ -311,28 +309,28 @@ export const TechnicalDetailPanel: React.FC = () => {
             
             <motion.div variants={itemVariants} className="mt-8 text-xs font-mono text-cyan-50/70 text-center mx-auto max-w-[80%] leading-relaxed border-t border-white/5 pt-4">
               Mapping acoustic observations to physical constraints. 
-              The <span className="text-cyan-400">AAI Wav2Vec2 backbone</span> translates formants into <span className="text-green-400">tongue kinematics</span>. Deepfakes generate physically impossible <span className="text-rose-500">velocity spikes</span>.
+              The <span className="text-cyan">AAI Wav2Vec2 backbone</span> translates formants into <span className="text-green-400">tongue kinematics</span>. Deepfakes generate physically impossible <span className="text-rose-500">velocity spikes</span>.
             </motion.div>
           </div>
         </motion.div>
       </div>
 
       {/* Bottom: Key Stats */}
-      <motion.div variants={itemVariants} className="w-full bg-black/60 border border-cyan-900/40 rounded-lg p-6 relative z-10 flex justify-between items-center divide-x divide-white/10">
         
+      <motion.div variants={itemVariants} className="w-full bg-black/60 border border-cyan-900/40 rounded-sm p-6 relative z-10 flex justify-between items-center divide-x divide-white/10">
         <div className="flex flex-col items-center px-6 flex-1">
-          <div className="text-[10px] font-mono text-cyan-500/60 mb-2 tracking-widest uppercase">Analysis Rate</div>
           <div className="flex items-baseline gap-1">
+          <div className="text-[10px] font-mono text-cyan/60 mb-2 tracking-widest uppercase">Analysis Rate</div>
             <span className="text-3xl font-mono text-white font-light">
               <NumberFlow value={stats.fps} format={{ maximumFractionDigits: 0 }} />
             </span>
-            <span className="text-sm font-mono text-cyan-500/50">fps</span>
           </div>
+            <span className="text-sm font-mono text-cyan/50">fps</span>
         </div>
 
         <div className="flex flex-col items-center px-6 flex-1">
-          <div className="text-[10px] font-mono text-cyan-500/60 mb-2 tracking-widest uppercase">Sensor Inputs</div>
           <div className="flex items-baseline gap-1">
+          <div className="text-[10px] font-mono text-cyan/60 mb-2 tracking-widest uppercase">Sensor Inputs</div>
             <span className="text-3xl font-mono text-white font-light">
               <NumberFlow value={stats.dof} format={{ maximumFractionDigits: 0 }} />
             </span>
@@ -341,13 +339,13 @@ export const TechnicalDetailPanel: React.FC = () => {
         </div>
 
         <div className="flex flex-col items-center px-6 flex-1">
-          <div className="text-[10px] font-mono text-cyan-500/60 mb-2 tracking-widest uppercase">Human Limit</div>
           <div className="flex items-baseline gap-1">
+          <div className="text-[10px] font-mono text-cyan/60 mb-2 tracking-widest uppercase">Human Limit</div>
             <span className="text-3xl font-mono text-white font-light">
               <NumberFlow value={stats.humanVel} format={{ maximumFractionDigits: 0 }} />
             </span>
-            <span className="text-sm font-mono text-cyan-500/50">cm/s</span>
           </div>
+            <span className="text-sm font-mono text-cyan/50">cm/s</span>
         </div>
 
         <div className="flex flex-col items-center px-6 flex-1">
@@ -365,8 +363,8 @@ export const TechnicalDetailPanel: React.FC = () => {
         </div>
 
         <div className="flex flex-col items-center px-6 flex-1 border-r-0">
-          <div className="text-[10px] font-mono text-cyan-500/60 mb-2 tracking-widest uppercase">Confidence</div>
           <div className="flex items-baseline gap-1">
+          <div className="text-[10px] font-mono text-cyan/60 mb-2 tracking-widest uppercase">Confidence</div>
             <span className="text-3xl font-mono text-cyan-300 font-bold drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">
               <NumberFlow value={stats.conf} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} />
             </span>

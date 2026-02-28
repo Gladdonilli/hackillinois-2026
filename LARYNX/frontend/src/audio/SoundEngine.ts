@@ -924,5 +924,58 @@ export const SoundEngine = {
     soundtrackGain?.gain.setTargetAtTime(preVacuumSoundtrackGain, now, 0.3)
   },
 
+
+  // ==================== TICK JITTER (HEARTBEAT DISRUPTION) ====================
+
+  /** Enable arrhythmic tick jitter — interval varies ±50ms to trigger sympathetic nervous response */
+  enableTickJitter: (): void => {
+    if (!requireAudioReady() || !processingTickLoop) return
+    tickJitterActive = true
+    // Replace steady loop with jittered scheduling
+    processingTickLoop.stop(0)
+    const jitterTick = () => {
+      if (!tickJitterActive || !processingTickSynth) return
+      processingTickSynth.triggerAttackRelease('C4', '32n')
+      // IEC spec: interval jitter >50ms = sympathetic nervous system response
+      const baseInterval = (60 / (Tone.Transport.bpm.value || 120)) * 1000
+      const jitter = baseInterval * (0.7 + Math.random() * 0.6)  // ±30% variation
+      setTimeout(jitterTick, jitter)
+    }
+    jitterTick()
+  },
+
+  disableTickJitter: (): void => {
+    tickJitterActive = false
+    // Resume steady loop if still ticking
+    if (tickingActive && processingTickLoop) {
+      processingTickLoop.start(0)
+    }
+  },
+
+  // ==================== GEIGER COUNTER CONTROL ====================
+
+  startGeigerClicks: (): void => {
+    if (!requireAudioReady()) return
+    geigerActive = true
+    if (geigerGain) geigerGain.gain.setTargetAtTime(1, Tone.now(), 0.1)
+  },
+
+  stopGeigerClicks: (): void => {
+    geigerActive = false
+    if (geigerInterval) { clearTimeout(geigerInterval); geigerInterval = null }
+    if (geigerGain) geigerGain.gain.setTargetAtTime(0, Tone.now(), 0.2)
+  },
+
+  // ==================== OXIMETER CONTROL ====================
+
+  startOximeter: (): void => {
+    if (!requireAudioReady()) return
+    if (oximeterGain) oximeterGain.gain.setTargetAtTime(1, Tone.now(), 0.3)
+  },
+
+  stopOximeter: (): void => {
+    if (oximeterGain) oximeterGain.gain.setTargetAtTime(0, Tone.now(), 0.2)
+  },
+
   isInitialized: (): boolean => initialized,
 }

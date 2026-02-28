@@ -63,15 +63,15 @@ export function SkullClipEffect() {
     <group>
       <mesh ref={mesh1} visible={false}>
         <torusGeometry args={[1.2, 0.02, 16, 64]} />
-        <meshStandardMaterial ref={materialRef} color="#FF3366" emissive="#FF3366" transparent opacity={0.8} toneMapped={false} />
+        <meshStandardMaterial ref={materialRef} color="#DC2626" emissive="#DC2626" transparent opacity={0.8} toneMapped={false} />
       </mesh>
       <mesh ref={mesh2} visible={false}>
         <torusGeometry args={[1.2, 0.02, 16, 64]} />
-        <meshStandardMaterial ref={material2Ref} color="#FF3366" emissive="#FF3366" transparent opacity={0.4} toneMapped={false} />
+        <meshStandardMaterial ref={material2Ref} color="#DC2626" emissive="#DC2626" transparent opacity={0.4} toneMapped={false} />
       </mesh>
       <mesh ref={mesh3} visible={false}>
         <torusGeometry args={[1.2, 0.02, 16, 64]} />
-        <meshStandardMaterial ref={material3Ref} color="#FF3366" emissive="#FF3366" transparent opacity={0.2} toneMapped={false} />
+        <meshStandardMaterial ref={material3Ref} color="#DC2626" emissive="#DC2626" transparent opacity={0.2} toneMapped={false} />
       </mesh>
     </group>
   )

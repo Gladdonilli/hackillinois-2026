@@ -122,8 +122,8 @@ export function WaveformDisplay() {
         // Draw active segment highlight
         if (analyzing && totalFrames > 0 && currentFrame > 0) {
             const playheadX = (currentFrame / totalFrames) * width;
-            ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
             ctx.fillRect(Math.max(0, playheadX - 12), 0, 24, height);
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.1)';
         }
 
         const isViolent = tongueVelocity > 50;
@@ -150,9 +150,9 @@ export function WaveformDisplay() {
              grad.addColorStop(0, 'rgba(255, 50, 50, 0.2)');
              grad.addColorStop(1, 'rgba(255, 50, 50, 0.8)');
           } else {
-             grad.addColorStop(0, 'rgba(0, 255, 255, 0.1)');
-             grad.addColorStop(1, 'rgba(0, 255, 255, 0.6)');
           }
+             grad.addColorStop(0, 'rgba(56, 189, 248, 0.1)');
+             grad.addColorStop(1, 'rgba(56, 189, 248, 0.6)');
           
           ctx.fillStyle = grad;
           ctx.fillRect(x, y, barWidth, amplitude);
@@ -240,18 +240,18 @@ export function WaveformDisplay() {
         if (playheadX > width) playheadX = width;
 
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
         ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
         ctx.moveTo(playheadX, 0);
         ctx.lineTo(playheadX, height);
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.strokeStyle = '#00FFFF';
         ctx.lineWidth = 2;
+        ctx.strokeStyle = '#38BDF8';
         ctx.shadowBlur = 8;
-        ctx.shadowColor = '#00FFFF';
         ctx.moveTo(playheadX, 0);
+        ctx.shadowColor = '#38BDF8';
         ctx.lineTo(playheadX, height);
         ctx.stroke();
         ctx.shadowBlur = 0;
@@ -264,8 +264,8 @@ export function WaveformDisplay() {
         const timeStr = `${m}:${s}.${ms}`;
         
         ctx.font = '9px monospace';
-        ctx.fillStyle = 'rgba(0, 255, 255, 0.7)';
         ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.7)';
         ctx.fillText(timeStr, width - 4, height - 6);
       }
 
@@ -288,10 +288,10 @@ export function WaveformDisplay() {
       if (levelBar) {
           levelBar.style.width = `${currentLevel.toFixed(1)}%`;
           if (tongueVelocity > 80) {
-              levelBar.style.background = 'linear-gradient(90deg, #00FFFF, #FF0000)';
           } else if (tongueVelocity > 50) {
-              levelBar.style.background = 'linear-gradient(90deg, #00FFFF, #FFA500)';
+              levelBar.style.background = 'linear-gradient(90deg, #38BDF8, #FF0000)';
           } else {
+              levelBar.style.background = 'linear-gradient(90deg, #38BDF8, #FFA500)';
               levelBar.style.background = ''; // Use CSS default
           }
       }
@@ -319,9 +319,9 @@ export function WaveformDisplay() {
       let containerEl = document.getElementById('waveform-container');
       if (containerEl) {
          if (analyzing) {
-           containerEl.style.boxShadow = `0 0 15px rgba(0, 255, 255, ${breathingAlpha})`;
-           containerEl.style.borderColor = `rgba(0, 255, 255, ${Math.max(0.1, breathingAlpha + 0.1)})`;
          } else {
+           containerEl.style.boxShadow = `0 0 15px rgba(56, 189, 248, ${breathingAlpha})`;
+           containerEl.style.borderColor = `rgba(56, 189, 248, ${Math.max(0.1, breathingAlpha + 0.1)})`;
            containerEl.style.boxShadow = '';
            containerEl.style.borderColor = '';
          }

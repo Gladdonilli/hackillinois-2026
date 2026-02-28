@@ -85,7 +85,7 @@ export function HeadModel() {
                 roughness={0.1}
                 chromaticAberration={0.5}
                 anisotropy={0.3}
-                color="#88ccff"
+                color="#a8d8ea"
                 backside={true}
                 samples={6}
                 resolution={512}

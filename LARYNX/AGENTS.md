@@ -52,3 +52,11 @@ Browser → CF Worker (R2 upload) → Modal (Parselmouth)
 ## STATUS
 
 Spec-complete. Zero implementation code. Highest risk = Blender sagittal slice of ARKit head (asset pipeline). Scientific basis validated by review agents (184 cm/s IS reproducible on standard TTS).
+
+## TESTING REQUIREMENTS
+
+- **MANDATORY**: After EVERY frontend visual change, verify with `agent-browser` before declaring done
+- Run `agent-browser open <url>` → `agent-browser snapshot -i` → verify render
+- For WebGL/Canvas changes, use `agent-browser screenshot` + `look_at` (snapshot misses canvas content)
+- Build-green does NOT guarantee runtime-visible rendering — always do visual verification
+- Sound engine + backend files are owned by parallel sessions — DO NOT edit those files from the frontend session
