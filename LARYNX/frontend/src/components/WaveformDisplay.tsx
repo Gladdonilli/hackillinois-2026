@@ -348,7 +348,7 @@ export function WaveformDisplay() {
     >
       <div className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-1.5">
-            <span className="text-[10px] tracking-[0.3em] uppercase text-[#666] font-mono">AUDIO WAVEFORM</span>
+            <span className="text-[10px] tracking-[0.3em] uppercase text-dim font-mono">AUDIO WAVEFORM</span>
             <span className="flex gap-0.5">
                 <span className="w-1 h-1 rounded-full bg-cyan animate-pulse" style={{ animationDelay: '0s' }} />
                 <span className="w-1 h-1 rounded-full bg-cyan animate-pulse" style={{ animationDelay: '0.2s' }} />
@@ -382,10 +382,10 @@ export function WaveformDisplay() {
       </div>
 
       <div className="flex flex-row justify-between items-center mt-2 border-t border-border/30 pt-2">
-        <div ref={f1ValRef} className="font-mono text-[9px] text-[#555] w-1/4">F1: --- Hz</div>
-        <div ref={f2ValRef} className="font-mono text-[9px] text-[#555] w-1/4 text-center">F2: --- Hz</div>
-        <div ref={f3ValRef} className="font-mono text-[9px] text-[#555] w-1/4 text-center">F3: --- Hz</div>
-        <div ref={statusTextRef} className="font-mono text-[9px] text-[#666] tracking-widest w-1/4 text-right truncate pl-2">STANDBY</div>
+        <div ref={f1ValRef} className="font-mono text-[9px] text-dim w-1/4">F1: --- Hz</div>
+        <div ref={f2ValRef} className="font-mono text-[9px] text-dim w-1/4 text-center">F2: --- Hz</div>
+        <div ref={f3ValRef} className="font-mono text-[9px] text-dim w-1/4 text-center">F3: --- Hz</div>
+        <div ref={statusTextRef} className="font-mono text-[9px] text-dim tracking-widest w-1/4 text-right truncate pl-2">STANDBY</div>
       </div>
     </motion.div>
   );
