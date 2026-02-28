@@ -5,33 +5,39 @@
 @layer base {
   :root {
     /* LARYNX Clinical Dark Mode — no light mode toggle */
-    --background: 0 0% 0%; /* #000000 */
-    --foreground: 0 0% 93%; /* #EDEDED */
-
-    --card: 0 0% 4%; /* #0A0A0A */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 4%;
     --card-foreground: 0 0% 93%;
     --popover: 0 0% 4%;
     --popover-foreground: 0 0% 93%;
-
-    --primary: 180 100% 50%; /* #00FFFF Clinical Cyan */
+    --primary: 180 100% 50%;
     --primary-foreground: 0 0% 0%;
-
-    --secondary: 0 0% 12%; /* #1F1F1F */
+    --secondary: 0 0% 12%;
     --secondary-foreground: 0 0% 93%;
-
     --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 40%; /* #666666 */
-
-    --accent: 180 100% 50%; /* #00FFFF */
+    --muted-foreground: 0 0% 40%;
+    --accent: 180 100% 50%;
     --accent-foreground: 0 0% 0%;
-
-    --destructive: 345 100% 60%; /* #FF3366 */
+    --destructive: 345 100% 60%;
     --destructive-foreground: 0 0% 93%;
-
-    --border: 0 0% 12%; /* #1F1F1F */
+    --border: 0 0% 12%;
     --input: 0 0% 12%;
     --ring: 180 100% 50%;
     --radius: 0.3rem;
+
+    /* LARYNX brand tokens */
+    --cyan: #00FFFF;
+    --cyan-dim: #00CCCC;
+    --cyan-glow: 0 255 255;
+    --warn: #FF3366;
+    --warn-glow: 255 51 102;
+    --genuine: #00FF88;
+    --genuine-glow: 0 255 136;
+    --surface: #0A0A0A;
+    --surface-elevated: #111111;
+    --grid-line: rgba(0, 255, 255, 0.03);
+    --scanline-opacity: 0.04;
   }
 }
 
@@ -42,29 +48,355 @@
   body {
     @apply bg-background text-foreground;
     min-width: 1280px;
-    overflow-x: hidden;
+    overflow: hidden;
     font-family: "Geist", system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    cursor: crosshair;
   }
   code, pre, .font-mono {
     font-family: "Geist Mono", "JetBrains Mono", monospace;
   }
+  ::selection {
+    background: rgba(0, 255, 255, 0.2);
+    color: #00FFFF;
+  }
 }
 
-/* Canvas fills viewport in analysis mode */
+/* ============================================
+   CINEMATIC BACKGROUND EFFECTS
+   ============================================ */
+
+/* Fullscreen scanline overlay — always visible */
+.scanline-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 2px,
+    rgba(0, 0, 0, var(--scanline-opacity)) 4px
+  );
+}
+
+/* Animated grid background */
+.grid-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 20%, transparent 100%);
+  animation: grid-drift 20s linear infinite;
+}
+
+@keyframes grid-drift {
+  0% { background-position: 0 0; }
+  100% { background-position: 60px 60px; }
+}
+
+/* Vignette overlay */
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.7) 100%);
+}
+
+/* ============================================
+   GLOW EFFECTS
+   ============================================ */
+
+.glow-cyan {
+  box-shadow:
+    0 0 10px rgba(var(--cyan-glow), 0.15),
+    0 0 30px rgba(var(--cyan-glow), 0.08),
+    0 0 60px rgba(var(--cyan-glow), 0.04);
+}
+
+.glow-cyan-strong {
+  box-shadow:
+    0 0 15px rgba(var(--cyan-glow), 0.3),
+    0 0 40px rgba(var(--cyan-glow), 0.15),
+    0 0 80px rgba(var(--cyan-glow), 0.08);
+}
+
+.glow-warn {
+  box-shadow:
+    0 0 15px rgba(var(--warn-glow), 0.3),
+    0 0 40px rgba(var(--warn-glow), 0.15),
+    0 0 80px rgba(var(--warn-glow), 0.08);
+}
+
+.glow-genuine {
+  box-shadow:
+    0 0 15px rgba(var(--genuine-glow), 0.3),
+    0 0 40px rgba(var(--genuine-glow), 0.15),
+    0 0 80px rgba(var(--genuine-glow), 0.08);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(var(--cyan-glow), 0.5), 0 0 30px rgba(var(--cyan-glow), 0.2);
+}
+
+.text-glow-warn {
+  text-shadow: 0 0 10px rgba(var(--warn-glow), 0.5), 0 0 30px rgba(var(--warn-glow), 0.2);
+}
+
+.text-glow-genuine {
+  text-shadow: 0 0 10px rgba(var(--genuine-glow), 0.5), 0 0 30px rgba(var(--genuine-glow), 0.2);
+}
+
+/* ============================================
+   ANIMATED BORDERS
+   ============================================ */
+
+.border-glow {
+  position: relative;
+  border: 1px solid rgba(0, 255, 255, 0.15);
+}
+
+.border-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    var(--border-angle, 0deg),
+    transparent 40%,
+    rgba(0, 255, 255, 0.4) 50%,
+    transparent 60%
+  );
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: border-rotate 4s linear infinite;
+}
+
+@keyframes border-rotate {
+  0% { --border-angle: 0deg; }
+  100% { --border-angle: 360deg; }
+}
+
+@property --border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* ============================================
+   PULSE & BREATHING ANIMATIONS
+   ============================================ */
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.02); opacity: 1; }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.98; }
+  52% { opacity: 0.85; }
+  54% { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes typewriter-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-breathe { animation: breathe 4s ease-in-out infinite; }
+.animate-flicker { animation: flicker 6s ease-in-out infinite; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(0,255,255,0.05) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* ============================================
+   HUD PANEL STYLING
+   ============================================ */
+
+.hud-panel {
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 255, 255, 0.1);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Corner brackets on HUD panels */
+.hud-panel::before,
+.hud-panel::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: rgba(0, 255, 255, 0.3);
+  border-style: solid;
+  border-width: 0;
+  pointer-events: none;
+}
+
+.hud-panel::before {
+  top: 0; left: 0;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.hud-panel::after {
+  bottom: 0; right: 0;
+  border-bottom-width: 1px;
+  border-right-width: 1px;
+}
+
+/* Sweep line across HUD panels */
+.hud-sweep::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.03), transparent);
+  animation: sweep 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes sweep {
+  0%, 100% { left: -50%; }
+  50% { left: 100%; }
+}
+
+/* ============================================
+   LAYOUT HELPERS
+   ============================================ */
+
 .canvas-container {
   position: fixed;
   inset: 0;
   z-index: 0;
 }
 
-/* HUD overlays float above canvas */
 .hud-overlay {
   position: fixed;
   z-index: 10;
   pointer-events: none;
 }
+
 .hud-overlay > * {
   pointer-events: auto;
+}
+
+/* ============================================
+   INTRO / BOOT SEQUENCE
+   ============================================ */
+
+@keyframes glitch-1 {
+  0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+  20% { clip-path: inset(20% 0 60% 0); transform: translate(-2px, 1px); }
+  40% { clip-path: inset(60% 0 20% 0); transform: translate(2px, -1px); }
+  60% { clip-path: inset(40% 0 40% 0); transform: translate(-1px, 2px); }
+  80% { clip-path: inset(10% 0 80% 0); transform: translate(1px, -2px); }
+}
+
+@keyframes glitch-2 {
+  0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+  25% { clip-path: inset(50% 0 30% 0); transform: translate(3px, 0); }
+  50% { clip-path: inset(10% 0 70% 0); transform: translate(-3px, 0); }
+  75% { clip-path: inset(70% 0 10% 0); transform: translate(2px, 0); }
+}
+
+.glitch-text {
+  position: relative;
+}
+
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.glitch-text::before {
+  color: #FF3366;
+  animation: glitch-1 3s ease-in-out infinite;
+  z-index: -1;
+}
+
+.glitch-text::after {
+  color: #00FFFF;
+  animation: glitch-2 2.5s ease-in-out infinite reverse;
+  z-index: -1;
+}
+
+/* ============================================
+   GAUGE / METER COMPONENTS
+   ============================================ */
+
+.gauge-fill {
+  transition: width 0.15s ease-out;
+  background: linear-gradient(90deg, rgba(0, 255, 255, 0.6) 0%, #00FFFF 100%);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+  height: 100%;
+  border-radius: 1px;
+}
+
+.gauge-fill-warn {
+  background: linear-gradient(90deg, rgba(255, 51, 102, 0.6) 0%, #FF3366 100%);
+  box-shadow: 0 0 8px rgba(255, 51, 102, 0.4);
+}
+
+.gauge-track {
+  background: rgba(255, 255, 255, 0.05);
+  height: 3px;
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 255, 0.4);
 }
