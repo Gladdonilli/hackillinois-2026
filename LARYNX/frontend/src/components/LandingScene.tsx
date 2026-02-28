@@ -1,31 +1,11 @@
 import { useRef, useEffect, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Sparkles, Stars, useGLTF, Text, Billboard } from '@react-three/drei'
-import { EffectComposer, Bloom, ChromaticAberration } from '@react-three/postprocessing'
-import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
 import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import gsap from 'gsap'
 
-// Shared ref for chromatic aberration offset
-const chromaticOffset = new THREE.Vector2(0, 0)
-
-function GlitchEffectHandler() {
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
-    const glitchTime = t % 7
-    const isGlitching = glitchTime < 0.2
-
-    if (isGlitching) {
-      chromaticOffset.set((Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.05)
-    } else {
-      // Subtle default aberration
-      chromaticOffset.set(0.002, 0.002)
-    }
-  })
-  return null
-}
 
 function MouthBeacon({ portalState }: { portalState: string }) {
   const groupRef = useRef<THREE.Group>(null)
@@ -366,12 +346,7 @@ export function LandingScene() {
 
       <FaceModel portalState={portalState} />
       <MouthBeacon portalState={portalState} />
-      <GlitchEffectHandler />
 
-      <EffectComposer>
-        <Bloom luminanceThreshold={1} mipmapBlur={true} intensity={1.2} />
-        <ChromaticAberration offset={chromaticOffset} blendFunction={BlendFunction.NORMAL} radialModulation={false} modulationOffset={0} />
-      </EffectComposer>
     </Canvas>
   )
 }
