@@ -88,34 +88,6 @@ declare module '@react-three/postprocessing' {
   export const Vignette: React.FC<VignetteProps>
 }
 
-// THREE namespace re-exports for moduleResolution: "bundler"
-// @types/three@0.168.0 doesn't export namespace members properly under bundler resolution
-declare module 'three' {
-  export class Mesh extends import('three').Object3D {
-    geometry: import('three').BufferGeometry
-    material: import('three').Material | import('three').Material[]
-    isMesh: true
-    morphTargetInfluences?: number[]
-    morphTargetDictionary?: { [key: string]: number }
-  }
-  export class Group extends import('three').Object3D {
-    isGroup: true
-  }
-  export class InstancedMesh extends Mesh {
-    count: number
-    instanceMatrix: import('three').InstancedBufferAttribute
-  }
-  export class CatmullRomCurve3 extends import('three').Curve<import('three').Vector3> {
-    constructor(points?: import('three').Vector3[], closed?: boolean, curveType?: string, tension?: number)
-    points: import('three').Vector3[]
-  }
-  export class WebGLRenderer {
-    constructor(parameters?: any)
-    domElement: HTMLCanvasElement
-    extensions: { get: (name: string) => any }
-  }
-}
-
 // lucide-react ships no .d.ts
 declare module 'lucide-react' {
   import { FC, SVGProps } from 'react'
@@ -127,10 +99,12 @@ declare module 'lucide-react' {
   }
   export const Upload: FC<IconProps>
   export const AlertTriangle: FC<IconProps>
+  export const AlertCircle: FC<IconProps>
   export const CheckCircle: FC<IconProps>
   export const XCircle: FC<IconProps>
   export const Loader2: FC<IconProps>
   export const FileAudio: FC<IconProps>
+  export const AudioWaveform: FC<IconProps>
   export const X: FC<IconProps>
   export const Music: FC<IconProps>
   export const Shield: FC<IconProps>
