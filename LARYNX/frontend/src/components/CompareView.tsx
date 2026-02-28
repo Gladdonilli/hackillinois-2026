@@ -150,9 +150,9 @@ const VelocityGraph = ({ isFake, frames }: { isFake: boolean; frames?: EMAFrame[
       // Flashing text logic for fake peak
       if (isFake && valueRef.current) {
          if (nextVal > 150) {
-            valueRef.current.className = `text-2xl font-bold font-mono text-glow-warn animate-flicker text-[#FF3366] whitespace-nowrap`;
+            valueRef.current.className = `text-2xl font-bold font-mono text-glow-warn animate-flicker text-warn whitespace-nowrap`;
          } else {
-            valueRef.current.className = `text-2xl font-bold font-mono text-glow-warn text-[#FF3366] whitespace-nowrap`;
+            valueRef.current.className = `text-2xl font-bold font-mono text-glow-warn text-warn whitespace-nowrap`;
          }
       }
 
@@ -166,7 +166,7 @@ const VelocityGraph = ({ isFake, frames }: { isFake: boolean; frames?: EMAFrame[
   return (
     <div className="flex flex-col relative pt-4">
       <div className="absolute top-0 right-2 z-10 flex justify-end min-w-[200px]">
-         <div ref={valueRef} className={`text-2xl font-bold font-mono whitespace-nowrap ${isFake ? 'text-glow-warn text-[#FF3366]' : 'text-glow-cyan text-[#00FFFF]'}`}>
+         <div ref={valueRef} className={`text-2xl font-bold font-mono whitespace-nowrap ${isFake ? 'text-glow-warn text-warn' : 'text-glow-cyan text-cyan'}`}>
            Peak: 0.0 cm/s
          </div>
       </div>

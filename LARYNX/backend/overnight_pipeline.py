@@ -54,8 +54,8 @@ image = (
 # Constants
 # ---------------------------------------------------------------------------
 LIBRISPEECH_URL = "https://openslr.trmal.net/resources/12/dev-clean.tar.gz"
-N_REAL_SAMPLES = 2700
-N_FAKE_SAMPLES = 2700
+N_REAL_SAMPLES = 300
+N_FAKE_SAMPLES = 300
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
 INFERENCE_PASSES = 10
@@ -424,19 +424,14 @@ def main():
     print("\n\U0001f4e6 Step 1: Downloading LibriSpeech + generating ElevenLabs deepfakes (parallel)...")
     libri_handle = download_librispeech.spawn()
 
-    # Build ElevenLabs work items: 2700 fakes split 50/50 across v2 and v3
+    # Build ElevenLabs work items: 300 fakes using Flash v2.5 (cheapest model)
     import random as _rng
     el_rng = _rng.Random(42)
     el_items: list[tuple[int, str, str, str, str]] = []
-    n_per_model = N_FAKE_SAMPLES // 2
-    for model_id, count in [
-        ("eleven_multilingual_v2", n_per_model),
-        ("eleven_v3", N_FAKE_SAMPLES - n_per_model),
-    ]:
-        for i in range(count):
-            voice_id, voice_name = el_rng.choice(ELEVENLABS_VOICES)
-            sentence = el_rng.choice(SENTENCES)
-            el_items.append((i, voice_id, voice_name, model_id, sentence))
+    for i in range(N_FAKE_SAMPLES):
+        voice_id, voice_name = el_rng.choice(ELEVENLABS_VOICES)
+        sentence = el_rng.choice(SENTENCES)
+        el_items.append((i, voice_id, voice_name, "eleven_flash_v2_5", sentence))
 
     # Split into chunks of 50, dispatch across up to 50 containers via .map()
     CHUNK_SIZE = 50

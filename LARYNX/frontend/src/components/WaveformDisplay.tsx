@@ -302,7 +302,7 @@ export function WaveformDisplay() {
       if (statusEl) {
          if (status === 'idle') {
             statusEl.textContent = 'STANDBY';
-            statusEl.className = 'font-mono text-[9px] text-[#666] tracking-widest w-1/4 text-right truncate pl-2';
+            statusEl.className = 'font-mono text-[9px] text-dim tracking-widest w-1/4 text-right truncate pl-2';
          } else if (status === 'uploading') {
             statusEl.textContent = 'INGESTING...';
             statusEl.className = 'font-mono text-[9px] text-cyan animate-pulse tracking-widest w-1/4 text-right truncate pl-2';
@@ -311,7 +311,7 @@ export function WaveformDisplay() {
             statusEl.className = 'font-mono text-[9px] text-cyan animate-pulse tracking-widest w-1/4 text-right truncate pl-2';
          } else if (status === 'complete') {
             statusEl.textContent = 'ANALYSIS COMPLETE';
-            statusEl.className = `font-mono text-[9px] tracking-widest w-1/4 text-right truncate pl-2 ${verdict && !verdict.isGenuine ? 'text-red-500 [text-shadow:0_0_8px_rgba(255,0,0,0.6)]' : 'text-green-500'}`;
+            statusEl.className = `font-mono text-[9px] tracking-widest w-1/4 text-right truncate pl-2 ${verdict && !verdict.isGenuine ? 'text-warn [text-shadow:0_0_8px_rgba(220,38,38,0.6)]' : 'text-genuine'}`;
          }
       }
 

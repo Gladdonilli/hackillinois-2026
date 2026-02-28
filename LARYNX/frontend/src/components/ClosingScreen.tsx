@@ -116,7 +116,7 @@ export function ClosingScreen({ onReset }: ClosingScreenProps) {
       {/* CTA Button */}
       <motion.button
         onClick={onReset}
-        className="px-10 py-4 border border-cyan-500/50 bg-cyan-500/5 hover:bg-cyan-500/20 text-cyan-400 font-mono tracking-[0.3em] uppercase transition-all duration-300 group z-10 hover:shadow-[0_0_30px_rgba(0,255,255,0.2)]"
+        className="px-10 py-4 border border-cyan/50 bg-cyan/5 hover:bg-cyan/20 text-cyan font-mono tracking-[0.3em] uppercase transition-all duration-300 group z-10 hover:shadow-[0_0_30px_rgba(56,189,248,0.2)]"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 3.2, duration: 0.5 }}

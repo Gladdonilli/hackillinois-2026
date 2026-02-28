@@ -146,7 +146,7 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
           </div>
 
           {/* Data Readout */}
-          <div className="flex flex-col items-start gap-1 font-mono text-[10px] tracking-widest text-[#00FFFF] mt-2 w-[320px]">
+          <div className="flex flex-col items-start gap-1 font-mono text-[10px] tracking-widest text-cyan mt-2 w-[320px]">
             {readoutLines.map((line, i) => (
               <motion.div
                 key={i}

@@ -74,7 +74,6 @@ export function TongueModel() {
           ref={matRef}
           color="#38BDF8"
           emissive="#38BDF8"
-          emissive="#00FFFF"
           emissiveIntensity={0.5}
           roughness={0.3}
           metalness={0.1}
