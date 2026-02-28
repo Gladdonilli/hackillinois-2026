@@ -1,11 +1,83 @@
 # Supermemory Export
 
-**Exported:** 2026-02-28T21:11:27.888Z
+**Exported:** 2026-02-28T21:50:12.728Z
 **Scope:** project
 
 ---
 
-## Project Memories (156)
+## Project Memories (166)
+
+### [M5MjMQvLnVhfS4aQYhbGAr] (learned-pattern)
+
+[PROJECT] LEARNED-PATTERN: Parallel sessions cause repo state divergence. The auto-push.sh script + parallel sessions create new commits on main while this session's working copy becomes stale. Before editing files, ALWAYS verify the working copy is on the latest main and that files actually exist at expected paths. Key symptom: editing files that appear to exist (JJ tracks them) but the frontend directory has been restructured by another session's commits (e.g. pumzwtyo "fix: frontend API wiring + Aedify build" moved/removed files). Run `jj log -r 'all()' --limit 10` and `ls` the target directory before any edits.
+
+*Created: 2026-02-28T21:43:56.326Z*
+
+### [Z3dEXcNpeZfFYYUepg3fes] (architecture)
+
+[PROJECT] ARCHITECTURE: JJ repo has an `empty-base` branch (change wumymusv) created for "full-repo PR scans" — it's deliberately empty. If working copy suddenly shows no source files, check `jj log -r 'all()'` — you're likely on empty-base, not main. Fix: `jj new main` to get back to main with all 20K+ files.
+
+*Created: 2026-02-28T21:37:58.915Z*
+
+### [fzHj65MQScexE548JzeNNz] (learned-pattern)
+
+[PROJECT] LEARNED-PATTERN: SoundEngine.ts moved from src/sound/SoundEngine.ts to src/audio/SoundEngine.ts (discovered during perf fix session). The parallel sound session reorganized the directory structure. SoundEngine portalFilter.frequency.setValueAtTime() at L570/580 is NOT a bug — these are anchor points for subsequent linearRampToValueAtTime() calls, which is correct Web Audio API usage. Perf fix #7 was cancelled as false positive from the audit.
+
+*Created: 2026-02-28T21:37:54.732Z*
+
+### [U8VKzCq2C3jFyV3tgU6xTB] (learned-pattern)
+
+[PROJECT] LEARNED-PATTERN: Three.js CatmullRomCurve3.getPoints(divisions) does NOT accept a pre-allocated buffer — it always returns a new Vector3[] array. Optimization strategy for per-frame usage: accept the Vector3 allocation but eliminate the downstream flatMap() by pre-allocating a Float32Array(divisions*3+3) via useRef and copying with a for-loop. Applied in VelocityRibbons.tsx — eliminated 153-element array allocation per frame.
+
+*Created: 2026-02-28T21:37:50.728Z*
+
+### [Lre6yV4DKYgspPSGT5HjAh] (project-config)
+
+[PROJECT] project-config: Full deployment status as of Feb 28. All 7 CF products active: Workers (larynx-api.tianyi35.workers.dev, version d74b81a8), D1 (larynx-analysis, 4c23a222), R2 (larynx-audio), Workers AI (AI binding), Vectorize (larynx-signatures, 768 dims, cosine), Pages (larynx.pages.dev, deploy 3dcfee75), AI Gateway (larynx-gateway). Custom domains: voxlarynx.tech (Pages), api.voxlarynx.tech (Worker). Modal: gladdonilli--larynx-analyze.modal.run. Aedify: auto-deploys from GitHub, container-based via Nixpacks, port 8000, root package.json shim delegates to LARYNX/frontend.
+
+*Created: 2026-02-28T21:35:38.495Z*
+
+### [uvnK2DYAKf5E87ZDtV6Uxg] (architecture)
+
+[PROJECT] architecture: Frontend API wiring (FIXED Feb 28). Three connection points all use `import.meta.env.VITE_API_URL` with fallback to `https://larynx-api.tianyi35.workers.dev`. (1) useAnalysisStream.ts: constructs `${API_BASE}/api/analyze`, POSTs FormData for SSE analysis stream. (2) useComparisonStream.ts: constructs `${API_BASE}/api/compare`, POSTs for comparison SSE stream. (3) useLarynxStore.ts fetchHistory: uses `${API_BASE}/api/history?limit=20`. VITE_API_URL in .env = `https://larynx-api.tianyi35.workers.dev`. Full chain: CF Pages → CF Worker → Modal SSE. Previously broken: hooks posted to URL root (no /api/ path) with -dev Modal fallback.
+
+*Created: 2026-02-28T21:35:31.411Z*
+
+### [JfUeS7j4tHDhdAsxgMEWm9] (architecture)
+
+[PROJECT] architecture: overnight_pipeline.py refactored to use Modal Volume-based dataset caching (Feb 28 2026). Previously, main() read ALL WAVs from local disk into memory and sent raw bytes over the wire via .map() for EVERY pass (30 passes × ~86K WAVs = ~129GB total network transfer). New approach: two new Modal functions (upload_wavs_to_volume, list_volume_dataset) upload WAVs to /model-cache/dataset/{real,fake}/ ONCE, then predict_ema_batch receives volume paths (strings) instead of bytes. predict_ema_batch calls model_cache.reload() on entry to handle warm containers seeing new uploads. Upload is incremental (skips existing files) so subsequent runs transfer nothing. Net effect: ~129GB network → ~4.3GB one-time upload + negligible string dispatch per pass. Containers read WAVs at NVMe speed from co-located volume.
+
+*Created: 2026-02-28T21:29:52.208Z*
+
+### [d7zce4ryrdsYxYBnhW8nuS] (architecture)
+
+[PROJECT] architecture: Aedify.ai is a container-based PaaS using Nixpacks (Railway's builder). "Deploy from GitHub" clones full repo, detects framework via root manifest files, builds Docker image via Nixpacks, runs as container with health check on configured port (8000). No root directory setting available. Requires root-level package.json for Node.js detection. Settings: port mapping, env vars, compute resources (CPU/Memory sliders), GitHub auto-deploy on push. Prize: $300 platform credits + 5mo free OpenClaw per member.
+
+*Created: 2026-02-28T21:27:23.938Z*
+
+### [u4W6sNBjUrcWS3a5y74yE5] (error-solution)
+
+[PROJECT] error-solution: Aedify build fails with "Cannot find module './_tsc.js'" when using nested npm install. Root cause: Nixpacks runs npm install at repo root first (for serve dependency), then build script does cd LARYNX/frontend && npm install && npm run build. The tsc binary in nested node_modules has module resolution conflict with root node_modules. Fix: change root package.json build to skip tsc (use vite build only) since Vite handles TS natively, OR install all deps in one layer.
+
+*Created: 2026-02-28T21:27:18.768Z*
+
+### [8sdrn7ABpk5iJFHc7nZvYE] (conversation)
+
+[PROJECT] conversation: handoff-2026-02-28T21:12Z digest. B200 was kept as fastest target, but Blackwell compatibility required upgrading `LARYNX/backend/overnight_pipeline.py` image deps to torch/torchaudio 2.7.0+cu128 with PyTorch cu128 index after `no kernel image` failures under torch 2.5.1. Run 3 inference output was recovered for training via local `train_local.py`, producing updated `training_data/ensemble_model.pkl` (21:05) with 76.8% GroupKFold on 86,420 rows. Run 4 relaunched on B200 (`ap-5Jk4yzY3WjQt2ycL1NkaiM`) and is actively processing pass 1 batches.
+
+*Created: 2026-02-28T21:12:04.393Z*
+
+### [GCz2FYRZcPn73Z3gmV5KvL] (architecture)
+
+[PROJECT] architecture: Run 3 inference data completed on Modal and local classifier training was completed offline from `LARYNX/backend/training_data/aai_results.json`. Local training script `LARYNX/backend/train_local.py` produced updated `training_data/ensemble_model.pkl` at 2026-02-28 21:05 with GroupKFold CV accuracy 76.8% on 86,420 rows (43,210 real + 43,210 fake, 108 features, 2,099 speaker groups). This provides a fresh model artifact despite the original Modal Run 3 post-inference training stage not emitting usable logs in the original PTY stream.
+
+*Created: 2026-02-28T21:11:28.367Z*
+
+### [81ipswVnhwEgL4dha38nTL] (project-config)
+
+[PROJECT] project-config: Run 4 training/inference pipeline is now configured for Blackwell B200 in `LARYNX/backend/overnight_pipeline.py` with `gpu="B200"`, `INFERENCE_PASSES=30`, `BATCH_SIZE=20`, and `@modal.concurrent(max_inputs=10)`. PyTorch stack was upgraded to `torch==2.7.0+cu128` and `torchaudio==2.7.0+cu128` with `extra_index_url="https://download.pytorch.org/whl/cu128"` to provide SM100-compatible kernels. This change was required after B200 failed under torch 2.5.1 with no-kernel-image runtime errors.
+
+*Created: 2026-02-28T21:11:28.349Z*
 
 ### [eWA5GZdi8DZhCoVZ19ZfgY] (project-config)
 
@@ -85,12 +157,6 @@
 
 *Created: 2026-02-28T20:03:10.601Z*
 
-### [oMxB1bXjXjX8QjtV9NrXe9] (architecture)
-
-[PROJECT] architecture: LARYNX frontend wiring state (Feb 28 2026). useAnalysisStream.ts posts FormData to VITE_API_URL (fallback: gladdonilli--larynx-analyze-dev.modal.run), parses SSE events: progress→setProgress, frame→addFrame(sensors/tongueVelocity/timestamp), verdict→setVerdict+setStatus('complete'), error→setStatus('error'). useLarynxStore.ts (Zustand) holds: status, audioFile/Url, frames[], currentFrame, progress, verdict, tongueVelocity, tongueT1({x,y}), formants, comparison (dual-channel for CompareView), portalState. Types in larynx.ts: SensorName='UL'|'LL'|'JAW'|'T1'|'T2'|'T3', 6 status states (idle→uploading→analyzing→complete/comparing/technical/closing/error). CF Worker proxy routes to Modal. Full chain: frontend→CF Worker(api.voxlarynx.tech)→Modal→SSE→Zustand→R3F animation.
-
-*Created: 2026-02-28T20:00:14.757Z*
-
 ### [5BfqGQR1wwtKuZifXWVfx7] (architecture)
 
 [PROJECT] architecture: LARYNX classifier mismatch risk (Feb 28 2026). CRITICAL: The live inference pipeline (pipeline.py) uses Praat formant→articulatory mapping for EMA trajectories, while the training pipeline (overnight_pipeline.py) uses HuBERT→AAI neural inversion. The 108 features (6 articulators × 3 signals × 6 stats) have the same SCHEMA but different INPUT trajectories. classifier.py's classify_ema_frames() extracts features identically but from formant-derived positions instead of AAI-derived ones. The ensemble verdict uses weighted blend: 0.6×formant_confidence + 0.4×classifier_confidence, so even if classifier accuracy degrades, formant-based anomaly detection still dominates. Velocity thresholds: T1=20, T2=15, T3=12, JAW=10 cm/s. ABSOLUTE_MAX_VELOCITY=22 cm/s.
@@ -108,12 +174,6 @@
 [PROJECT] architecture: LARYNX frontend audit findings (Feb 28 2026, 4-agent audit). 8 CRITICAL issues found: (1) No error boundaries anywhere — 4 Canvas instances, zero boundaries, any error = white screen requiring reload. (2) SSE stream in useAnalysisStream.ts has no timeout — while(true) reader.read() hangs forever on TCP drop. (3) reset() in useLarynxStore never calls cancelStream(), zombie SSE pushes verdict into idle state. (4) Portal GSAP chain deadlocks if any onComplete fails — WarpTransition has onComplete in useEffect deps causing timeline restart. (5) LandingScene.tsx:263 clock.getDelta() double-consumed, portal jaw animation DEAD. (6) WaveformDisplay.tsx:157-163 cyan gradient always overwrites red — waveform never turns red at skull-clip. (7) Duplicate VELOCITY_THRESHOLDS — constants.ts (20/15/10) vs types/larynx.ts (25/20/15). (8) CSS --radius=0.125rem with sm=calc(var(--radius)-4px) = -2px = square corners. Also: AnalysisView + IntroSequence still have pre-v3 #00FFFF/#FF3366 colors (primary demo screens). useState used for 60fps animation in 3 components. O(n²) frame accumulation in addFrame. No .dispose() calls on unmount.
 
 *Created: 2026-02-28T19:51:58.491Z*
-
-### [HyxwLaetx6j2AyETJqS2w6] (architecture)
-
-[PROJECT] architecture: Deep audit spec-reality gaps (Feb 28 2026). CRITICAL: D1 has NO tables — 0000_init.sql creates wrong `analyses` table, code expects `analysis_reports`. Fix: new migration 0001 from schema.sql. HIGH: API flow diverged from spec (spec says POST→jobId→GET /stream/{jobId}, reality streams SSE directly from POST /api/analyze). SSE event names diverged (spec: mel_ready/formants_extracted etc, reality: progress/frame/verdict). GET /api/ema/{jobId} in spec never implemented. MEDIUM: HistoryPanel/AnalysisList components don't exist yet. MODAL_COMPARE_URL not in wrangler.toml but mitigated by fallback. ensemble_model.pkl (860KB) in training_data/ not loaded — classifier.py checks backend/ root first where only classifier_model.pkl (104KB) exists. PASSED: velocity thresholds, CORS, cf-types.d.ts, zero TODO/FIXME.
-
-*Created: 2026-02-28T19:45:14.559Z*
 
 ### [ivCJ3LsqqGWdRwX4cd9hc4] (architecture)
 

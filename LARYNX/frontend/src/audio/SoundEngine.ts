@@ -3,6 +3,8 @@ import * as Tone from 'tone'
 type VerdictResult = 'genuine' | 'deepfake'
 
 let initialized = false
+let ambientOscsStarted = false
+let bgLayersStarted = false
 
 // Master bus chain: Compressor → Reverb → EQ3 → HPF → Limiter → Volume → Destination
 let masterCompressor: Tone.Compressor | null = null
@@ -161,7 +163,6 @@ const ensureInitializedGraph = (): void => {
   ambientGain.connect(masterCompressor)
   ambientLfo.connect(ambientOsc.frequency)
   // Oscillators NOT started here — deferred to startDrone() to avoid burning Web Audio thread on silence
-  let ambientOscsStarted = false
 
   ambientOsc2 = new Tone.Oscillator({
     type: 'sine',
@@ -185,7 +186,6 @@ const ensureInitializedGraph = (): void => {
   bgLayer2.connect(bgLayerGain)
   bgLayer3.connect(bgLayerGain)
   // bgLayers NOT started here — deferred to startBackgroundLayer() to avoid burning Web Audio thread on silence
-  let bgLayersStarted = false
 
   // --- Upload sounds ---
   uploadSine = new Tone.Synth({
