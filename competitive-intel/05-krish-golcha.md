@@ -79,6 +79,6 @@
 
 - **If he enters Caterpillar:** He's the favorite. Harvest AI is literally "generate training data for field robots using satellite imagery" — that's Caterpillar's dream project.
 - **If he enters Modal:** Multi-agent + vision makes him strong but not unbeatable (Aryan owns that space).
-- **Counter:** Prism operates in a completely different domain (statistical divergence, not CV/spatial). No overlap = no direct competition.
+- **Counter:** LARYNX operates in a completely different domain (articulatory physics, not CV/spatial). No overlap = no direct competition.
 - **His UI approach (Lovable scaffolding)** is interesting — he consciously trades UI originality for backend depth. If you invest in UI quality (UI/UX category prize), you differentiate from him.
 - **UIUC local** means judges may have seen him at workshops, mentoring sessions — soft advantage.

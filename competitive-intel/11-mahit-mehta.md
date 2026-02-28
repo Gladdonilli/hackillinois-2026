@@ -65,4 +65,4 @@ His HackIllinois team reportedly includes people with "Bloomberg, NASA, FinTech 
 
 - **Individually moderate, but dangerous in combination.** If Mahit joins Sidharth (Meta SI Labs) or a Tier 1 team, the combined team gets Bloomberg-grade infrastructure reliability + Rust performance.
 - **Low-latency inference** focus means he's a perfect fit for Modal track teams.
-- **Counter:** No direct overlap with Prism's domain. Only relevant if he joins a Voyagers team.
+- **Counter:** No direct overlap with LARYNX's domain (articulatory physics). Only relevant if he joins a Voyagers team.

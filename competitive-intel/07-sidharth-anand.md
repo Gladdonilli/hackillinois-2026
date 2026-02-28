@@ -61,5 +61,5 @@ This translates directly to building **reliable agentic AI products** at hackath
 
 - **If he teams up with Mahit (Bloomberg) or Vedant (Anthropic):** Nightmare team for agentic AI
 - **His agentic AI focus overlaps with the multi-agent meta** — but his approach will be more rigorous/safe than most
-- **Counter:** Prism is NOT an agent — it's an analysis tool. Different category entirely.
+- **Counter:** LARYNX is NOT an agent — it's a voice forensics tool. Different category entirely.
 - **Watch for:** What team he forms. Sidharth solo is a moderate threat. Sidharth + strong teammates = severe.

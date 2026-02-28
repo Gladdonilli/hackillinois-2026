@@ -57,6 +57,6 @@
 
 - His strength is **packaging and product sense**, not raw technical depth
 - He won at TreeHacks for "impact" — judges valued the real-world application over the engineering
-- Counter: If judging criteria at HackIllinois weight "Technical Quality" heavily, Prism's statistical analysis outperforms his "product demo" approach
+- Counter: If judging criteria weight "Technical Quality" heavily, LARYNX's inverse physics pipeline (AAI) outperforms his "product demo" approach
 - He targets Modal + Voyagers — if you're in Voyagers, he's a competitor for the top 7
 - His team recruitment pattern means watch for who he pairs with at HackIllinois

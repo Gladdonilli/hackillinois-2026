@@ -407,7 +407,7 @@
 ## STRATEGIC TAKEAWAYS FOR YOU (SOLO VOYAGER)
 
 ### Track Recommendation Based on Competition:
-1. **Stripe** (LEAST contested) — Only Rohan is a real threat here. If Prism has strong API surface design, this is the weakest field.
+1. **Stripe** (LEAST contested) — Only Rohan is a real threat here. If LARYNX has strong API surface design, this is the weakest field.
 2. **Caterpillar** (MODERATE) — Krish's Harvest AI is a DIRECT fit. Eva and Sanjavan also strong. Avoid unless you have a differentiated angle.
 3. **Modal** (AVOID) — Aryan has won this track 3 times. Bowen's team has unlimited OpenAI API. Atharva just won TreeHacks. This track is a bloodbath.
 
@@ -419,9 +419,9 @@
 5. **Multi-agent systems** are the 2026 meta (Krish, Atharva, Aryan all use them)
 6. **Use Lovable/v0 for rapid UI** to spend time on hard backend (Krish's approach)
 
-### Your Differentiator (Prism):
-- **Statistical divergence analysis** is UNTOUCHED — zero hackathon winners in this space
-- **Cross-model hallucination detection** = novel, deeply technical, not a wrapper
+### Your Differentiator (LARYNX):
+- **Articulatory physics inversion** is UNTOUCHED — zero hackathon winners in this space
+- **Deepfake kinematic forensics** = novel, deeply technical, flags physically impossible velocities
 - **Prize stacking** via sponsor challenges (Supermemory + Cloudflare + OpenAI) is track-independent
 - **Solo execution** with AI tooling (Antigravity/Cliproxy/OpenCode) can match a team of 2-3
 

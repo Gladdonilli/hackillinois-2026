@@ -59,11 +59,11 @@ Here is the competitive intelligence extracted directly from the winning reposit
 
 ### 🧠 Execution Quality Bar & Tech Patterns for HackIllinois 2026
 
-Based on these TreeHacks 2025 results and your project context (solo hacking the Prism cross-model hallucination detector for the HackVoyagers $5K track):
+Based on these TreeHacks 2025 results and your project context (solo hacking the LARYNX deepfake voice detector for the HackVoyagers $5K track):
 
-1. **Move Beyond Simple Text RAG:** Notice that the winners used **Multimodal RAG** (video/audio) or **3D Vector Embeddings** (MRIs). For Prism, your JSD (Jensen-Shannon Divergence) and cosine divergence evaluation of atomic claims is exactly the kind of deep algorithmic complexity that separates a winner from a simple LLM wrapper.
+1. **Move Beyond Simple Text RAG:** Notice that the winners used **Multimodal RAG** (video/audio) or **3D Vector Embeddings** (MRIs). For LARYNX, your articulatory physics mapping and tongue velocity evaluation is exactly the kind of deep algorithmic complexity that separates a winner from a simple LLM wrapper.
 2. **Polished UI is Non-Negotiable:** Teams are using tools like **Vercel v0** to auto-generate production-grade UIs in minutes. Your UI needs to look enterprise-ready immediately. The visual highlighting of "consensus vs hallucination risk" must be stunning and intuitive.
-3. **Hardware/Physical World Integration is a Hackathon Cheat Code:** Projects like AR glasses (sign-speak) or camera-based trash sorting (TreeTrash) demo incredibly well. While Prism is pure software, you can simulate "physical" stakes by running your demo on high-stakes, real-world data (e.g., cross-checking medical claims or legal contracts live).
+3. **Hardware/Physical World Integration is a Hackathon Cheat Code:** Projects like AR glasses (sign-speak) or camera-based trash sorting (TreeTrash) demo incredibly well. While LARYNX is pure software, you can simulate "physical" stakes by running your demo on high-stakes, real-world data (e.g., detecting state-sponsored deepfake audio live).
 4. **Scope Ruthlessly (The "Solo" Advantage):** Winners don't build full products; they build **perfectly orchestrated 3-minute demos**. Because you are solo, you must fake non-critical paths (auth, settings, generic dashboards) and spend 100% of your time on the core technical hook: the cross-model claim extraction and divergence visualization.
 
 Since you are targeting the **HackVoyagers $5K prize** + Modal/Stripe + Supermemory/Cloudflare/OpenAI, your architecture perfectly aligns with the TreeHacks winning meta: it's a deeply technical, algorithm-heavy AI infrastructure tool, not just a prompt wrapper.
@@ -107,7 +107,7 @@ The meta for elite hackathons has converged on stacks that allow maximum velocit
 #### 2. Technical Depth > Feature Width
 Judges at HackMIT and HackIllinois (especially for tracks like Modal and Caterpillar) actively penalize thin API wrappers. 
 *   **What loses:** "We built an app where you type a prompt and OpenAI returns a plan."
-*   **What wins (e.g., your Prism project):** "We built a consumer UX that parallel-queries N models, extracts atomic claims, runs JSD (Jensen-Shannon Divergence) + cosine divergence, and visually maps hallucination risk."
+*   **What wins (e.g., your LARYNX project):** "We built a consumer UX that reverse-engineers articulatory physics from audio, maps formant trajectories to tongue/jaw kinematics, and flags physically impossible velocities."
 *   *Takeaway:* Fake the non-critical features. Spend 80% of your time on the core divergence algorithm and the real-time visualization of that data.
 
 #### 3. The Demo Polish Bar
@@ -121,7 +121,7 @@ Since you are competing solo for the Voyager track, you must ruthlessly align wi
 *   **Supermemory:** Ensure you are using their specific contextual graph/entity mapping, not just RAG.
 *   **Cloudflare:** Host your frontend or API edge workers on CF to lock in that specific sponsor prize.
 
-Since I cannot currently scrape the Devpost page, I recommend manually visiting `hackmit-2025.devpost.com` to review the specific UI/UX patterns of the top 3 winners. Given your active project (Prism), your architecture (cross-model hallucination detection via divergence) is sufficiently novel to win if the frontend polish matches the algorithmic depth.
+Since I cannot currently scrape the Devpost page, I recommend manually visiting hackmit-2025.devpost.com to review the specific UI/UX patterns of the top 3 winners. Given your active project (LARYNX), your architecture (deepfake voice detection via articulatory physics) is sufficiently novel to win if the frontend polish matches the algorithmic depth.
 
 ---
 ---
@@ -174,7 +174,7 @@ Based on data extracted from the CalHacks 11.0 Devpost and GitHub repositories, 
 
 To win the **$5K HackVoyagers Track** at HackIllinois, your project must clear the bar set by these elite winners. The "GPT wrapper" era is dead. Here is what judges are rewarding now:
 
-1.  **Multi-Modal Real-Time Processing:** Text-in/text-out is no longer impressive. Winners are doing voice-to-action, continuous real-time transcription, or hardware-to-AI pipelines. *For your Prism project, the UI must feel instantly reactive, visualizing the cross-model divergence in real-time as the tokens stream in.*
+1.  **Multi-Modal Real-Time Processing:** Text-in/text-out is no longer impressive. Winners are doing voice-to-action, continuous real-time transcription, or hardware-to-AI pipelines. *For your LARYNX project, the UI must feel instantly reactive, visualizing the tongue/jaw kinematics in real-time as the audio streams in.*
 2.  **Agentic Execution, Not Just Chat:** Projects like *Companion* and the Fetch.ai winners won because the AI *did* something (browser automation, task scheduling) rather than just *saying* something. *Your cross-model hallucination detection needs to automatically execute the extraction, JSD analysis, and highlighting without manual prompting.*
 3.  **The "Stage-Ready" Demo:** Elite hackathons prioritize the 3-minute pitch. Projects like *Duet* and *Talk Tuah* have an undeniable "wow" factor when demonstrated live. The polish of the demo video and the live Shark Tank pitch matters more than the backend test coverage.
 4.  **Hardware/Edge Inference:** A significant portion of top projects run on edge devices (AR glasses, Raspberry Pis, EEGs). Since you are doing the Modal AI Inference track, emphasize the complexity of your custom serverless architecture over standard API calls.
@@ -265,7 +265,7 @@ If you look at the repos of recent PennApps and HackGT winners, their stacks hav
 *   **Technical Innovations (The "Wow" Factor):**
     *   **Sub-500ms Latency:** Waiting 10 seconds for an LLM response kills a 3-minute demo. Winners use Groq or streaming edge functions so the UI reacts instantly.
     *   **Agentic Tool Use:** The AI doesn't just output text; it triggers real-world actions (e.g., executing a Stripe payment, dispatching an email via Resend, querying a live database).
-    *   **Cross-Model Consensus/Evaluation:** (Highly relevant to your Prism project). Using multiple smaller models to fact-check a larger model, or routing queries dynamically based on complexity.
+    *   **Articulatory Physics Extraction:** (Highly relevant to your LARYNX project). Using AAI models to map audio to physical movements, or flagging impossible velocities dynamically.
     *   **Visualizing the "Black Box":** Judges love when a project shows *how* the AI is thinking. Node-edge graphs, thought-process terminal windows, or confidence scores (like your proposed JSD + cosine divergence metrics).
 
 ### The Winning Demo Strategy (The "3-Minute Shark Tank")
@@ -273,13 +273,13 @@ If you look at the repos of recent PennApps and HackGT winners, their stacks hav
 At HackGT and PennApps, the tech gets you into the top 10; the demo wins the grand prize.
 
 1.  **Start with the Hook (0:00 - 0:30):** Don't show a login screen. Start immediately in the meat of the application solving a hair-on-fire problem. 
-2.  **The "Oh Shit" Technical Moment (0:30 - 1:30):** Show the feature that makes technical judges sit up. For your project (Prism), this is demonstrating the claim-level cross-model hallucination detection *live*, showing the consensus graph reacting.
+2.  **The "Oh Shit" Technical Moment (0:30 - 1:30):** Show the feature that makes technical judges sit up. For your project (LARYNX), this is demonstrating the real-time tongue velocity detection and 3D skull clipping *live*, showing the physical impossibility.
 3.  **Under the Hood (1:30 - 2:30):** Briefly explain the architecture. "We used Modal for custom inference, Supermemory for the knowledge graph, and Cloudflare Workers to tie it together with zero cold-start." Drop the sponsor names clearly.
 4.  **Impact / Future (2:30 - 3:00):** Why this matters and what you'd build with 3 more months.
 
-### Applying this to your HackIllinois Solo Run (Prism)
+### Applying this to your HackIllinois Solo Run (LARYNX)
 
-Your validated idea—**Prism (claim-level cross-model hallucination detection)**—perfectly fits the 2025-2026 winning meta. 
+Your validated idea—**LARYNX (deepfake voice detection via articulatory physics)**—perfectly fits the 2025-2026 winning meta. 
 
 *   **Why it can win:** It attacks the "black box consolidator" problem directly. It's deeply technical (JSD + cosine divergence) rather than just a prompt wrapper. 
 *   **How to execute solo in 36h:**
@@ -370,7 +370,7 @@ These are massive, historically significant hackathons with great prizes, though
 ### Strategic Takeaways for HackIllinois
 1. **The Talent Overlap:** As seen in your competitive intel, top-tier hackers travel. Teams that win at TreeHacks, HackMIT, and OpenAI official hackathons are present at HackIllinois. 
 2. **Prize Stacking is the Meta:** At events like HackIllinois, CalHacks, and TreeHacks, the smartest teams don't just aim for the Grand Prize. They heavily optimize for "Prize Stacking" (e.g., hitting the $5K Voyager prize + $5K Cloudflare + $5K OpenAI + Modal/Stripe tracks).
-3. **The AI Inference Trend:** With companies like Anthropic, OpenAI, and Modal throwing massive compute credits at these events, the meta has shifted from "UI wrappers around GPT-4" to "custom agentic workflows, multi-model evaluation, and fast inference." Your project, **Prism** (cross-model hallucination detection using JSD + cosine divergence), perfectly fits the archetype of a project that wins these top-tier prize pools because it demonstrates *algorithmic depth* rather than just API routing. 
+3.  **The AI Inference Trend:** With companies like Anthropic, OpenAI, and Modal throwing massive compute credits at these events, the meta has shifted from "UI wrappers around GPT-4" to "custom agentic workflows, multi-model evaluation, and fast inference." Your project, **LARYNX** (deepfake voice detection using articulatory physics), perfectly fits the archetype of a project that wins these top-tier prize pools because it demonstrates *algorithmic depth* rather than just API routing. 
 
 ---
 ---
@@ -411,11 +411,11 @@ A scraped Devpost prompt for a recent 2025 hackathon (HackPrinceton) perfectly o
 2.  **Open Source Model Hosting:** They explicitly call out hosting models like **DeepSeek, Llama (Text), Flux (Image Generation), or LTXV (Video)**. 
 3.  **Heavy Compute Workloads:** Aryan won by running Face Detection. Other winners run custom video generation or massive batch processing. If your task requires a GPU, it's a good fit for Modal.
 
-### 3. Strategic Takeaways for your HackIllinois Project ("Prism")
-Since you are a solo hacker building **Prism** (a cross-model hallucination detector using JSD + cosine divergence), here is how you beat teams like Aryan's in the Modal Track:
+### 3. Strategic Takeaways for your HackIllinois Project ("LARYNX")
+Since you are a solo hacker building **LARYNX** (a deepfake voice detector using articulatory physics), here is how you beat teams like Aryan's in the Modal Track:
 
 *   **Host the Evaluator Models on Modal:** Don't just ping external APIs to compare them. Use Modal to actually host a local instance of an open-source evaluator model (like a smaller Llama-3 or DeepSeek-R1 distilled model) that runs the semantic similarity/cosine divergence checks. 
-*   **Parallel Inference:** Prism checks $N$ models. Write your Python backend using Modal's `@modal.function` and `.map()` to run the cross-model claim extractions and mathematical evaluations **in parallel**. Modal judges *love* seeing their parallelization features used to reduce a 30-second multi-model check down to 3 seconds.
+*   **Parallel Inference:** LARYNX processes audio frames. Write your Python backend using Modal's @modal.function and .map() to run the AAI model inference and kinematic evaluations **in parallel**. Modal judges *love* seeing their parallelization features used to reduce a 30-second processing task down to 3 seconds.
 *   **Highlight the "Heavy Math":** Modal is built for compute-heavy workloads. Visually emphasize (in your 3-minute video and pitch) how Modal's infrastructure specifically computes the JSD (Jensen-Shannon Divergence) and processes the graph of claims simultaneously, which would normally bottleneck a standard Vercel backend.
 
 ---
@@ -461,7 +461,7 @@ If you want to win the Stripe track, your API must implement the following patte
 
 **3. Cursor-Based Pagination**
 *   **What it is:** Using pointers instead of `limit` and `offset` (which get slow at scale).
-*   **How to win:** If your API returns lists (e.g., a list of hallucination evaluations in your Prism app), use `has_more`, `data` arrays, and `starting_after` / `ending_before` query parameters.
+*   **How to win:** If your API returns lists (e.g., a list of deepfake detections in your LARYNX app), use has_more, data arrays, and starting_after / ending_before query parameters.
 
 **4. Impeccable Documentation (Redoc / Swagger)**
 *   **How to win:** An API without docs is not a product. Automatically generate an OpenAPI (Swagger) spec. Better yet, serve it using **Redoc** so it looks exactly like Stripe's three-pane documentation layout. Include code snippets in cURL, Python, and Node.js.
@@ -473,31 +473,31 @@ If you want to win the Stripe track, your API must implement the following patte
 
 Projects that win this track usually treat the **API as the primary product**, rather than just a backend for a frontend.
 
-1.  **Unified APIs / Infrastructure:** E.g., An API that unifies 5 different AI providers into one standard interface (perfect for your Prism project).
+1.  **Unified APIs / Infrastructure:** E.g., An API that maps audio features to physical articulatory movements via AAI models (perfect for your LARYNX project).
 2.  **Headless Platforms:** E.g., A headless loyalty-point or micro-transaction engine.
 3.  **Developer Tooling:** Mocking servers, webhook testing proxies, or API analytics wrappers.
 
 ### Track Comparison: Stripe vs. Modal for HackIllinois
 
-Since you are executing **Solo** on "Prism" (a claim-level cross-model hallucination detection engine), here is how to weigh the two:
+Since you are executing **Solo** on "LARYNX" (a deepfake voice detection engine via articulatory physics), here is how to weigh the two:
 
 **Stripe Track ("Best Web API")**
 *   **The Vibe:** Pedantic, architectural, meticulous, DX-focused.
 *   **Execution Bar:** High code quality, robust error handling, edge-case management, and documentation.
-*   **Prism Fit:** You can package Prism as an "API-as-a-Product" (e.g., an enterprise API that companies plug into their CI/CD pipeline to evaluate LLM outputs). You win by providing incredible docs, idempotency on evaluations, and webhooks for async evaluation results.
+*   **LARYNX Fit:** You can package LARYNX as an "API-as-a-Product" (e.g., an enterprise API that companies plug into their CI/CD pipeline to verify audio authenticity). You win by providing incredible docs, idempotency on evaluations, and webhooks for async detection results.
 *   **Solo Viability:** Very High. Designing a clean API interface is often easier for a solo dev than building a massive flashy frontend or complex distributed infra.
 
 **Modal Track ("Best AI Inference")**
 *   **The Vibe:** Scale, heavy compute, ambitious AI/ML, "hard tech."
 *   **Execution Bar:** Actually getting complex models running in the cloud, managing cold starts, handling massive concurrency, or chaining complex VLM/LLM pipelines together smoothly.
-*   **Prism Fit:** Perfect fit natively. Prism *is* an inference/evaluation product.
+*   **LARYNX Fit:** Perfect fit natively. LARYNX *is* an inference/evaluation product.
 *   **Solo Viability:** Medium/High. Modal makes infra easy, but you have to prove you did something ambitious with the compute (e.g., running 5 models in parallel to calculate JS Divergence).
 
 ### Strategic Recommendation
 
-As a solo dev, **Modal is likely the more natural fit for "Prism"**, simply because Prism is fundamentally an AI inference and evaluation tool, and the "wow factor" of parallel model execution maps perfectly to Modal's value prop. 
+As a solo dev, **Modal is likely the more natural fit for "LARYNX"**, simply because LARYNX is fundamentally an AI inference and evaluation tool, and the "wow factor" of parallel AAI model execution maps perfectly to Modal's value prop. 
 
-However, if you feel your strength is in **backend architecture over raw ML engineering**, pivoting Prism's framing to be an **"Enterprise Evaluation API"** and targeting the Stripe track is a massive brain-play. Most hackathon teams will build sloppy backends for flashy frontends. If you show up with a pristine, fully-documented, highly-scalable API with idempotency and webhooks, you will immediately stand out to the Stripe judges.
+However, if you feel your strength is in **backend architecture over raw ML engineering**, pivoting LARYNX's framing to be an **"Enterprise Voice Verification API"** and targeting the Stripe track is a massive brain-play. Most hackathon teams will build sloppy backends for flashy frontends. If you show up with a pristine, fully-documented, highly-scalable API with idempotency and webhooks, you will immediately stand out to the Stripe judges.
 
 ---
 ---
@@ -518,7 +518,7 @@ Here is the strategic breakdown answering your key questions, tailored to your s
 ### 1. How do winners scope their projects for 24-36h?
 **The 2026 Meta:** "Build ONE core feature properly. Add ONE strategic 'wow factor'."
 *   **Ruthless Mocking:** Winners do not build fully functional production backends. Non-core features like authentication, user settings, or database persistence are hardcoded or mocked unless they directly tie to a sponsor prize. 
-*   **Extreme Leverage:** A recent winner of the 2026 Cursor Hackathon reported cloning a $700M app (Wispr Flow) in just 4 hours using only Cursor's Composer 1.5. The scope of what is possible in 36 hours has expanded, provided you heavily constrain the *novel* logic to just your core differentiator (for you: the Prism cross-model hallucination detection).
+*   **Extreme Leverage:** A recent winner of the 2026 Cursor Hackathon reported cloning a $700M app (Wispr Flow) in just 4 hours using only Cursor's Composer 1.5. The scope of what is possible in 36 hours has expanded, provided you heavily constrain the *novel* logic to just your core differentiator (for you: the LARYNX deepfake voice detection via articulatory physics).
 
 ### 2. What percentage of time goes to demo prep vs coding?
 **The 2026 Meta:** It is highly skewed toward presentation. 
@@ -545,14 +545,14 @@ Here is the strategic breakdown answering your key questions, tailored to your s
 ### 5. What makes a 3-minute demo compelling to judges?
 **The 2026 Meta:** Flawless UX execution and a seamless narrative.
 *   Judges prioritize **working demos and clear ideas** over massive, unfulfilled promises. 
-*   **The Wow Factor:** Winners ensure there is one specific, visually impressive moment in the demo. For Prism, this should be the visual highlighting of consensus vs. hallucination risk across N models happening in real-time.
+*   **The Wow Factor:** Winners ensure there is one specific, visually impressive moment in the demo. For LARYNX, this should be the 3D skull visualization where the tongue clips through bone due to physically impossible velocities.
 *   If an API call takes 10 seconds, winners either pre-warm it, fake the loading state for the demo, or talk smoothly over the exact duration of the loading spinner. Dead air kills demos.
 
 ### 6. Are there specific patterns in how winners structure their pitch?
 **The 2026 Meta:** Problem → Solution → USP → GTM → Prototype.
 Winning pitches follow a strict psychological arc:
 1.  **Problem (30s):** Highly relatable pain point. (e.g., "AI hallucination makes enterprise adoption impossible because users blindly trust single-model outputs.")
-2.  **Solution & USP (45s):** Introduce the product and its Unique Selling Proposition. (e.g., "Prism is the first consumer UX that cross-verifies claims against N models instantly.")
+2.  **Solution & USP (45s):** Introduce the product and its Unique Selling Proposition. (e.g., "LARYNX is the first consumer UX that reverse-engineers voice box physics to catch deepfakes instantly.")
 3.  **The Live Demo (90s):** The core feature in action. No code is shown unless specifically requested by technical judges. This must be a live, interactive element, not screenshots.
 4.  **GTM/Impact (15s):** How this scales or why it matters right now.
 

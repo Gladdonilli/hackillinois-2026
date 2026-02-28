@@ -63,5 +63,5 @@ Working at **Lamont-Doherty Earth Observatory** validates the numerical analysis
 
 - **Caterpillar track:** Eva + Krish Golcha are the two biggest threats. Both have spatial/geospatial backgrounds.
 - **Her weakness is classic:** Researchers spend 30 hours on the model and 6 on the demo. If judging weights "Product Design" and "Impact & Intent" alongside "Technical Quality," pure research depth isn't enough.
-- **Counter:** Prism is consumer UX-first with statistical analysis — completely different lane.
+- **Counter:** LARYNX is deep-tech physics forensics — mapping formant trajectories to tongue kinematics, a completely different lane.
 - **If she teams up with anyone else from the channel** (e.g., Mahit for Rust/low-latency, Sanjavan for production pipelines), the combined team becomes Tier 1.

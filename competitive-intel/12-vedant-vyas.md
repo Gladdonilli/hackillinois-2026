@@ -54,4 +54,4 @@ Python / NumPy / Pandas / JavaScript / Firebase / SQLite
 - **Individually moderate threat.** Solid UIUC CS background with industry experience but no standout wins.
 - **Threat multiplier:** If he teams with **Sidharth Anand** (Meta SI Labs, CompE, same school) or **Mahit Mehta** (Bloomberg, Rust), the combined team becomes HIGH threat for any agentic AI project.
 - **Stripe track:** If he enters Stripe alongside Rohan Kapur, the track gets more competitive but still manageable.
-- **Counter:** No overlap with Prism. Only relevant in the broader Voyagers competition.
+- **Counter:** No overlap with LARYNX. Only relevant in the broader Voyagers competition.

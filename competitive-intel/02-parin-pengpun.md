@@ -80,5 +80,5 @@ The EMNLP paper is particularly notable: demonstrated that seed-free synthetic d
 - This person operates at a fundamentally different technical depth than 95% of hackathon participants
 - If he builds something with custom model adaptation or fine-tuning, it will be genuinely novel
 - His weakness is the classic researcher trap: **spending 30 hours on the model and 6 hours on UX**
-- Counter: Prism's strength is the opposite — consumer UX with statistical analysis, not model training
+- Counter: LARYNX focuses on physical forensics — mapping formants to impossible tongue velocities rather than just model fine-tuning
 - If judging criteria weight "Technical Quality" heavily, Parin is the person to worry about most

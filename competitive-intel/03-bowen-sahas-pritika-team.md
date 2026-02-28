@@ -80,6 +80,6 @@
 
 - Their advantage is **resource access**, not technical novelty
 - They can brute-force solutions because API costs don't constrain them
-- Counter: Build something that can't be brute-forced — Prism's statistical divergence analysis requires architectural thinking, not just more API calls
+- Counter: Build something that can't be brute-forced — LARYNX's articulatory physics inversion requires deep acoustic-to-kinematic mapping, not just more API calls
 - They're **locked into AI Inference** — if you avoid that track, they're not your problem
 - Watch if they recruit a 4th with strong UX/design skills — that would eliminate their only gap
