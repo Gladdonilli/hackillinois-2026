@@ -36,7 +36,9 @@ export default function App() {
   useEffect(() => {
     const handleInteraction = () => {
       if (!initRef.current) {
-        SoundEngine.init()
+        SoundEngine.init().then(() => {
+          SoundEngine.startBackgroundLayer()
+        })
         initRef.current = true
       }
       window.removeEventListener('click', handleInteraction)
@@ -68,12 +70,14 @@ export default function App() {
         SoundEngine.stopDrone()
         const verdict = useLarynxStore.getState().verdict
         if (verdict) {
-          if (verdict.isGenuine) {
-            SoundEngine.playVerdict('genuine')
-            SoundEngine.playResolution('genuine')
-          } else {
-            SoundEngine.triggerDeepfakeReveal()
-          }
+          SoundEngine.triggerVerdictBuild(() => {
+            if (verdict.isGenuine) {
+              SoundEngine.playVerdict('genuine')
+              SoundEngine.playResolution('genuine')
+            } else {
+              SoundEngine.triggerDeepfakeReveal()
+            }
+          })
         }
         break
       }
@@ -83,6 +87,7 @@ export default function App() {
         SoundEngine.stopDrone()
         SoundEngine.stopHorror()
         SoundEngine.stopRiser()
+        SoundEngine.stopBackgroundLayer()
         break
     }
   }, [status, showIntro])
@@ -113,6 +118,17 @@ export default function App() {
       if (horrorActive) SoundEngine.stopHorror()
     }
   }, [status, showIntro])
+
+  // Portal state sound effects
+  const portalState = useLarynxStore((state) => state.portalState)
+  useEffect(() => {
+    if (!SoundEngine.isInitialized()) return
+    if (portalState === 'entering') {
+      SoundEngine.playPortalEntry()
+    } else if (portalState === 'warping') {
+      SoundEngine.playWarpTransition()
+    }
+  }, [portalState])
 
   // In portal transition state, we show landing state but portal handles its own view
   const isPortalTransition = ['entering', 'warping'].includes(useLarynxStore(state => state.portalState))

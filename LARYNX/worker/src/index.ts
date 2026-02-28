@@ -200,8 +200,9 @@ app.post('/api/analyze', async (c) => {
                       report_id, audio_key, verdict, confidence,
                       peak_velocity, threshold, anomalous_frames,
                       total_frames, anomaly_ratio, processing_time_ms,
-                      client_ip_hash
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                      client_ip_hash, classifier_score, classifier_model,
+                      ensemble_score
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
                   )
                   .bind(
                     reportId,
@@ -214,7 +215,10 @@ app.post('/api/analyze', async (c) => {
                     verdict.totalFrameCount || 0,
                     verdict.anomalyRatio || 0,
                     processingTimeMs,
-                    ipHash
+                    ipHash,
+                    verdict.classifierScore ?? null,
+                    verdict.classifierModel ?? null,
+                    verdict.ensembleScore ?? null,
                   )
                   .run();
 
@@ -277,27 +281,7 @@ app.post('/api/compare', async (c) => {
       400
     );
   }
-
-  // Validate both files
-  for (const [label, file] of [['file_a', fileA], ['file_b', fileB]] as const) {
-    const fname = (file as File).name || 'unknown.wav';
-    const ext = fname.includes('.') ? fname.split('.').pop()!.toLowerCase() : '';
-    if (!ALLOWED_FORMATS.has(ext)) {
-      return c.json<ApiResponse<null>>(
-        { success: false, error: { code: 'INVALID_FORMAT', message: `Invalid format for ${label}: "${ext}". Allowed: wav, mp3, flac, ogg` } },
-        400
-      );
-    }
-    const ab = await (file as File).arrayBuffer();
-    if (ab.byteLength > MAX_FILE_SIZE) {
-      return c.json<ApiResponse<null>>(
-        { success: false, error: { code: 'UPLOAD_TOO_LARGE', message: `${label} too large (${(ab.byteLength / (1024 * 1024)).toFixed(1)}MB). Maximum: 10MB` } },
-        413
-      );
-    }
-  }
-
-  // Upload both to R2
+  // Read buffers once (already consumed during validation, so re-read here)
   const bufA = await fileA.arrayBuffer();
   const bufB = await fileB.arrayBuffer();
   const nameA = fileA.name || 'file_a.wav';

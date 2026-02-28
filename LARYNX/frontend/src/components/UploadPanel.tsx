@@ -70,7 +70,7 @@ function FileCard({
 export default function UploadPanel() {
   const containerRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { playClick, playSwoosh } = useUIEarcons()
+  const { playClick, playSwoosh, playDropHover, playSuccess } = useUIEarcons()
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [duration, setDuration] = useState<number | null>(null)
@@ -99,6 +99,7 @@ export default function UploadPanel() {
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
       setDuration(audioBuffer.duration)
       
+      playSuccess()
       setAudioFile(file)
       
       // Immediately trigger portal process after setting file
@@ -113,6 +114,9 @@ export default function UploadPanel() {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
+    if (!isDragging) {
+      playDropHover()
+    }
     setIsDragging(true)
   }
 

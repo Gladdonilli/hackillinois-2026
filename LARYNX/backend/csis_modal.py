@@ -1,5 +1,8 @@
 """CSIS Phase 2 — AAI Model Validation on Modal (A100).
 
+STANDALONE SCRIPT — not imported by app.py or any other module.
+Has its own modal.App('hackillinois-2026') and Modal image definition.
+
 Runs Peter Wu's Acoustic-to-Articulatory Inversion model on real vs deepfake
 WAV files and compares EMA tongue velocity profiles.
 

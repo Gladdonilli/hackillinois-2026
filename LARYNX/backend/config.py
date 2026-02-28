@@ -24,9 +24,7 @@ F2_FRONT_HZ = 2400.0  # Tongue front ≈ +20mm
 TONGUE_BACK_MM = -20.0
 TONGUE_FRONT_MM = 20.0
 
-# F3 → lip rounding: low F3 = rounded, high F3 = unrounded
-F3_ROUND_HZ = 2200.0
-F3_UNROUND_HZ = 3000.0
+# F3 → lip rounding (reserved for future use — not mapped in current pipeline)
 
 # Velocity computation
 # DO NOT CLAMP articulatory values — deepfake values > 1.0 cause skull clip
@@ -49,13 +47,8 @@ ABSOLUTE_MAX_VELOCITY = 22.0  # cm/s, tongue tip absolute limit
 
 # TTS deepfake signature: F2 jumps of 500+ Hz in 10ms → 50-150 cm/s
 # Any velocity > 22 cm/s is flagged as anomalous
-ANOMALY_WINDOW_FRAMES = 3  # consecutive anomalous frames to trigger flag
-
 # SSE streaming
 SSE_HEARTBEAT_INTERVAL = 15.0  # seconds between keepalive pings
-
-# Sensor names mapping
-SENSOR_NAMES = ["UL", "LL", "JAW", "T1", "T2", "T3"]
 
 # File upload constraints
 MAX_FILE_SIZE_MB = 10

@@ -1,21 +1,10 @@
-"""LARYNX Backend Models — Pydantic schemas for API request/response."""
+"""LARYNX Backend Models — Pydantic schemas for pipeline data types."""
 
 from __future__ import annotations
 
-import uuid
-from enum import Enum
 from typing import Optional
-
 from pydantic import BaseModel, Field
 
-
-class AnalysisStatus(str, Enum):
-    """Analysis job status."""
-    IDLE = "idle"
-    UPLOADING = "uploading"
-    ANALYZING = "analyzing"
-    COMPLETE = "complete"
-    ERROR = "error"
 
 
 class SensorPosition(BaseModel):
@@ -38,8 +27,6 @@ class FormantData(BaseModel):
     f1: float = Field(description="First formant Hz (jaw opening)")
     f2: float = Field(description="Second formant Hz (tongue frontness)")
     f3: float = Field(description="Third formant Hz (lip rounding)")
-    f4: Optional[float] = Field(default=None, description="Fourth formant Hz")
-
 
 class Verdict(BaseModel):
     """Final analysis verdict."""
@@ -61,22 +48,3 @@ class AnalysisProgress(BaseModel):
     message: str = Field(description="Human-readable status message")
 
 
-class AnalyzeRequest(BaseModel):
-    """Response to POST /api/analyze."""
-    job_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique analysis job identifier")
-    duration: float = Field(description="Audio duration in seconds")
-    sample_rate: int = Field(description="Sample rate used")
-    frame_count: int = Field(description="Expected number of analysis frames")
-
-
-class ApiResponse(BaseModel):
-    """Standard API envelope — ALL endpoints use this."""
-    success: bool = Field(description="Indicates if the request was successful")
-    data: Optional[dict] = Field(default=None, description="Response payload")
-    error: Optional[str] = Field(default=None, description="Error message if success is False")
-
-
-class SSEEvent(BaseModel):
-    """Server-Sent Event payload."""
-    event: str = Field(description="Event type: progress|result|error|heartbeat")
-    data: dict = Field(description="Event payload")

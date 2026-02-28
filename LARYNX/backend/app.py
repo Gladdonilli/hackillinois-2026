@@ -80,7 +80,7 @@ async def analyze(request: Request, file: UploadFile = File(...)):
     if file is None:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "error": "No file provided"},
+            content={"success": False, "error": {"code": "INVALID_FORMAT", "message": "No file provided"}},
             headers=actual_cors,
         )
 
@@ -92,7 +92,7 @@ async def analyze(request: Request, file: UploadFile = File(...)):
             status_code=400,
             content={
                 "success": False,
-                "error": f"Invalid format '{ext}'. Allowed: {', '.join(ALLOWED_FORMATS)}"
+                "error": {"code": "INVALID_FORMAT", "message": f"Invalid format '{ext}'. Allowed: {', '.join(ALLOWED_FORMATS)}"},
             },
             headers=actual_cors,
         )
@@ -105,7 +105,7 @@ async def analyze(request: Request, file: UploadFile = File(...)):
             status_code=400,
             content={
                 "success": False,
-                "error": f"File too large ({size_mb:.1f}MB). Maximum: {MAX_FILE_SIZE_MB}MB"
+                "error": {"code": "UPLOAD_TOO_LARGE", "message": f"File too large ({size_mb:.1f}MB). Maximum: {MAX_FILE_SIZE_MB}MB"},
             },
             headers=actual_cors,
         )
@@ -216,7 +216,7 @@ async def compare(request: Request, file_a: UploadFile = File(...), file_b: Uplo
     if file_a is None or file_b is None:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "error": "Two files (file_a, file_b) are required"},
+            content={"success": False, "error": {"code": "INVALID_FORMAT", "message": "Two files (file_a, file_b) are required"}},
             headers=actual_cors,
         )
 
@@ -224,12 +224,12 @@ async def compare(request: Request, file_a: UploadFile = File(...), file_b: Uplo
         filename = file.filename or "unknown.wav"
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
         if ext not in ALLOWED_FORMATS:
-            return None, None, f"{label}: Invalid format '{ext}'. Allowed: {', '.join(ALLOWED_FORMATS)}"
+            return None, None, {"code": "INVALID_FORMAT", "message": f"{label}: Invalid format '{ext}'. Allowed: {', '.join(ALLOWED_FORMATS)}"}
         
         audio_bytes = await file.read()
         size_mb = len(audio_bytes) / (1024 * 1024)
         if size_mb > MAX_FILE_SIZE_MB:
-            return None, None, f"{label}: File too large ({size_mb:.1f}MB). Maximum: {MAX_FILE_SIZE_MB}MB"
+            return None, None, {"code": "UPLOAD_TOO_LARGE", "message": f"{label}: File too large ({size_mb:.1f}MB). Maximum: {MAX_FILE_SIZE_MB}MB"}
             
         return audio_bytes, filename, None
 
@@ -352,9 +352,5 @@ async def health():
 
 
 if __name__ == "__main__":
-    # Required entrypoint for `modal serve` or `modal run` execution if invoked directly.
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "serve":
-        app.serve()
-    else:
-        print("Run via: modal serve app.py")
+    print("Run via: modal run LARYNX/backend/app.py")
+    print("  or:   modal serve LARYNX/backend/app.py")

@@ -34,13 +34,13 @@ from LARYNX.backend.classifier import classify_ema_frames
 
 class AudioPreprocessor:
     def load(self, audio_bytes: bytes, filename: str) -> tuple[np.ndarray, int]:
-        samples, sr = librosa.load(BytesIO(audio_bytes), sr=16000, mono=True)
+        samples, sr = librosa.load(BytesIO(audio_bytes), sr=SAMPLE_RATE, mono=True)
         
         # Apply noise gate: compute RMS per frame, zero out frames below -40dB
         rms = librosa.feature.rms(y=samples, frame_length=2048, hop_length=512)[0]
         rms_db = librosa.amplitude_to_db(rms, ref=np.max)
         
-        mask = rms_db > -40.0
+        mask = rms_db > NOISE_GATE_DB
         expanded_mask = np.repeat(mask, 512)
         
         if len(expanded_mask) > len(samples):
@@ -56,11 +56,12 @@ class FormantExtractor:
     def extract(self, samples: np.ndarray, sample_rate: int) -> list[FormantData]:
         sound = parselmouth.Sound(samples, sampling_frequency=sample_rate)
         formants = sound.to_formant_burg(
-            time_step=0.01, 
-            max_number_of_formants=5, 
-            maximum_formant=5500.0, 
-            window_length=0.025
+            time_step=FORMANT_TIME_STEP,
+            max_number_of_formants=MAX_FORMANTS,
+            maximum_formant=MAX_FORMANT_HZ,
+            window_length=WINDOW_LENGTH,
         )
+        pitch = sound.to_pitch_ac(time_step=FORMANT_TIME_STEP, pitch_floor=PITCH_FILTER_HZ)
         pitch = sound.to_pitch_ac(time_step=0.01, pitch_floor=80.0)
         
         num_frames = formants.get_number_of_frames()
@@ -76,7 +77,7 @@ class FormantExtractor:
             p = pitch.get_value_at_time(t)
             
             # Skip frames where pitch < 80Hz (unvoiced)
-            if math.isnan(p) or p < 80.0:
+            if math.isnan(p) or p < PITCH_FILTER_HZ:
                 f1_track.append(last_f1)
                 f2_track.append(last_f2)
                 f3_track.append(last_f3)
@@ -98,9 +99,9 @@ class FormantExtractor:
             last_f1, last_f2, last_f3 = f1, f2, f3
             
         # Apply 5-frame median filter
-        f1_track = median_filter(f1_track, size=5).tolist()
-        f2_track = median_filter(f2_track, size=5).tolist()
-        f3_track = median_filter(f3_track, size=5).tolist()
+        f1_track = median_filter(f1_track, size=MEDIAN_FILTER_SIZE).tolist()
+        f2_track = median_filter(f2_track, size=MEDIAN_FILTER_SIZE).tolist()
+        f3_track = median_filter(f3_track, size=MEDIAN_FILTER_SIZE).tolist()
         
         return [FormantData(f1=f1, f2=f2, f3=f3) for f1, f2, f3 in zip(f1_track, f2_track, f3_track)]
 
@@ -109,9 +110,10 @@ class ArticulatoryMapper:
     def map_formants(self, formants: list[FormantData]) -> list[dict[str, SensorPosition]]:
         frames = []
         for f in formants:
-            jaw_y = (f.f1 - 300) / (900 - 300) * 15.0
+            jaw_y = (f.f1 - F1_CLOSED_HZ) / (F1_OPEN_HZ - F1_CLOSED_HZ) * JAW_MAX_MM
             
-            t1_x = (f.f2 - 800) / (2400 - 800) * 40.0 - 20.0
+            t_range = TONGUE_FRONT_MM - TONGUE_BACK_MM
+            t1_x = (f.f2 - F2_BACK_HZ) / (F2_FRONT_HZ - F2_BACK_HZ) * t_range + TONGUE_BACK_MM
             t1_y = jaw_y * 0.7 + 2.0
             
             sensors = {
@@ -127,7 +129,7 @@ class ArticulatoryMapper:
 
 
 class VelocityAnalyzer:
-    def compute(self, sensor_frames: list[dict[str, SensorPosition]], dt: float = 0.01) -> list[EMAFrame]:
+    def compute(self, sensor_frames: list[dict[str, SensorPosition]], dt: float = FORMANT_TIME_STEP) -> list[EMAFrame]:
         ema_frames = []
         
         if not sensor_frames:
@@ -154,7 +156,7 @@ class VelocityAnalyzer:
                 dy = curr[name].y - prev[name].y
                 
                 # convert mm/frame to cm/s with scale factor
-                vel = math.sqrt(dx*dx + dy*dy) * 1.5 / dt / 10.0
+                vel = math.sqrt(dx*dx + dy*dy) * VELOCITY_SCALE / dt / 10.0
                 curr[name].velocity = vel
                 
                 if vel > VELOCITY_THRESHOLDS.get(name, 100.0):

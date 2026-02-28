@@ -1,7 +1,12 @@
-"""LARYNX Classifier — GBM ensemble integration for hybrid deepfake detection.
+"""LARYNX Classifier — Hybrid ensemble integration for deepfake detection.
 
-Loads the trained classifier_model.pkl, extracts the same 252 articulatory
-features from live EMA frames, and returns a deepfake probability score.
+Loads the trained model bundle (ensemble_model.pkl or classifier_model.pkl),
+extracts articulatory features matching the training pipeline, and returns
+a deepfake probability score.
+
+IMPORTANT: Feature extraction MUST match overnight_pipeline.py's predict_ema_batch().
+Training produces 108 features: 6 articulators × 3 signals (vel/accel/jerk) × 6 stats
+(peak/mean/p95/p99/median/std). The model bundle's 'feature_names' key is authoritative.
 """
 
 from __future__ import annotations
@@ -17,8 +22,13 @@ from LARYNX.backend.models import EMAFrame
 
 logger = logging.getLogger(__name__)
 
-# Path to saved classifier model bundle
-MODEL_PATH = Path(__file__).parent / "classifier_model.pkl"
+# Path to saved classifier model bundle — check both names
+# overnight_pipeline.py saves as ensemble_model.pkl, legacy as classifier_model.pkl
+MODEL_DIR = Path(__file__).parent
+MODEL_PATHS = [
+    MODEL_DIR / "ensemble_model.pkl",
+    MODEL_DIR / "classifier_model.pkl",
+]
 
 # Map pipeline sensor names → classifier articulator column indices
 # Classifier expects 12D: LI(0,1), UL(2,3), LL(4,5), TT(6,7), TB(8,9), TD(10,11)
@@ -42,26 +52,47 @@ ARTICULATORS = {
 }
 
 # Pipeline runs at 100 fps (formant time step = 0.01s)
+# overnight_pipeline trains at 200 Hz — but the model bundle's feature_names
+# are scale-invariant (statistics), so dt only affects absolute magnitudes.
+# We use pipeline dt to match the live data rate.
 PIPELINE_DT = 0.01
 
 
 def _load_model() -> Optional[dict]:
-    """Load classifier model bundle from disk. Returns None if unavailable."""
-    try:
-        if not MODEL_PATH.exists():
-            logger.warning("Classifier model not found at %s", MODEL_PATH)
-            return None
-        with open(MODEL_PATH, "rb") as f:
-            bundle = pickle.load(f)
-        # Validate required keys
-        required = {"classifier", "scaler", "feature_names", "classifier_name"}
-        if not required.issubset(bundle.keys()):
-            logger.warning("Classifier model missing required keys: %s", required - bundle.keys())
-            return None
-        return bundle
-    except Exception as e:
-        logger.error("Failed to load classifier model: %s", e)
-        return None
+    """Load classifier model bundle from disk. Checks both naming conventions.
+
+    Returns None if unavailable. Normalizes key names across bundle formats.
+    """
+    for model_path in MODEL_PATHS:
+        try:
+            if not model_path.exists():
+                continue
+            with open(model_path, "rb") as f:
+                bundle = pickle.load(f)
+
+            # Support both naming conventions from different training scripts
+            # overnight_pipeline.py uses: model, scaler, feature_keys, model_name
+            # legacy train_classifier.py uses: classifier, scaler, feature_names, classifier_name
+            normalized = {}
+            normalized["classifier"] = bundle.get("model") or bundle.get("classifier")
+            normalized["scaler"] = bundle.get("scaler")
+            normalized["feature_names"] = bundle.get("feature_keys") or bundle.get("feature_names")
+            normalized["classifier_name"] = bundle.get("model_name") or bundle.get("classifier_name")
+
+            if not all([normalized["classifier"], normalized["scaler"], normalized["feature_names"], normalized["classifier_name"]]):
+                logger.warning("Model bundle at %s missing required keys", model_path)
+                continue
+
+            logger.info("Loaded classifier from %s (%s, %d features)",
+                        model_path.name, normalized["classifier_name"], len(normalized["feature_names"]))
+            return normalized
+
+        except Exception as e:
+            logger.error("Failed to load classifier model from %s: %s", model_path, e)
+            continue
+
+    logger.warning("No classifier model found in %s", MODEL_DIR)
+    return None
 
 
 # Lazy-loaded model singleton
@@ -93,7 +124,7 @@ def _ema_frames_to_array(ema_frames: list[EMAFrame]) -> np.ndarray:
 def _compute_kinematics(ema: np.ndarray, ix: int, iy: int) -> dict:
     """Compute velocity, acceleration, jerk for a 2D articulatory point.
 
-    Mirrors train_classifier.py compute_kinematics() exactly.
+    Matches overnight_pipeline.py's compute_kinematics() logic.
     """
     x = ema[:, ix]
     y = ema[:, iy]
@@ -104,22 +135,20 @@ def _compute_kinematics(ema: np.ndarray, ix: int, iy: int) -> dict:
     vel = np.sqrt(dx**2 + dy**2) / PIPELINE_DT / 10.0  # mm/s → cm/s
 
     # Acceleration (cm/s²)
-    accel = np.diff(vel) / PIPELINE_DT
+    accel = np.abs(np.diff(vel) / PIPELINE_DT)
 
     # Jerk (cm/s³)
     jerk = np.abs(np.diff(accel) / PIPELINE_DT)
 
-    # Absolute acceleration
-    abs_accel = np.abs(accel)
-
-    return {"vel": vel, "accel": abs_accel, "jerk": jerk}
+    return {"vel": vel, "accel": accel, "jerk": jerk}
 
 
 def _extract_features(ema: np.ndarray) -> dict:
-    """Extract comprehensive feature vector from EMA trajectory.
+    """Extract feature vector from EMA trajectory.
 
-    Mirrors train_classifier.py extract_features() exactly — same feature names,
-    same statistics, same cross-articulator ratios, same temporal correlations.
+    MUST match overnight_pipeline.py's feature extraction exactly.
+    Training produces 108 features: 6 articulators × 3 signals × 6 stats.
+    Stats: peak, mean, p95, p99, median, std.
     """
     features = {}
 
@@ -131,58 +160,13 @@ def _extract_features(ema: np.ndarray) -> dict:
             if len(signal) == 0:
                 continue
 
-            # Statistical features
+            # 6 statistics — exactly matching overnight_pipeline.py
             features[f"{prefix}_{signal_name}_peak"] = float(np.max(signal))
             features[f"{prefix}_{signal_name}_mean"] = float(np.mean(signal))
-            features[f"{prefix}_{signal_name}_median"] = float(np.median(signal))
-            features[f"{prefix}_{signal_name}_std"] = float(np.std(signal))
-            features[f"{prefix}_{signal_name}_p75"] = float(np.percentile(signal, 75))
-            features[f"{prefix}_{signal_name}_p90"] = float(np.percentile(signal, 90))
             features[f"{prefix}_{signal_name}_p95"] = float(np.percentile(signal, 95))
             features[f"{prefix}_{signal_name}_p99"] = float(np.percentile(signal, 99))
-
-            # Shape features
-            features[f"{prefix}_{signal_name}_skew"] = float(
-                np.mean(((signal - np.mean(signal)) / (np.std(signal) + 1e-8)) ** 3)
-            )
-            features[f"{prefix}_{signal_name}_kurtosis"] = float(
-                np.mean(((signal - np.mean(signal)) / (np.std(signal) + 1e-8)) ** 4) - 3
-            )
-
-            # Ratio features (tail heaviness)
-            mean_val = np.mean(signal) + 1e-8
-            features[f"{prefix}_{signal_name}_p99_mean_ratio"] = float(
-                np.percentile(signal, 99) / mean_val
-            )
-            features[f"{prefix}_{signal_name}_peak_mean_ratio"] = float(
-                np.max(signal) / mean_val
-            )
-
-    # Cross-articulator features (ratios between articulators)
-    for art1 in ["ul", "ll", "li"]:
-        for art2 in ["tt", "tb", "td"]:
-            key1 = f"{art1}_vel_mean"
-            key2 = f"{art2}_vel_mean"
-            if key1 in features and key2 in features:
-                features[f"{art1}_{art2}_vel_ratio"] = features[key1] / (features[key2] + 1e-8)
-
-            key1j = f"{art1}_jerk_mean"
-            key2j = f"{art2}_jerk_mean"
-            if key1j in features and key2j in features:
-                features[f"{art1}_{art2}_jerk_ratio"] = features[key1j] / (features[key2j] + 1e-8)
-
-    # Temporal correlation features (how correlated are articulator movements?)
-    for art1_name, (ix1, iy1) in list(ARTICULATORS.items())[:3]:  # lips/jaw
-        for art2_name, (ix2, iy2) in list(ARTICULATORS.items())[3:]:  # tongue
-            min_len = min(len(ema[:, ix1]), len(ema[:, ix2]))
-            corr_x = np.corrcoef(ema[:min_len, ix1], ema[:min_len, ix2])[0, 1]
-            corr_y = np.corrcoef(ema[:min_len, iy1], ema[:min_len, iy2])[0, 1]
-            features[f"{art1_name.lower()}_{art2_name.lower()}_corr_x"] = float(
-                corr_x if np.isfinite(corr_x) else 0
-            )
-            features[f"{art1_name.lower()}_{art2_name.lower()}_corr_y"] = float(
-                corr_y if np.isfinite(corr_y) else 0
-            )
+            features[f"{prefix}_{signal_name}_median"] = float(np.median(signal))
+            features[f"{prefix}_{signal_name}_std"] = float(np.std(signal))
 
     return features
 
