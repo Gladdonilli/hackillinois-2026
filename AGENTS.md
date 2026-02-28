@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Project:** HackIllinois 2026 — LARYNX (Deepfake Voice Detection via Articulatory Physics)
-**Updated:** 2026-02-28 (Sound Phase 2)
+**Updated:** 2026-02-28 (Post-Recovery)
 
 ## OVERVIEW
 
@@ -82,9 +82,40 @@ jj git push               # Push to GitHub
 snapshot.max-new-file-size = 27000000  # 27MB (default 1MB)
 ```
 
+**Note**: Files exceeding this limit are silently excluded from JJ snapshots.
+The `elevenlabs_dataset.zip` (314MB) is above this limit AND in `.gitignore` — doubly excluded.
+
+## .GITIGNORE POLICY
+
+**What gets pushed to GitHub (code, docs, configs, small artifacts):**
+- `LARYNX/backend/*.py` — pipeline code, classifier, API
+- `LARYNX/frontend/src/` — React components, shaders, stores
+- `LARYNX/frontend/worker/` — CF Worker proxy
+- `LARYNX/frontend/public/` — static assets (facecap.glb is <1MB, OK)
+- `LARYNX/*.md` — architecture docs, stack, demo script, todos
+- `LARYNX/backend/training_data/ensemble_model.pkl` — trained model (<1MB, whitelisted)
+- `shared/`, `competitive-intel/`, `research/`, `scripts/`, `_intel/`
+- Top-level docs: `AGENTS.md`, `ATTENDEE_GUIDE.md`, `RESOURCES.md`
+- Config files: `package.json`, `tsconfig.json`, `vite.config.ts`, `wrangler.jsonc`
+
+**What is .gitignored (NEVER push):**
+- `LARYNX/backend/training_data/datasets/` — 14GB of WAVs (merged/real, merged/fake, intermediate dirs)
+- `LARYNX/backend/training_data/audio/` — 270MB intermediate audio
+- `LARYNX/backend/training_data/aai_results.json` — 52MB AAI inference results
+- `LARYNX/backend/training_data/aai_results_checkpoint.json` — large checkpoint
+- `LARYNX/backend/training_data/ema_outputs/` — EMA trajectory outputs
+- `*.zip`, `*.tar.gz`, `*.tar.bz2` — raw dataset downloads
+- `node_modules/`, `dist/`, `.vite/`, `.wrangler/` — build artifacts
+- `__pycache__/`, `*.pyc` — Python bytecode
+- `.env`, `.env.*` — secrets
+
+**If adding new large files**: Add to `.gitignore` BEFORE they get tracked by JJ.
+Once JJ snapshots a file, it's in git objects — removing it from `.gitignore` later
+requires `jj file untrack <path>` and history rewriting to avoid pushing bloated commits.
+
 ## NOTES
 
-- **VCS**: JJ-colocated repo. `synapse` bookmark = working branch (legacy name, still LARYNX code). `main` = last stable. No `git add` — working copy IS the commit
+- **VCS**: JJ-colocated repo. `main` = primary branch. `synapse` bookmark exists on GitHub (legacy, research docs only). No `git add` — working copy IS the commit
 - **Remote**: `Gladdonilli/hackillinois-2026` (private)
 - **Identity**: Gladdonilli / tianyi35@illinois.edu
 - **Strategy**: Modal track. LARYNX is fundamentally GPU inference (AAI model) — perfect fit for sponsor track
