@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLarynxStore } from '@/store/useLarynxStore';
 import { Badge } from '@/components/ui/badge';

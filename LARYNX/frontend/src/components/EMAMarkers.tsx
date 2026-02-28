@@ -1,10 +1,9 @@
-import React, { useRef, useMemo } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useLarynxStore } from '@/store/useLarynxStore';
 import { VELOCITY_THRESHOLDS } from '@/types/larynx';
-import type { EMASensor } from '@/types/larynx';
 
 const SENSOR_NAMES = ['UL', 'LL', 'JAW', 'T1', 'T2', 'T3'] as const;
 type SensorNameType = typeof SENSOR_NAMES[number];
@@ -17,7 +16,7 @@ export function EMAMarkers() {
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const color = useMemo(() => new THREE.Color(), []);
 
-  useFrame((state) => {
+  useFrame(() => {
     if (!meshRef.current) return;
 
     const { frames, currentFrame } = useLarynxStore.getState();

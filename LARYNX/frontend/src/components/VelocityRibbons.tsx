@@ -46,7 +46,7 @@ export function VelocityRibbons() {
 
     // Apply color directly to Trail child material (skips React DOM updates for 60fps)
     if (trailRef.current) {
-      trailRef.current.traverse((child) => {
+      trailRef.current.traverse((child: THREE.Object3D) => {
         if (child instanceof THREE.Mesh) {
           const mat = child.material as MaterialWithColor
           if (mat && mat.color) {

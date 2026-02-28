@@ -82,7 +82,6 @@ const ensureInitializedGraph = (): void => {
 
   processingTickSynth = new Tone.MetalSynth({
     volume: -10,
-    frequency: 250,
     envelope: {
       attack: 0.001,
       decay: 0.1,

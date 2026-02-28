@@ -54,7 +54,7 @@ export function PostProcessingEffects() {
   if (!enabled) return null
 
   return (
-    <EffectComposer disableNormalPass multisampling={4}>
+    <EffectComposer enableNormalPass={false} multisampling={4}>
       <Bloom
         ref={bloomRef}
         luminanceThreshold={1.0}
@@ -65,6 +65,8 @@ export function PostProcessingEffects() {
         ref={chromaticAberrationRef}
         offset={offsetRef.current}
         blendFunction={BlendFunction.NORMAL}
+        radialModulation={false}
+        modulationOffset={0.0}
       />
       <Scanline
         density={1.5}
