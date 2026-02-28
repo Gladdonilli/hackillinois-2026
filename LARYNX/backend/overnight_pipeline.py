@@ -43,11 +43,16 @@ image = (
     )
     .run_commands(
         "pip install git+https://github.com/articulatory/articulatory.git",
+        # Force scipy pin AFTER articulatory install (it may override)
         "pip install scipy==1.13.1",
-        # Patch pqmf.py for scipy compat
-        "find /usr/local/lib/python3.11 -name 'pqmf.py' -path '*/articulatory/*' "
-        "-exec sed -i 's/from scipy.signal import kaiser/from scipy.signal.windows import kaiser/' {} +",
-    )
+        # Patch ALL scipy.signal kaiser imports in articulatory package
+        "find /usr/local/lib/python3.11 -name '*.py' -path '*/articulatory/*' "
+        "-exec sed -i 's/from scipy\\.signal import kaiser/from scipy.signal.windows import kaiser/g' {} +",
+        # Also patch any bare 'scipy.signal.kaiser' calls
+        "find /usr/local/lib/python3.11 -name '*.py' -path '*/articulatory/*' "
+        "-exec sed -i 's/scipy\\.signal\\.kaiser/scipy.signal.windows.kaiser/g' {} +",
+        # Verify the patch worked
+        "python3 -c 'from scipy.signal.windows import kaiser; print(\"scipy kaiser OK\")'",
 )
 
 # ---------------------------------------------------------------------------

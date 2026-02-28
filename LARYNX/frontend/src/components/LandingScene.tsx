@@ -122,9 +122,9 @@ function FaceModel() {
         const mat = new THREE.MeshStandardMaterial({
           color: '#88ccff',
           emissive: '#00FFFF',
-          emissiveIntensity: 0.1,
+          emissiveIntensity: 0.3,
           transparent: true,
-          opacity: 0.25,
+          opacity: 0.45,
           wireframe: false,
         })
         mat.onBeforeCompile = customShader.onBeforeCompile
@@ -139,9 +139,9 @@ function FaceModel() {
         mesh.material = new THREE.MeshStandardMaterial({
           color: '#00FFFF',
           emissive: '#00FFFF',
-          emissiveIntensity: 0.2,
+          emissiveIntensity: 0.5,
           transparent: true,
-          opacity: 0.15,
+          opacity: 0.25,
           wireframe: true,
         })
       }
@@ -220,9 +220,11 @@ export function LandingScene() {
       dpr={[1, 1.5]}
       style={{ position: 'fixed', inset: 0, zIndex: 0 }}
     >
-      <fog attach="fog" args={['#000000', 5, 30]} />
-      <ambientLight intensity={0.05} />
-      <pointLight position={[0, 5, 5]} intensity={0.3} color="#00FFFF" />
+      <fog attach="fog" args={['#000000', 8, 40]} />
+      <ambientLight intensity={0.15} />
+      <pointLight position={[0, 5, 5]} intensity={0.8} color="#00FFFF" />
+      <pointLight position={[-3, -2, 4]} intensity={0.4} color="#4488FF" />
+      <spotLight position={[0, 3, 8]} angle={0.5} penumbra={0.8} intensity={0.6} color="#FFFFFF" />
 
       <Sparkles count={150} scale={15} size={2.5} speed={0.3} opacity={0.6} color="#00FFFF" />
       <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade speed={1} />

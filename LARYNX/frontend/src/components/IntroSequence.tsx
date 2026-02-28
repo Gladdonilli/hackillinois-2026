@@ -20,8 +20,8 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
 
     const timer = setTimeout(() => {
       setComplete(true);
-      setTimeout(onComplete, 800); // Wait for fade out
-    }, 2500);
+      setTimeout(onComplete, 1200); // Wait for fade out
+    }, 5500);
     return () => clearTimeout(timer);
   }, [onComplete]);
 
@@ -38,8 +38,8 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.8, // Start typing after sweep
+        staggerChildren: 0.12,
+        delayChildren: 0.8,
       }
     }
   };
@@ -122,7 +122,7 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
                   key={i}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 1.5 + i * 0.02, duration: 0.01 }}
+                transition={{ delay: 1.5 + i * 0.03, duration: 0.01 }}
                 >
                   {char === ' ' ? '\u00A0' : char}
                 </motion.span>
@@ -152,7 +152,7 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
                 key={i}
                 initial={{ opacity: 0, textShadow: "0 0 20px #FFFFFF", filter: "brightness(2)" }}
                 animate={{ opacity: 0.6, textShadow: "0 0 0px #FFFFFF", filter: "brightness(1)" }}
-                transition={{ delay: 1.8 + i * 0.2, duration: 0.3 }}
+                transition={{ delay: 2.5 + i * 0.15, duration: 0.3 }}
               >
                 {line}
               </motion.div>
