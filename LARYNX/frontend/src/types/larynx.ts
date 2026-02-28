@@ -30,7 +30,7 @@ export interface AnalysisProgress {
   percent: number
 }
 
-export type AnalysisStatus = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error'
+export type AnalysisStatus = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'comparing' | 'technical' | 'closing' | 'error'
 
 export interface ApiResponse<T> {
   success: boolean
