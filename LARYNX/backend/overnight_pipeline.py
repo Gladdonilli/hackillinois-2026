@@ -1,14 +1,14 @@
 """
-LARYNX Overnight Training Pipeline — Wave 1
+LARYNX Overnight Training Pipeline — Wave 2
 =============================================
-Downloads LibriSpeech + generates edge-tts deepfakes → AAI inference on Modal →
-acoustic features locally → trains ensemble classifier.
+Downloads LibriSpeech real speech + generates ElevenLabs deepfakes → AAI inference
+on Modal → acoustic features → trains ensemble classifier with GroupKFold by speaker.
 
 Usage:
   source ~/modal-env/bin/activate
-  modal run LARYNX/backend/overnight_pipeline.py
+  ELEVENLABS_API_KEY=<key> modal run LARYNX/backend/overnight_pipeline.py
 
-Estimated: ~1-2 hours on Modal A100, ~$15-20 credits
+Estimated: ~3-6 hours on Modal A100 (10 passes × ~5400 samples)
 """
 
 import modal
@@ -54,8 +54,8 @@ image = (
 # Constants
 # ---------------------------------------------------------------------------
 LIBRISPEECH_URL = "https://openslr.trmal.net/resources/12/dev-clean.tar.gz"
-N_REAL_SAMPLES = 300
-N_FAKE_SAMPLES = 300
+N_REAL_SAMPLES = 2700
+N_FAKE_SAMPLES = 2700
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
 INFERENCE_PASSES = 10
@@ -114,27 +114,29 @@ SENTENCES = [
     "Unique New York, you know you need unique New York, a unique New York utility unit.",
 ]
 
-EDGE_TTS_VOICES = [
-    "en-AU-NatashaNeural", "en-AU-WilliamMultilingualNeural",
-    "en-CA-ClaraNeural", "en-CA-LiamNeural",
-    "en-GB-LibbyNeural", "en-GB-MaisieNeural", "en-GB-RyanNeural",
-    "en-GB-SoniaNeural", "en-GB-ThomasNeural",
-    "en-HK-YanNeural", "en-HK-SamNeural",
-    "en-IN-NeerjaNeural", "en-IN-NeerjaExpressiveNeural", "en-IN-PrabhatNeural",
-    "en-IE-ConnorNeural", "en-IE-EmilyNeural",
-    "en-KE-AsiliaNeural", "en-KE-ChilembaNeural",
-    "en-NZ-MitchellNeural", "en-NZ-MollyNeural",
-    "en-NG-AbeoNeural", "en-NG-EzinneNeural",
-    "en-PH-JamesNeural", "en-PH-RosaNeural",
-    "en-SG-LunaNeural", "en-SG-WayneNeural",
-    "en-ZA-LeahNeural", "en-ZA-LukeNeural",
-    "en-TZ-ElimuNeural", "en-TZ-ImaniNeural",
-    "en-US-AnaNeural", "en-US-AndrewNeural", "en-US-AndrewMultilingualNeural",
-    "en-US-AriaNeural", "en-US-AvaNeural", "en-US-AvaMultilingualNeural",
-    "en-US-BrianNeural", "en-US-BrianMultilingualNeural",
-    "en-US-ChristopherNeural", "en-US-EmmaNeural", "en-US-EmmaMultilingualNeural",
-    "en-US-EricNeural", "en-US-GuyNeural", "en-US-JennyNeural",
-    "en-US-MichelleNeural", "en-US-RogerNeural", "en-US-SteffanNeural",
+# ElevenLabs voices — diverse set of premade voices for deepfake generation
+# Each tuple: (voice_id, voice_name) for speaker tracking in GroupKFold
+ELEVENLABS_VOICES = [
+    ("21m00Tcm4TlvDq8ikWAM", "Rachel"),
+    ("pNInz6obpgDQGcFmaJgB", "Adam"),
+    ("EXAVITQu4vr4xnSDxMaL", "Bella"),
+    ("ErXwobaYiN019PkySvjV", "Antoni"),
+    ("MF3mGyEYCl7XYWbV9V6O", "Elli"),
+    ("TxGEqnHWrfWFTfGW9XjX", "Josh"),
+    ("VR6AewLTigWG4xSOukaG", "Arnold"),
+    ("pqHfZKP75CvOlQylNhV4", "Bill"),
+    ("nPczCjzI2devNBz1zQrb", "Brian"),
+    ("N2lVS1w4EtoT3dr4eOWO", "Callum"),
+    ("IKne3meq5aSn9XLyUdCD", "Charlie"),
+    ("XB0fDUnXU5powFXDhCwa", "Charlotte"),
+    ("Xb7hH8MSUJpSbSDYk0k2", "Alice"),
+    ("iP95p4xoKVk53GoZ742B", "Chris"),
+    ("cjVigY5qzO86Huf0OWal", "Eric"),
+    ("cgSgspJ2msm6clMCkdW9", "Jessica"),
+    ("FGY2WhTYpPnrIDTdsKH5", "Laura"),
+    ("TX3LPaxmHKxFdv7VOQHJ", "Liam"),
+    ("bIHbv24MWmeRgasZH58o", "Will"),
+    ("XrExE9yKIg1WjnnlVkGX", "Matilda"),
 ]
 
 
@@ -305,28 +307,66 @@ def download_librispeech() -> list[tuple[str, bytes]]:
     image=(
         modal.Image.debian_slim(python_version="3.11")
         .apt_install("ffmpeg")
-        .pip_install("edge-tts", "aiofiles")
+        .pip_install("requests")
     ),
-    timeout=1800,
+    timeout=3600,
+    secrets=[modal.Secret.from_name("elevenlabs-api-key")],
 )
-def generate_deepfakes() -> list[tuple[str, bytes]]:
-    """Generate N_FAKE_SAMPLES edge-tts deepfakes with diverse voices."""
-    import asyncio
-    import edge_tts
+def generate_elevenlabs_deepfakes() -> list[tuple[str, bytes]]:
+    """Generate N_FAKE_SAMPLES ElevenLabs deepfakes with diverse voices.
+
+    Returns (filename, wav_bytes) pairs where filename encodes the voice name
+    for GroupKFold speaker tracking.
+    """
+    import requests
     import subprocess
     from pathlib import Path
 
-    work_dir = Path("/tmp/deepfakes")
+    work_dir = Path("/tmp/elevenlabs")
     work_dir.mkdir(exist_ok=True)
 
-    async def generate_one(idx: int, sentence: str, voice: str) -> tuple[str, bytes] | None:
-        filename = f"fake_{voice}_{idx:04d}"
+    api_key = os.environ.get("ELEVENLABS_API_KEY", "")
+    if not api_key:
+        raise ValueError("ELEVENLABS_API_KEY not set")
+
+    items = []
+    errors = 0
+    n_voices = len(ELEVENLABS_VOICES)
+    n_sentences = len(SENTENCES)
+
+    for idx in range(N_FAKE_SAMPLES):
+        voice_id, voice_name = ELEVENLABS_VOICES[idx % n_voices]
+        sentence = SENTENCES[idx % n_sentences]
+        # Encode voice name in filename for speaker tracking
+        filename = f"elevenlabs_{voice_name}_{idx:04d}"
+
         mp3_path = work_dir / f"{filename}.mp3"
         wav_path = work_dir / f"{filename}.wav"
 
         try:
-            comm = edge_tts.Communicate(sentence, voice)
-            await comm.save(str(mp3_path))
+            # ElevenLabs TTS API
+            resp = requests.post(
+                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+                headers={
+                    "xi-api-key": api_key,
+                    "Content-Type": "application/json",
+                    "Accept": "audio/mpeg",
+                },
+                json={
+                    "text": sentence,
+                    "model_id": "eleven_multilingual_v2",
+                    "voice_settings": {
+                        "stability": 0.5,
+                        "similarity_boost": 0.75,
+                    },
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+
+            # Save MP3
+            with open(mp3_path, "wb") as f:
+                f.write(resp.content)
 
             # Convert to 16kHz mono WAV
             subprocess.run(
@@ -341,31 +381,22 @@ def generate_deepfakes() -> list[tuple[str, bytes]]:
             mp3_path.unlink(missing_ok=True)
             wav_path.unlink(missing_ok=True)
 
-            return (f"{filename}.wav", wav_bytes)
+            items.append((f"{filename}.wav", wav_bytes))
+
+            if (idx + 1) % 50 == 0:
+                print(f"  Generated {idx + 1}/{N_FAKE_SAMPLES} ElevenLabs deepfakes...")
+
         except Exception as e:
             print(f"  FAIL {filename}: {e}")
-            return None
+            errors += 1
+            # Rate limit backoff
+            if "429" in str(e) or "rate" in str(e).lower():
+                print("  Rate limited, waiting 60s...")
+                import time
+                time.sleep(60)
+            continue
 
-    async def generate_all():
-        tasks = []
-        for idx in range(N_FAKE_SAMPLES):
-            sentence = SENTENCES[idx % len(SENTENCES)]
-            voice = EDGE_TTS_VOICES[idx % len(EDGE_TTS_VOICES)]
-            tasks.append(generate_one(idx, sentence, voice))
-
-        # Process in batches of 20 to avoid overwhelming edge-tts
-        results = []
-        batch_size = 20
-        for i in range(0, len(tasks), batch_size):
-            batch = tasks[i:i + batch_size]
-            batch_results = await asyncio.gather(*batch)
-            results.extend([r for r in batch_results if r is not None])
-            print(f"  Generated {len(results)}/{N_FAKE_SAMPLES} deepfakes...")
-
-        return results
-
-    items = asyncio.run(generate_all())
-    print(f"Generated {len(items)} deepfake WAV files")
+    print(f"Generated {len(items)} ElevenLabs deepfakes ({errors} errors)")
     return items
 
 

@@ -375,6 +375,40 @@ const ensureInitializedGraph = (): void => {
   verdictSubGain.connect(masterCompressor)
   verdictSub.start()
 
+  // --- Generative soundtrack (dark minor arpeggios) ---
+  soundtrackSynth = new Tone.PolySynth(Tone.Synth, {
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.3, decay: 0.6, sustain: 0.2, release: 1.5 },
+    volume: -24,
+  })
+  soundtrackFilter = new Tone.Filter({ type: 'lowpass', frequency: 600 })
+  soundtrackGain = new Tone.Gain(0)
+  soundtrackSynth.connect(soundtrackFilter)
+  soundtrackFilter.connect(soundtrackGain)
+  soundtrackGain.connect(masterCompressor)
+
+  const chords: string[][] = [
+    ['A2', 'C3', 'E3'],      // Am
+    ['D2', 'F3', 'A3'],      // Dm
+    ['E2', 'G#3', 'B3'],     // E (dominant)
+    ['A2', 'C3', 'E3'],      // Am (return)
+  ]
+
+  soundtrackLoop = new Tone.Loop((time: number) => {
+    if (!soundtrackSynth || !soundtrackActive) return
+    const chord = chords[soundtrackChordIndex % chords.length]
+    // Arpeggiate: play each note 200ms apart
+    chord.forEach((note, i) => {
+      soundtrackSynth!.triggerAttackRelease(note, '2n', time + i * 0.2)
+    })
+    soundtrackChordIndex++
+    // Slowly open filter over time for evolving harmonic content
+    if (soundtrackFilter) {
+      const freq = 600 + (soundtrackChordIndex % 16) * 50
+      soundtrackFilter.frequency.linearRampTo(freq, 2, time)
+    }
+  }, '2m')
+
   Tone.Transport.bpm.value = DEFAULT_TICK_BPM
   initialized = true
 }
@@ -416,6 +450,7 @@ export const SoundEngine = {
       warpNoise, warpFilter, warpChirp,
       scanSweepSynth, dataPointSynth,
       verdictSub, verdictSubGain,
+      soundtrackSynth, soundtrackFilter, soundtrackGain,
       masterCompressor, masterReverb, masterEq, masterHighpass, masterLimiter, masterBus,
     ]
     for (const node of disposables) {
@@ -719,8 +754,13 @@ export const SoundEngine = {
 
   triggerDeepfakeReveal: (): void => {
     SoundEngine.stopTicking()
-    SoundEngine.startRiser()
+    // Acoustic vacuum: fade everything to near-silence for horror lean-in
+    SoundEngine.triggerAcousticVacuum()
     setTimeout(() => {
+      SoundEngine.startRiser()
+    }, 1500)
+    setTimeout(() => {
+      SoundEngine.restoreFromVacuum()
       SoundEngine.triggerSilence()
       setTimeout(() => {
         SoundEngine.playSubImpact()
@@ -770,6 +810,59 @@ export const SoundEngine = {
 
     const activeGain = safeVelocity > 0.1 ? 1 : 0
     velocityGain.gain.setTargetAtTime(activeGain, now, 0.06)
+  },
+
+  // ==================== GENERATIVE SOUNDTRACK ====================
+
+  startSoundtrack: (): void => {
+    if (!requireAudioReady() || soundtrackActive) return
+    if (!soundtrackGain || !soundtrackLoop) return
+    soundtrackActive = true
+    soundtrackChordIndex = 0
+    const now = Tone.now()
+    soundtrackGain.gain.setTargetAtTime(0.7, now, 1.5)
+    soundtrackLoop.start(now)
+    Tone.Transport.start(now)
+  },
+
+  stopSoundtrack: (): void => {
+    if (!soundtrackActive) return
+    soundtrackActive = false
+    if (soundtrackGain) {
+      soundtrackGain.gain.setTargetAtTime(0, Tone.now(), 0.5)
+    }
+    setTimeout(() => {
+      soundtrackLoop?.stop(0)
+    }, 2000)
+  },
+
+  // ==================== ACOUSTIC VACUUM ====================
+
+  triggerAcousticVacuum: (): void => {
+    if (!requireAudioReady() || vacuumActive) return
+    vacuumActive = true
+    const now = Tone.now()
+    // Save current gain levels
+    preVacuumAmbientGain = ambientGain?.gain.value ?? 0
+    preVacuumBgGain = bgLayerGain?.gain.value ?? 0
+    preVacuumTensionGain = tensionGain?.gain.value ?? 0
+    preVacuumSoundtrackGain = soundtrackGain?.gain.value ?? 0
+    // Fade to near-silence over 1.5s
+    ambientGain?.gain.setTargetAtTime(0.02, now, 0.4)
+    bgLayerGain?.gain.setTargetAtTime(0.01, now, 0.3)
+    tensionGain?.gain.setTargetAtTime(0.01, now, 0.3)
+    soundtrackGain?.gain.setTargetAtTime(0.02, now, 0.4)
+  },
+
+  restoreFromVacuum: (): void => {
+    if (!vacuumActive) return
+    vacuumActive = false
+    const now = Tone.now()
+    // Restore saved gain levels
+    ambientGain?.gain.setTargetAtTime(preVacuumAmbientGain, now, 0.3)
+    bgLayerGain?.gain.setTargetAtTime(preVacuumBgGain, now, 0.3)
+    tensionGain?.gain.setTargetAtTime(preVacuumTensionGain, now, 0.3)
+    soundtrackGain?.gain.setTargetAtTime(preVacuumSoundtrackGain, now, 0.3)
   },
 
   isInitialized: (): boolean => initialized,
