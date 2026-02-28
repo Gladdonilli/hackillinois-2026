@@ -428,7 +428,7 @@ def generate_elevenlabs_chunk(chunk: list[tuple[int, str, str, str, str]]) -> li
     return items
 
 
-@app.function(image=image, volumes={"/model-cache": model_cache}, timeout=120)
+@app.function(image=image, volumes={"/model-cache": model_cache}, timeout=600)
 def load_elevenlabs_cache() -> list[tuple[str, bytes]]:
     """Load cached ElevenLabs fakes from volume. Returns (filename, wav_bytes) pairs."""
     from pathlib import Path
