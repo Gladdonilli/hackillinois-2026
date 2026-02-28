@@ -150,7 +150,7 @@ ELEVENLABS_VOICES = [
     retries=3,
     max_containers=10,            # 10 GPU cap on Modal account
     )
-@modal.concurrent(max_inputs=4)  # 4 batches per container — 80GB fits ~4×8GB model instances
+@modal.concurrent(max_inputs=10) # 10 concurrent batches per container — model loaded once, CPU handles preprocessing
 def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
     """Process a batch of WAV files through AAI model. Each item is (filename, wav_bytes)."""
     import torch

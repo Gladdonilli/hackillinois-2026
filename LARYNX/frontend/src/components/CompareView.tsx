@@ -199,7 +199,7 @@ export const CompareView = () => {
       {status === 'comparing' && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
           <div className="text-white/60 font-mono text-sm tracking-widest">{progress.message}</div>
-            <div className="w-64 h-1 bg-white/10 rounded-sm overflow-hidden">
+          <div className="w-64 h-1 bg-white/10 rounded-sm overflow-hidden">
             <div className="h-full bg-gradient-to-r from-cyan to-violation transition-all duration-300" style={{ width: `${progress.percent}%` }} />
           </div>
         </div>
@@ -217,13 +217,20 @@ export const CompareView = () => {
               isFakeA
                 ? 'bg-violation/20 border-violation/40 text-violation text-glow-warn animate-pulse-glow'
                 : 'bg-genuine/20 border-genuine/40 text-genuine text-glow-genuine'
-            }>
+            }`}>
               {labelA}
               {verdictA && <span className="ml-2 text-xs opacity-70">({(verdictA.confidence * 100).toFixed(0)}%)</span>}
+            </div>
           </div>
 
           <div className="flex-1 relative overflow-hidden">
-            <Canvas camera={{ position: CAMERA.COMPARE_POSITION, fov: 45 }}>
+            <Canvas camera={{ position: CAMERA.COMPARE_POSITION, fov: 45 }}
+              onCreated={({ gl }) => {
+                const canvas = gl.domElement;
+                canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); });
+                canvas.addEventListener('webglcontextrestored', () => {});
+              }}
+            >
               <Suspense fallback={null}>
                 <Environment preset="city" />
                 <ambientLight intensity={0.5} />
@@ -263,7 +270,13 @@ export const CompareView = () => {
           </div>
 
           <div className="flex-1 relative overflow-hidden">
-            <Canvas camera={{ position: CAMERA.COMPARE_POSITION, fov: 45 }}>
+            <Canvas camera={{ position: CAMERA.COMPARE_POSITION, fov: 45 }}
+              onCreated={({ gl }) => {
+                const canvas = gl.domElement;
+                canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); });
+                canvas.addEventListener('webglcontextrestored', () => {});
+              }}
+            >
               <Suspense fallback={null}>
                 <Environment preset="city" />
                 <ambientLight intensity={0.5} />

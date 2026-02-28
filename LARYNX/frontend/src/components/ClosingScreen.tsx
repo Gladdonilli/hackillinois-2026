@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { motion } from 'motion/react'
 import { SoundEngine } from '@/audio/SoundEngine'
 import { COLORS } from '@/constants'
 
