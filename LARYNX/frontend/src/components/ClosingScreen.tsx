@@ -5,9 +5,10 @@ import { COLORS } from '@/constants'
 
 interface ClosingScreenProps {
   onReset: () => void;
+  onShowHistory?: () => void;
 }
 
-export function ClosingScreen({ onReset }: ClosingScreenProps) {
+export function ClosingScreen({ onReset, onShowHistory }: ClosingScreenProps) {
   const title = "LARYNX";
   const subtitle = "Deepfake Voice Detection via Articulatory Physics";
   
@@ -131,6 +132,20 @@ export function ClosingScreen({ onReset }: ClosingScreenProps) {
       >
         Try it yourself <span className="inline-block transition-transform group-hover:translate-x-2">→</span>
       </motion.button>
+
+      {/* Optional History Button */}
+      {onShowHistory && (
+        <motion.button
+          onClick={onShowHistory}
+          className="px-8 py-3 mt-6 border border-cyan/30 rounded-sm hover:bg-cyan/10 text-cyan/80 font-mono tracking-widest text-xs transition-all duration-300 z-10"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 3.5, duration: 0.5 }}
+          data-interactive
+        >
+          VIEW HISTORY ALBUM
+        </motion.button>
+      )}
 
       {/* Decorative HUD corners — using .hud-panel pseudo-elements via a positioned container */}
       <div className="absolute top-6 left-6 right-6 bottom-6 hud-panel pointer-events-none bg-transparent border-cyan/20" />

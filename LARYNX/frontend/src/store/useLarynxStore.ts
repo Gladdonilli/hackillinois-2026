@@ -31,6 +31,22 @@ interface LarynxState {
   // Comparison state
   comparison: ComparisonState
 
+  // History state
+  showHistory: boolean
+  historyItems: Array<{
+    reportId: string
+    createdAt: string
+    verdict: string
+    confidence: number
+    peakVelocity: number
+    threshold: number
+    anomalousFrames: number
+    totalFrames: number
+    anomalyRatio: number
+    processingTimeMs: number
+  }>
+  historyLoading: boolean
+
   setAudioFile: (file: File | null) => void
   setStatus: (status: AnalysisStatus) => void
   startAnalysis: () => void
@@ -52,6 +68,9 @@ interface LarynxState {
   // Stream abort registry — hooks register their AbortController here
   _streamAbort: AbortController | null
   _setStreamAbort: (controller: AbortController | null) => void
+
+  toggleHistory: () => void
+  fetchHistory: () => Promise<void>
 }
 
 const initialComparison: ComparisonState = {
@@ -75,6 +94,9 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   comparison: { ...initialComparison },
   portalState: 'idle',
   _streamAbort: null,
+  showHistory: false,
+  historyItems: [],
+  historyLoading: false,
 
   setAudioFile: (file) => {
     const currentUrl = get().audioUrl
@@ -166,6 +188,37 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
 
   setPortalState: (state) => set({ portalState: state }),
   _setStreamAbort: (controller) => set({ _streamAbort: controller } as Partial<LarynxState>),
+  toggleHistory: () => set((state) => ({ showHistory: !state.showHistory })),
+  fetchHistory: async () => {
+    set({ historyLoading: true })
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://api.voxlarynx.tech'
+      const res = await fetch(`${apiUrl}/api/history?limit=20`)
+      if (!res.ok) throw new Error('Failed to fetch history')
+      const json = await res.json()
+      if (json.success && json.data) {
+        // map snake_case to camelCase
+        const mappedItems = json.data.map((row: any) => ({
+          reportId: row.report_id,
+          createdAt: row.created_at,
+          verdict: row.verdict,
+          confidence: row.confidence,
+          peakVelocity: row.peak_velocity,
+          threshold: row.threshold,
+          anomalousFrames: row.anomalous_frames,
+          totalFrames: row.total_frames,
+          anomalyRatio: row.anomaly_ratio,
+          processingTimeMs: row.processing_time_ms
+        }))
+        set({ historyItems: mappedItems, historyLoading: false })
+      } else {
+        set({ historyItems: [], historyLoading: false })
+      }
+    } catch (e) {
+      console.error('Failed to fetch history', e)
+      set({ historyLoading: false })
+    }
+  },
 }))
 
 export { useLarynxStore }

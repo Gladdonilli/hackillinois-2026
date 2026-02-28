@@ -11,6 +11,7 @@ import { SoundEngine } from '@/audio/SoundEngine'
 import { LandingScene } from '@/components/LandingScene'
 import { CustomCursor } from '@/components/CustomCursor'
 import { WarpTransition } from '@/components/WarpTransition'
+import { HistoryPanel } from '@/components/HistoryPanel'
 const CompareView = lazy(() => import('@/components/CompareView').then(m => ({ default: m.CompareView })))
 const TechnicalDetailPanel = lazy(() => import('@/components/TechnicalDetailPanel').then(m => ({ default: m.TechnicalDetailPanel })))
 const ClosingScreen = lazy(() => import('@/components/ClosingScreen').then(m => ({ default: m.ClosingScreen })))
@@ -156,6 +157,16 @@ export default function App() {
           </div>
           {/* Hide upload panel during portal transition to focus on mouth opening */}
           {!isPortalTransition && <UploadPanel />}
+          {/* History Button Overlay in Idle */}
+          {!isPortalTransition && (
+            <button
+              className="absolute bottom-8 z-30 px-6 py-2 border border-cyan/30 rounded-sm bg-black/60 backdrop-blur-sm text-cyan/80 font-mono tracking-widest text-xs hover:bg-cyan/10 hover:border-cyan/50 hover:text-cyan transition-all"
+              onClick={() => useLarynxStore.getState().toggleHistory()}
+              data-interactive
+            >
+              VIEW DATABASE
+            </button>
+          )}
         </div>
       )}
       
@@ -271,11 +282,15 @@ export default function App() {
           className="absolute inset-0 z-10 animate-[fadeIn_0.8s_ease-out]"
         >
           <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
-            <ClosingScreen onReset={() => useLarynxStore.getState().reset()} />
+            <ClosingScreen 
+              onReset={() => useLarynxStore.getState().reset()} 
+              onShowHistory={() => useLarynxStore.getState().toggleHistory()}
+            />
           </Suspense>
         </div>
       )}
       
+      <HistoryPanel />
       {/* Scanline overlay — always on top */}
       <div className="scanline-overlay pointer-events-none z-50" />
 
