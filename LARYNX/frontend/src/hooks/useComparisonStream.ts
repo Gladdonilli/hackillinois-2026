@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import type { SensorName, EMASensor, Verdict } from '@/types/larynx'
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://gladdonilli--larynx-analyze-dev.modal.run'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://larynx-api.tianyi35.workers.dev'
 
 interface ChannelFrameData {
   channel: 0 | 1
@@ -34,10 +34,7 @@ export function useComparisonStream() {
     formData.append('file_a', fileA)
     formData.append('file_b', fileB)
 
-    // Use /api/compare if going through worker, or /compare if direct Modal
-    const url = BACKEND_URL.includes('/api/')
-      ? BACKEND_URL.replace(/\/api\/analyze\b/, '/api/compare')
-      : BACKEND_URL.replace(/\/analyze[^/]*$/, '') + '/compare'
+    const url = `${API_BASE.replace(/\/$/, '')}/api/compare`
 
     try {
       const response = await fetch(url, {

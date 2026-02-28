@@ -1,7 +1,8 @@
 import { useCallback, useRef } from 'react'
 import { useLarynxStore } from '@/store/useLarynxStore'
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://gladdonilli--larynx-analyze-dev.modal.run'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://larynx-api.tianyi35.workers.dev'
+const BACKEND_URL = `${API_BASE.replace(/\/$/, '')}/api/analyze`
 
 export function useAnalysisStream() {
   const abortRef = useRef<AbortController | null>(null)

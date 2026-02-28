@@ -2,7 +2,7 @@
   "name": "hackillinois-2026",
   "private": true,
   "scripts": {
-    "build": "cd LARYNX/frontend && npm install && npm run build",
+    "build": "cd LARYNX/frontend && npm install && npx vite build",
     "start": "npx serve LARYNX/frontend/dist -s -l 8000"
   },
   "dependencies": {
