@@ -145,7 +145,7 @@ ELEVENLABS_VOICES = [
 @app.function(
     image=image,
     volumes={"/model-cache": model_cache},
-    gpu="A100-80GB",                  # 80GB VRAM ($2.50/hr) — fits 4 concurrent batches
+    gpu="B200",                      # 192GB VRAM ($6.25/hr) — 7× FP16 TFLOPS vs A100, faster wall-clock
     timeout=600,
     retries=3,
     max_containers=10,            # 10 GPU cap on Modal account
