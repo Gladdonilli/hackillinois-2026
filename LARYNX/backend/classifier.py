@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # overnight_pipeline.py saves as ensemble_model.pkl, legacy as classifier_model.pkl
 MODEL_DIR = Path(__file__).parent
 MODEL_PATHS = [
+    MODEL_DIR / "training_data" / "ensemble_model.pkl",
     MODEL_DIR / "ensemble_model.pkl",
     MODEL_DIR / "classifier_model.pkl",
 ]

@@ -249,7 +249,7 @@ const ensureInitializedGraph = (): void => {
     iecAlarmSynth.triggerAttackRelease(IEC_BASE_FREQ, '32n', time + pulseTime)
     iecPulseIndex++
     if (iecPulseIndex >= 10) iecPulseIndex = 0
-  }, '1m')  // full cycle every measure
+  }, '4m')  // full 10-pulse cycle every 4 measures (4s at 60 BPM)
 
   // --- Scanner beep ---
   scannerBeepSynth = new Tone.FMSynth({
@@ -457,7 +457,7 @@ export const SoundEngine = {
       scannerBeepSynth, processingTickSynth,
       genuineStingSynth, deepfakeStingSynth, deepfakeDistortion,
       genuinePad, genuinePadFilter, genuinePadGain,
-      velocityOsc, velocityFilter, velocityDistortion, velocityCrusher, velocityGain,
+      // velocity chain removed in Phase 3 (replaced by Geiger+Oximeter)
       uploadSine, uploadAM, uploadMembrane,
       riserNoise, riserFilter, riserVolume,
       subImpact, noiseBurst, noiseBurstFilter,
@@ -483,11 +483,8 @@ export const SoundEngine = {
     genuineStingSynth = deepfakeStingSynth = null
     deepfakeDistortion = null
     genuinePad = null; genuinePadFilter = null; genuinePadGain = null
-    velocityOsc = velocityFilter = velocityDistortion = null
-    velocityCrusher = null; velocityGain = null
-    uploadSine = null; uploadAM = null; uploadMembrane = null
-    riserNoise = null; riserFilter = null; riserVolume = null
-    horrorSynth = null; horrorLfo = null; horrorTremolo = null
+    subImpact = null; noiseBurst = null; noiseBurstFilter = null
+    // velocity and horror chains removed in Phase 3 (replaced by Geiger+Oximeter and IEC alarm)
     iecAlarmSynth = null; iecAlarmGain = null
     iecAlarmLoop?.stop(0); iecAlarmLoop?.dispose(); iecAlarmLoop = null
     geigerSynth = null; geigerFilter = null; geigerGain = null
@@ -935,7 +932,7 @@ export const SoundEngine = {
     processingTickLoop.stop(0)
     const jitterTick = () => {
       if (!tickJitterActive || !processingTickSynth) return
-      processingTickSynth.triggerAttackRelease('C4', '32n')
+      processingTickSynth.triggerAttackRelease('32n', Tone.now())
       // IEC spec: interval jitter >50ms = sympathetic nervous system response
       const baseInterval = (60 / (Tone.Transport.bpm.value || 120)) * 1000
       const jitter = baseInterval * (0.7 + Math.random() * 0.6)  // ±30% variation
