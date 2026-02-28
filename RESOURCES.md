@@ -25,7 +25,7 @@ These are the AI services LARYNX's end-users interact with through the product:
 | Service | Free Tier Limit | Sufficient for 36h? | Setup |
 |---------|----------------|---------------------|-------|
 | **Workers** | 100K req/day, 10ms CPU/invocation | ✅ Yes | `npx wrangler login` |
-| **D1 (SQL)** | 5M reads/day, 100K writes/day, 500MB/db | ✅ Yes — use for claims/scores | `npx wrangler d1 create prism-db` |
+| **D1 (SQL)** | 5M reads/day, 100K writes/day, 500MB/db | ✅ Yes — use for claims/scores | `npx wrangler d1 create larynx-db` |
 | **R2 (Storage)** | 10GB, 1M writes, 10M reads/mo, zero egress | ✅ Yes | Via wrangler CLI |
 | **Vectorize** | 200K vectors, 1,536 dims, 30M queries/mo | ✅ Yes | Via wrangler CLI |
 | **AI Gateway** | Unlimited routing, 100K logs/mo | ✅ Yes | Dashboard setup |

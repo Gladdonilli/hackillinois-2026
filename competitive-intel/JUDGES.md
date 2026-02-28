@@ -456,51 +456,51 @@
 | Archetype | Count | What They Care About | How to Win |
 |-----------|-------|---------------------|------------|
 | **Systems Engineers** | ~20 | Distributed systems, scalability, latency, fault tolerance | Architecture diagram, latency numbers, failure handling |
-| **AI/ML Experts** | ~15 | Model architecture, inference quality, ML methodology | JSD math, inference pipeline, token-level analysis |
-| **Product/PM** | ~8 | User pain, market fit, impact narrative, execution quality | Lead with pain point, show business value, crisp delivery |
-| **Full-Stack/Frontend** | ~8 | UX quality, frontend architecture, visual polish | Beautiful heatmap, smooth interactions, responsive design |
-| **Security/Compliance** | ~6 | API key security, data handling, risk management | CF AI Gateway abstracts credentials, input sanitization |
+| **AI/ML Experts** | ~15 | Model architecture, inference quality, ML methodology | Biomechanics constraints, AAI inference pipeline, frame-level velocity analysis |
+| **Product/PM** | ~8 | User pain, market fit, impact narrative, execution quality | Lead with voice-fraud pain point, show business value, crisp delivery |
+| **Full-Stack/Frontend** | ~8 | UX quality, frontend architecture, visual polish | Beautiful 3D skull visualization, smooth interactions, clear anomaly storytelling |
+| **Security/Compliance** | ~6 | API key security, data handling, risk management | CF Workers proxy credentials, input sanitization |
 
 ### Optimal 3-Minute Demo Structure
 
 ```
-[0:00-0:20] HOOK — "Last week, an AI told a lawyer to cite cases that don't exist."
+[0:00-0:20] HOOK — "Last week, a CEO's voice was cloned to authorize a $25M wire transfer."
               → Pain is universal. Every judge gets it.
 
-[0:20-0:35] WHAT — "Prism detects hallucinations by comparing how different models
-              answer the same question, using information-theoretic distance."
-              → One sentence. JSD for AI judges, "distance" for everyone else.
+[0:20-0:35] WHAT — "LARYNX detects deepfake voices by reverse-engineering tongue
+              physics from audio using acoustic-to-articulatory inference."
+              → One sentence. Biomechanics rigor for AI judges, plain-language physics for everyone else.
 
-[0:35-1:30] LIVE DEMO — Paste a prompt → Watch fan-out → Heatmap renders
-              → Click a red cell → See the divergent claim with per-model breakdown
-              → "This claim has a JSD of 0.73 — models strongly disagree."
-              → Modal judges see their GPUs working. UX judges see the heatmap.
+[0:35-1:30] LIVE DEMO — Upload audio → Run AAI inference → 3D skull renders
+              → Tongue trajectory overlays in real time
+              → "Peak tongue-tip velocity: 184 cm/s — biomechanically impossible."
+              → Modal judges see their GPUs working. UX judges see the 3D evidence view.
 
-[1:30-2:10] ARCHITECTURE — Fan-out diagram on screen.
-              → "Open-source models run on Modal GPUs. Proprietary via CF AI Gateway.
-              → JSD + cosine computed per-claim. Results in real-time."
+[1:30-2:10] ARCHITECTURE — Pipeline diagram on screen.
+              → "16kHz audio into Wav2Vec2 AAI on Modal GPUs.
+              → EMA trajectories → frame-level velocity analysis → real-time 3D R3F output."
               → Systems engineers get distributed design. AI judges get methodology.
 
-[2:10-2:45] IMPACT — "Every AI-assisted decision needs a trust score.
-              → Healthcare, legal, financial — Prism is the verification layer."
+[2:10-2:45] IMPACT — "Voice authentication is broken.
+              → Banks, call centers, courts — LARYNX is the detection layer."
               → PM judges get impact. Founders get market size.
 
-[2:45-3:00] CLOSE — "Not a wrapper. Not a chat UI. A measurement instrument.
+[2:45-3:00] CLOSE — "Not a classifier. A physics engine for the human voice.
               → Built in 36 hours on Modal GPUs."
               → Anti-wrapper positioning for Vasu, Aydan, Karthik.
 ```
 
 ### What to EMPHASIZE
 
-- **Mathematical rigor** — JSD is real information theory, not a made-up score
-- **Architecture depth** — Fan-out topology, parallel inference, edge + cloud
-- **Working demo** — Show it actually running on Modal GPUs
-- **Visual impact** — The heatmap is genuinely impressive and intuitive
-- **Anti-wrapper positioning** — "We host models, we don't call APIs"
+- **Scientific rigor** — Articulatory velocity limits are grounded in biomechanics research
+- **Architecture depth** — AAI neural inference pipeline, edge + cloud, GPU execution
+- **Working demo** — Show real-time AAI inference running on Modal GPUs
+- **Visual impact** — The 3D skull clip moment is genuinely memorable
+- **Anti-wrapper positioning** — "We run a real Wav2Vec2-based neural model, not an API wrapper"
 
 ### What to DE-EMPHASIZE
 
-- Don't oversell the AI angle — 15+ judges ARE AI experts; they'll see through hype
+- Don't oversell vague AI claims — 15+ judges ARE AI experts; they'll see through hype
 - Don't show unfinished features — Yurii and serial judges will punish scope creep
 - Don't bash any specific AI company — Aydan is at OpenAI
 - Don't lead with technical jargon — PM judges need the pain point first
@@ -508,9 +508,9 @@
 
 ### RED FLAGS TO AVOID
 
-1. **"We used the GPT API"** → Instant credibility loss with Vasu, Aydan, Modal judges
+1. **"We just wrapped an API"** → Instant credibility loss with Vasu, Aydan, Modal judges
 2. **Loading spinners during demo** → Parthiv builds low-latency infra; he'll notice
 3. **Scope creep visible in UI** → Yurii will punish incomplete features
-4. **No statistical explanation** → Harsh Deep (Stats degree), Phoebe (Stats minor), Sunil (IEEE), Jay (production ML) will ask
+4. **No biomechanics explanation** → Harsh Deep (Stats degree), Phoebe (Stats minor), Sunil (IEEE), Jay (production ML) will ask
 5. **Security hand-waving** → 6 security/compliance judges will probe
 6. **"It could also do X, Y, Z"** → Ship ONE thing perfectly. Don't promise features.

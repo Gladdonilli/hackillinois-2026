@@ -22,7 +22,7 @@ aai_image = (
         "torch==2.5.1",
         "torchaudio==2.5.1",
         "numpy==2.1.3",
-        "scipy==1.14.1",
+        "scipy==1.13.1",
         "soundfile>=0.10.2",
         "librosa==0.10.2.post1",
         "PyYAML",
