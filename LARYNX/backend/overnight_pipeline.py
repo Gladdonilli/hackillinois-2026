@@ -27,6 +27,48 @@ from pathlib import Path
 app = modal.App("hackillinois-2026")
 model_cache = modal.Volume.from_name("model-cache", create_if_missing=True)
 
+# Volume paths for dataset caching (upload once, read at NVMe speed)
+VOLUME_DATASET_BASE = "/model-cache/dataset"
+
+
+@app.function(
+    image=modal.Image.debian_slim(python_version="3.11"),
+    volumes={"/model-cache": model_cache},
+    timeout=600,
+)
+def upload_wavs_to_volume(wav_items: list[tuple[str, bytes]], subdir: str) -> int:
+    """Upload WAV files to Modal volume under /model-cache/dataset/{subdir}/. Returns count written."""
+    from pathlib import Path
+    dest = Path(f"/model-cache/dataset/{subdir}")
+    dest.mkdir(parents=True, exist_ok=True)
+    written = 0
+    for filename, wav_bytes in wav_items:
+        fpath = dest / filename
+        if not fpath.exists():
+            with open(fpath, "wb") as f:
+                f.write(wav_bytes)
+            written += 1
+    model_cache.commit()
+    return written
+
+
+@app.function(
+    image=modal.Image.debian_slim(python_version="3.11"),
+    volumes={"/model-cache": model_cache},
+    timeout=120,
+)
+def list_volume_dataset() -> dict[str, list[str]]:
+    """List WAV files on volume. Returns {subdir: [filenames]}."""
+    from pathlib import Path
+    result: dict[str, list[str]] = {}
+    base = Path("/model-cache/dataset")
+    if not base.exists():
+        return result
+    for subdir in sorted(base.iterdir()):
+        if subdir.is_dir():
+            result[subdir.name] = [f.name for f in sorted(subdir.glob("*.wav"))]
+    return result
+
 image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libsndfile1", "ffmpeg", "wget", "sox", "git")
@@ -152,8 +194,8 @@ ELEVENLABS_VOICES = [
     max_containers=10,            # 10 GPU cap on Modal account
     )
 @modal.concurrent(max_inputs=10) # 10 concurrent batches per container — model loaded once, CPU handles preprocessing
-def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
-    """Process a batch of WAV files through AAI model. Each item is (filename, wav_bytes)."""
+def predict_ema_batch(wav_paths: list[str]) -> list[dict]:
+    """Process a batch of WAV files from volume paths through AAI model."""
     import torch
     import numpy as np
     import soundfile as sf
@@ -197,11 +239,15 @@ def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
     model.to(device).eval()
     print("Models loaded.")
 
+    # Refresh volume to see latest dataset uploads (handles warm containers)
+    model_cache.reload()
+
     # --- Process batch ---
     results = []
-    for filename, wav_bytes in wav_items:
+    for vol_path in wav_paths:
+        filename = Path(vol_path).name
         try:
-            audio, sr = sf.read(io.BytesIO(wav_bytes))
+            audio, sr = sf.read(vol_path)
             if len(audio.shape) > 1:
                 audio = audio[:, 0]
             if sr != 16000:
@@ -461,24 +507,40 @@ def main():
     print("=" * 80)
     start_time = time.time()
 
-    # ---- Step 1: Load local merged dataset ----
-    print("\n📦 Step 1: Loading local merged dataset...")
+    # ---- Step 1: Sync dataset to Modal volume (upload once, read at NVMe speed) ----
+    print("\n📦 Step 1: Syncing dataset to Modal volume...")
+    existing = list_volume_dataset.remote()
+    existing_real = set(existing.get("real", []))
+    existing_fake = set(existing.get("fake", []))
+    print(f"  Volume has {len(existing_real)} real + {len(existing_fake)} fake WAVs cached")
 
-    all_real: list[tuple[str, bytes]] = []
-    all_fake: list[tuple[str, bytes]] = []
+    all_real_names = sorted([f.name for f in MERGED_REAL_DIR.glob("*.wav")])
+    all_fake_names = sorted([f.name for f in MERGED_FAKE_DIR.glob("*.wav")])
+    new_real = [n for n in all_real_names if n not in existing_real]
+    new_fake = [n for n in all_fake_names if n not in existing_fake]
 
-    for wav_path in sorted(MERGED_REAL_DIR.glob("*.wav")):
-        with open(wav_path, "rb") as f:
-            all_real.append((wav_path.name, f.read()))
+    UPLOAD_BATCH = 500  # ~25MB per batch at ~50KB/WAV
+    if new_real or new_fake:
+        print(f"  Uploading {len(new_real)} real + {len(new_fake)} fake new WAVs (one-time transfer)...")
+        for label, new_names, src_dir in [("real", new_real, MERGED_REAL_DIR), ("fake", new_fake, MERGED_FAKE_DIR)]:
+            for i in range(0, len(new_names), UPLOAD_BATCH):
+                batch_names = new_names[i:i + UPLOAD_BATCH]
+                batch = []
+                for name in batch_names:
+                    with open(src_dir / name, "rb") as f:
+                        batch.append((name, f.read()))
+                written = upload_wavs_to_volume.remote(batch, label)
+                done = min(i + UPLOAD_BATCH, len(new_names))
+                print(f"    {label}: {done}/{len(new_names)} (+{written} new)")
+    else:
+        print("  ✅ All WAVs already on volume — skipping upload")
 
-    for wav_path in sorted(MERGED_FAKE_DIR.glob("*.wav")):
-        with open(wav_path, "rb") as f:
-            all_fake.append((wav_path.name, f.read()))
-
-    print(f"  ✅ Loaded {len(all_real)} real + {len(all_fake)} fake = {len(all_real) + len(all_fake)} samples")
+    real_paths = [f"/model-cache/dataset/real/{n}" for n in all_real_names]
+    fake_paths = [f"/model-cache/dataset/fake/{n}" for n in all_fake_names]
+    print(f"  ✅ {len(real_paths)} real + {len(fake_paths)} fake = {len(real_paths) + len(fake_paths)} samples ready on volume")
 
     # ---- Step 2: AAI inference on Modal (batched, multi-pass overnight mode) ----
-    n_samples_once = len(all_real) + len(all_fake)
+    n_samples_once = len(real_paths) + len(fake_paths)
     print(
         f"\n🧠 Step 2: Running AAI inference on {n_samples_once} samples "
         f"for {INFERENCE_PASSES} passes (~{n_samples_once * INFERENCE_PASSES} total inferences)..."
@@ -486,8 +548,8 @@ def main():
 
     # Batch into groups of 20 for fewer scheduling round trips
     BATCH_SIZE = 20
-    all_items_labeled = [(f, b, "real") for f, b in all_real] + [(f, b, "deepfake") for f, b in all_fake]
-    labels = {f: l for f, _, l in all_items_labeled}
+    all_items_labeled = [(p, "real") for p in real_paths] + [(p, "deepfake") for p in fake_paths]
+    labels = {Path(p).name: l for p, l in all_items_labeled}
 
     all_results = []
     for pass_idx in range(INFERENCE_PASSES):
@@ -498,7 +560,7 @@ def main():
         batches = []
         for i in range(0, len(pass_items), BATCH_SIZE):
             batch_items = pass_items[i:i + BATCH_SIZE]
-            batch = [(f, b) for f, b, _ in batch_items]
+            batch = [p for p, _ in batch_items]
             batches.append(batch)
 
         print(f"  \U0001f501 Pass {pass_idx + 1}/{INFERENCE_PASSES}: dispatching {len(batches)} batches across 10 GPUs")
@@ -510,7 +572,7 @@ def main():
             if isinstance(batch_result, Exception):
                 err_str = str(batch_result)
                 print(f"    \u274c Batch {batch_idx + 1} failed: {err_str[:120]}")
-                batch_results = [{"filename": f, "error": err_str[:200]} for f, _ in batches[batch_idx]]
+                batch_results = [{"filename": Path(f).name, "error": err_str[:200]} for f in batches[batch_idx]]
             else:
                 batch_results = batch_result
             for r in batch_results:
