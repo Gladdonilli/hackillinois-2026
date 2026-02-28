@@ -52,7 +52,7 @@
     font-family: "Geist", system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    cursor: crosshair;
+    cursor: none;
   }
   code, pre, .font-mono {
     font-family: "Geist Mono", "JetBrains Mono", monospace;
@@ -399,4 +399,83 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 255, 255, 0.4);
+}
+/* ============================================
+   INTERACTIVE ELEMENT EFFECTS  
+   ============================================ */
+
+/* All interactive elements get data-interactive for cursor detection */
+button, a, [role="button"], input, label, [data-interactive] {
+  cursor: none !important;
+}
+
+/* Hover lift effect on HUD panels */
+.hud-panel {
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hud-panel:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 255, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Glow intensify on hover for glow elements */
+.glow-cyan:hover {
+  box-shadow:
+    0 0 20px rgba(var(--cyan-glow), 0.25),
+    0 0 50px rgba(var(--cyan-glow), 0.12),
+    0 0 100px rgba(var(--cyan-glow), 0.06);
+}
+
+/* Button press effect */
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Focus ring for accessibility */
+button:focus-visible, input:focus-visible, [data-interactive]:focus-visible {
+  outline: 1px solid rgba(0, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   TEXT ANIMATION UTILITIES
+   ============================================ */
+
+/* Typewriter cursor for intro */
+.typewriter-cursor::after {
+  content: '▊';
+  color: #00FFFF;
+  animation: typewriter-blink 0.8s ease-in-out infinite;
+  margin-left: 2px;
+}
+
+/* Number counter animation helper */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-count-up {
+  animation: count-up 0.3s ease-out both;
+}
+
+/* Data stream effect — for telemetry decorations */
+@keyframes data-stream {
+  0% { opacity: 0.2; }
+  10% { opacity: 0.8; }
+  20% { opacity: 0.3; }
+  30% { opacity: 0.9; }
+  40% { opacity: 0.4; }
+  50% { opacity: 1; }
+  60% { opacity: 0.3; }
+  70% { opacity: 0.7; }
+  80% { opacity: 0.2; }
+  90% { opacity: 0.6; }
+  100% { opacity: 0.2; }
+}
+
+.animate-data-stream {
+  animation: data-stream 3s ease-in-out infinite;
 }

@@ -1,6 +1,6 @@
 import { Suspense, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei';
+import { OrbitControls, Environment, Sparkles, Float, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 
 import { HeadModel } from '@/components/HeadModel';
@@ -85,8 +85,14 @@ export function AnalysisView() {
             <pointLight position={[-4, 0, 3]} intensity={0.5} color="#1a1a4a" /> {/* fill */}
             <pointLight position={[0, 2, -4]} intensity={0.3} color="#FF3366" /> {/* rim */}
             
+            {/* Environment Upgrades */}
+            <Sparkles count={200} scale={8} size={1.5} speed={0.2} opacity={0.4} color="#00FFFF" />
+            <ContactShadows position={[0, -2.5, 0]} opacity={0.2} scale={10} blur={2} far={4} color="#00FFFF" />
+            
             {/* Scene */}
-            <HeadModel />
+            <Float speed={0.8} rotationIntensity={0.02} floatIntensity={0.05}>
+              <HeadModel />
+            </Float>
             <TongueModel />
             <EMAMarkers />
             <ParticleField />

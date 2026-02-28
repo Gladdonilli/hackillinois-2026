@@ -1,78 +1,56 @@
-import { useRef } from 'react';
+import { MeshDistortMaterial, Float } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
+import { useRef } from 'react';
 import { useLarynxStore } from '@/store/useLarynxStore';
-
-const NORMAL_COLOR = new THREE.Color('#CC6677');
-const WARN_COLOR = new THREE.Color('#FF8800');
-const ALERT_COLOR = new THREE.Color('#FF0044');
+import * as THREE from 'three';
 
 export function TongueModel() {
   const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
-
+  const matRef = useRef<any>(null); // MeshDistortMaterial ref
+  const colorObj = useRef(new THREE.Color('#00FFFF'));
   useFrame(() => {
-    if (!meshRef.current || !materialRef.current) return;
-
-    const { frames, currentFrame } = useLarynxStore.getState();
+    const { frames, currentFrame, tongueVelocity } = useLarynxStore.getState();
+    if (!meshRef.current || !matRef.current) return;
+    
+    // Position from EMA data
     const frame = frames[currentFrame];
-    if (!frame || !frame.sensors) return;
-
-    // Map T1 sensor to tongue tip position, JAW opening
-    const t1 = frame.sensors.T1 || { x: 0, y: 0 };
-    const jaw = frame.sensors.JAW || { x: 0, y: 0 };
-
-    const targetX = t1.x / 50;
-    const targetY = (t1.y / 50) - 0.2 + (jaw.y / 100);
-    
-    // Smooth translation (LERP)
-    meshRef.current.position.x = THREE.MathUtils.lerp(meshRef.current.position.x, targetX, 0.15);
-    meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, targetY, 0.15);
-
-    // Velocity based visuals
-    // Assuming tongueVelocity exists in the frame, fallback to a derived or 0 value
-    const velocity = frame.tongueVelocity || (t1.velocity || 0);
-    
-    let targetColor = NORMAL_COLOR;
-    let targetEmissiveIntensity = 0.1;
-    let targetScale = 1.0;
-
-    if (velocity > 80) {
-      targetColor = ALERT_COLOR;
-      targetEmissiveIntensity = velocity / 50;
-      targetScale = 1 + velocity / 100; // Deepfake skull-clipping effect
-    } else if (velocity > 50) {
-      targetColor = ALERT_COLOR;
-      targetEmissiveIntensity = velocity / 50;
-    } else if (velocity > 20) {
-      targetColor = WARN_COLOR;
-      targetEmissiveIntensity = 0.5;
+    if (frame?.sensors?.T1) {
+      meshRef.current.position.x += (frame.sensors.T1.x - meshRef.current.position.x) * 0.15;
+      meshRef.current.position.y += (frame.sensors.T1.y - meshRef.current.position.y) * 0.15;
     }
-
-    // Apply color and emissive LERP
-    materialRef.current.color.lerp(targetColor, 0.15);
-    materialRef.current.emissive.lerp(targetColor, 0.15);
-    materialRef.current.emissiveIntensity = THREE.MathUtils.lerp(
-      materialRef.current.emissiveIntensity, 
-      targetEmissiveIntensity, 
-      0.15
-    );
-
-    // Smooth scaling without clamping above 1.0
-    meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
+    
+    // Velocity-driven distortion
+    const normalizedVel = Math.min(tongueVelocity / 100, 1);
+    matRef.current.distort = 0.1 + normalizedVel * 0.7;
+    matRef.current.speed = 2 + normalizedVel * 15;
+    
+    // Color lerp: cyan → warn → red
+    if (tongueVelocity > 80) {
+      colorObj.current.lerp(new THREE.Color('#FF0000'), 0.1);
+    } else if (tongueVelocity > 50) {
+      colorObj.current.lerp(new THREE.Color('#FF3366'), 0.1);
+    } else {
+      colorObj.current.lerp(new THREE.Color('#00FFFF'), 0.05);
+    }
+    matRef.current.color = colorObj.current;
+    matRef.current.emissiveIntensity = 0.3 + normalizedVel * 2.5;
   });
-
   return (
-    <mesh ref={meshRef} position={[0, -0.2, 0.3]}>
-      <capsuleGeometry args={[0.15, 0.5, 8, 16]} />
-      <meshStandardMaterial
-        ref={materialRef}
-        color="#CC6677"
-        roughness={0.6}
-        metalness={0.1}
-        emissive="#CC6677"
-        emissiveIntensity={0.1}
-      />
-    </mesh>
+    <Float speed={1.5} rotationIntensity={0.05} floatIntensity={0.1}>
+      <mesh ref={meshRef} position={[0, -0.3, 0.3]}>
+        <capsuleGeometry args={[0.15, 0.5, 8, 16]} />
+        <MeshDistortMaterial
+          ref={matRef}
+          color="#00FFFF"
+          emissive="#00FFFF"
+          emissiveIntensity={0.5}
+          roughness={0.3}
+          metalness={0.1}
+          distort={0.15}
+          speed={3}
+          toneMapped={false}
+        />
+      </mesh>
+    </Float>
   );
 }

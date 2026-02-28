@@ -9,6 +9,8 @@ import { WaveformDisplay } from '@/components/WaveformDisplay'
 import { AnalysisOverlay } from '@/components/AnalysisOverlay'
 import { IntroSequence } from '@/components/IntroSequence'
 import { SoundEngine } from '@/audio/SoundEngine'
+import { LandingScene } from '@/components/LandingScene'
+import { CustomCursor } from '@/components/CustomCursor'
 
 export default function App() {
   const status = useLarynxStore((state) => state.status)
@@ -98,6 +100,7 @@ export default function App() {
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(4px)' }}
             transition={{ duration: 0.6 }}
           >
+            <LandingScene />
             <UploadPanel />
           </motion.div>
         )}
@@ -168,6 +171,9 @@ export default function App() {
       
       {/* Scanline overlay — always on top */}
       <div className="scanline-overlay pointer-events-none z-50" />
+
+      {/* Custom Cursor — must be the very last element to be on top of everything including scanlines */}
+      <CustomCursor />
     </div>
   )
 }
