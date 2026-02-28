@@ -1,4 +1,4 @@
-import { Suspense, useRef } from 'react';
+import { Suspense, useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, Sparkles, Float, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
@@ -35,35 +35,64 @@ function ScannerLoader() {
   );
 }
 
-function GridFloor() {
+function MeasurementGrid() {
+  const ringRef = useRef<THREE.Mesh>(null!);
+
+  useFrame((state) => {
+    if (!ringRef.current) return;
+    ringRef.current.rotation.z = state.clock.elapsedTime * 0.1;
+    const scale = 1.0 + Math.sin(state.clock.elapsedTime * Math.PI) * 0.01;
+    ringRef.current.scale.set(scale, scale, scale);
+  });
+
   return (
-    <mesh rotation-x={-Math.PI / 2} position={[0, -2.5, 0]}>
-      <planeGeometry args={[40, 40]} />
-      <meshBasicMaterial color="#00FFFF" opacity={0.015} transparent wireframe />
+    <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.5, 0]}>
+      <ringGeometry args={[0.5, 3, 64, 1]} />
+      <meshBasicMaterial wireframe color="#00FFFF" transparent opacity={0.08} />
     </mesh>
   );
 }
 
-function AnimatedSpotLight() {
-  const lightRef = useRef<THREE.SpotLight>(null);
+function DataParticles() {
+  const count = 50;
+  const meshRef = useRef<THREE.InstancedMesh>(null!);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const particles = useMemo(() => {
+    return Array.from({ length: count }, () => ({
+      x: (Math.random() - 0.5) * 8,
+      y: (Math.random() - 0.5) * 8 - 2,
+      z: (Math.random() - 0.5) * 8,
+      speed: 0.1 + Math.random() * 0.2,
+    }));
+  }, [count]);
 
-  useFrame((state) => {
-    if (lightRef.current) {
-      lightRef.current.position.x = 3 + Math.sin(state.clock.elapsedTime * 0.5) * 0.5;
-      lightRef.current.position.z = 5 + Math.cos(state.clock.elapsedTime * 0.3) * 0.5;
-    }
+  useFrame((state, delta) => {
+    if (!meshRef.current) return;
+    particles.forEach((p, i) => {
+      p.y += p.speed * delta;
+      if (p.y > 4) p.y = -4;
+      dummy.position.set(p.x, p.y, p.z);
+      dummy.rotation.set(state.clock.elapsedTime * p.speed, state.clock.elapsedTime * p.speed * 0.5, 0);
+      dummy.updateMatrix();
+      meshRef.current.setMatrixAt(i, dummy.matrix);
+    });
+    meshRef.current.instanceMatrix.needsUpdate = true;
   });
 
   return (
-    <spotLight
-      ref={lightRef}
-      position={[3, 4, 5]}
-      color="#00FFFF"
-      intensity={2}
-      angle={0.4}
-      penumbra={0.5}
-      castShadow
-    />
+    <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
+      <planeGeometry args={[0.01, 0.02]} />
+      <meshBasicMaterial color="#00FFFF" transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
+    </instancedMesh>
+  );
+}
+
+function LightCone() {
+  return (
+    <mesh position={[3, 5, 2]} rotation={[Math.PI / 4, 0, -Math.PI / 6]}>
+      <coneGeometry args={[2, 8, 32, 1, true]} />
+      <meshBasicMaterial transparent opacity={0.03} color="#00FFFF" side={THREE.DoubleSide} blending={THREE.AdditiveBlending} depthWrite={false} />
+    </mesh>
   );
 }
 
@@ -78,13 +107,14 @@ export function AnalysisView() {
           style={{ background: 'transparent' }}
         >
           <Suspense fallback={null}> {/* Loader is outside Canvas */}
-            <fog attach="fog" args={['#000000', 8, 25]} />
+            <fogExp2 attach="fog" args={['#050510', 0.15]} />
             
             {/* Lighting */}
             <ambientLight intensity={0.08} />
-            <AnimatedSpotLight />
-            <pointLight position={[-4, 0, 3]} intensity={0.5} color="#1a1a4a" /> {/* fill */}
-            <pointLight position={[0, 2, -4]} intensity={0.3} color="#FF3366" /> {/* rim */}
+            <spotLight position={[3, 5, 2]} color="#00FFFF" intensity={3} angle={0.4} penumbra={0.5} castShadow />
+            <LightCone />
+            <pointLight position={[-3, 1, 2]} intensity={0.5} color="#1a1a4a" />
+            <pointLight position={[2, 0, -3]} intensity={0.8} color="#FF3366" />
             
             {/* Environment Upgrades */}
             <Sparkles count={200} scale={8} size={1.5} speed={0.2} opacity={0.4} color="#00FFFF" />
@@ -96,16 +126,17 @@ export function AnalysisView() {
             </Float>
             <TongueModel />
             <EMAMarkers />
-<VelocityRibbons />
+            <VelocityRibbons />
             <ParticleField />
             <SkullClipEffect />
-            <GridFloor />
+            <MeasurementGrid />
+            <DataParticles />
             
             {/* Effects */}
             <PostProcessingEffects />
             <CameraController />
             <OrbitControls enablePan={false} enableZoom={true} minDistance={2} maxDistance={10} />
-            <Environment preset="night" />
+            <Environment preset="city" />
           </Suspense>
         </Canvas>
       </Suspense>

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { SoundEngine } from '@/audio/SoundEngine';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLarynxStore } from '@/store/useLarynxStore';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,10 @@ export function VerdictPanel() {
   const evidenceRef = useRef<HTMLDivElement>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   
+  const noiseRef = useRef<HTMLDivElement>(null);
+  const checkIconRef = useRef<HTMLSpanElement>(null);
+  const badgeTextRef = useRef<HTMLSpanElement>(null);
+
   // Need local state for the counting animation so we don't cause React re-renders on every frame
   const countRef = useRef({ val: 0 });
   const [displayConfidence, setDisplayConfidence] = useState("0.0");
@@ -36,15 +41,95 @@ export function VerdictPanel() {
       if (evidenceRef.current?.children) {
         gsap.set(evidenceRef.current.children, { opacity: 0, y: 5 });
       }
+      if (checkIconRef.current) gsap.set(checkIconRef.current, { scale: 0 });
       countRef.current.val = 0;
       setDisplayConfidence("0.0");
+
+      const badgePopTime = verdict.isGenuine ? 0.3 : 0.4;
 
       // Badge Elastic pop
       tl.to(badgeRef.current, {
         scale: 1,
         ease: 'elastic.out(1, 0.4)',
-        duration: 0.8
-      }, 0.3);
+        duration: 0.8,
+        onStart: () => {
+          if (verdict.isGenuine) {
+            SoundEngine.playBeep();
+          }
+        }
+      }, badgePopTime);
+
+      if (!verdict.isGenuine) {
+        // Screen shake
+        tl.to(containerRef.current, { 
+          x: 'random(-5, 5)', 
+          y: 'random(-3, 3)', 
+          duration: 0.05, 
+          repeat: 6, 
+          yoyo: true,
+          clearProps: 'x,y',
+          onComplete: () => {
+            gsap.set(containerRef.current, { x: 0, y: 0 });
+          }
+        }, badgePopTime);
+        
+        // Glitch text
+        if (badgeTextRef.current) {
+          let cycles = 0;
+          const chars = "!<>-_\\/[]{}—=+*^?#";
+          const interval = setInterval(() => {
+            if (badgeTextRef.current) {
+              const glitched = Array.from("DEEPFAKE")
+                .map(c => Math.random() > 0.4 ? chars[Math.floor(Math.random() * chars.length)] : c)
+                .join('');
+              badgeTextRef.current.innerText = glitched;
+              badgeTextRef.current.setAttribute('data-text', glitched);
+            }
+            cycles++;
+            if (cycles >= 4) {
+              clearInterval(interval);
+              if (badgeTextRef.current) {
+                badgeTextRef.current.innerText = "DEEPFAKE";
+                badgeTextRef.current.setAttribute('data-text', "DEEPFAKE");
+              }
+            }
+          }, 100);
+        }
+
+        // Static noise overlay
+        if (noiseRef.current) {
+          tl.set(noiseRef.current, { opacity: 0.1 }, badgePopTime);
+          tl.to(noiseRef.current, { opacity: 0, duration: 2.0, ease: 'power2.out' }, badgePopTime);
+        }
+
+        // Border pulse
+        if (containerRef.current) {
+          tl.to(containerRef.current, {
+            borderColor: 'rgba(255, 51, 102, 0.8)',
+            boxShadow: '0 0 20px rgba(255, 51, 102, 0.4)',
+            duration: 0.125,
+            repeat: 15,
+            yoyo: true,
+            clearProps: 'borderColor,boxShadow'
+          }, badgePopTime);
+        }
+      } else {
+        // Genuine effect
+        if (containerRef.current) {
+          tl.to(containerRef.current, {
+             boxShadow: '0 0 40px rgba(0, 255, 136, 0.4)',
+             duration: 1.5,
+             ease: 'power2.inOut'
+          }, badgePopTime);
+        }
+        if (checkIconRef.current) {
+          tl.to(checkIconRef.current, {
+            scale: 1,
+            ease: 'elastic.out(1, 0.3)',
+            duration: 0.6
+          }, badgePopTime + 0.3);
+        }
+      }
 
       // Confidence fade up and count
       tl.to(confidenceRef.current, {
@@ -52,7 +137,7 @@ export function VerdictPanel() {
         y: 0,
         duration: 0.4,
         ease: 'power2.out'
-      }, 0.6);
+      }, badgePopTime + 0.3);
 
       tl.to(countRef.current, {
         val: verdict.confidence * 100,
@@ -60,8 +145,18 @@ export function VerdictPanel() {
         ease: 'power3.out',
         onUpdate: () => {
           setDisplayConfidence(countRef.current.val.toFixed(1));
+        },
+        onComplete: () => {
+          if (verdict.isGenuine && confidenceRef.current) {
+            gsap.to(confidenceRef.current, {
+              scale: 1.05,
+              duration: 0.1,
+              yoyo: true,
+              repeat: 1
+            });
+          }
         }
-      }, 0.6);
+      }, badgePopTime + 0.3);
 
       // List stagger
       if (evidenceRef.current?.children) {
@@ -71,8 +166,19 @@ export function VerdictPanel() {
           duration: 0.4,
           stagger: 0.1,
           ease: 'power2.out'
-        }, 1.0);
-      }
+        }, badgePopTime + 0.7);
+
+        if (!verdict.isGenuine) {
+          Array.from(evidenceRef.current.children).forEach((child, i) => {
+            tl.to(child.children, {
+              color: '#FF3366',
+              duration: 0.1,
+              yoyo: true,
+              repeat: 1,
+              clearProps: 'color'
+            }, badgePopTime + 0.7 + (i * 0.1));
+          });
+        }
     }
   }, [status, verdict]);
 
@@ -84,7 +190,18 @@ export function VerdictPanel() {
     <>
       {/* Full screen flash element */}
       {status === 'complete' && verdict && (
-        <div ref={flashRef} className="fixed inset-0 bg-white z-[100] pointer-events-none opacity-10" />
+        <>
+          <div ref={flashRef} className="fixed inset-0 bg-white z-[100] pointer-events-none opacity-10" />
+          {!verdict.isGenuine && (
+            <div 
+              ref={noiseRef} 
+              className="fixed inset-0 pointer-events-none z-[90] opacity-0 mix-blend-overlay" 
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+              }}
+            />
+          )}
+        </>
       )}
       
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
@@ -129,7 +246,10 @@ export function VerdictPanel() {
                     verdict.isGenuine ? "bg-[#00FF88] text-black" : "bg-[#FF3366] text-white"
                   )}
                 >
-                  {verdict.isGenuine ? "GENUINE" : "DEEPFAKE"}
+                  {verdict.isGenuine && <span ref={checkIconRef} className="inline-block mr-2 origin-center">✓</span>}
+                  <span ref={badgeTextRef} data-text={verdict.isGenuine ? "GENUINE" : "DEEPFAKE"} className={cn(!verdict.isGenuine && "glitch-text")}>
+                    {verdict.isGenuine ? "GENUINE" : "DEEPFAKE"}
+                  </span>
                 </Badge>
               </div>
               
