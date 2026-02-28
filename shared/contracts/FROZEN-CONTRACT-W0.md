@@ -72,6 +72,13 @@ interface Report {
 
 **Response**: `ApiResponse<{ service: "larynx", status: "healthy", timestamp: number }>`
 
+### GET /api/history
+
+**Response**: `ApiResponse<Report[]>`
+
+Returns the 50 most recent analysis reports, ordered by `created_at` descending.
+Used by the frontend history panel. Not authenticated — scoped to all users.
+
 ---
 
 ## 3. SSE Event Types

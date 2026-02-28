@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import pickle
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
@@ -58,7 +58,7 @@ ARTICULATORS = {
 PIPELINE_DT = 0.01
 
 
-def _load_model() -> Optional[dict]:
+def _load_model() -> Optional[dict[str, Any]]:
     """Load classifier model bundle from disk. Checks both naming conventions.
 
     Returns None if unavailable. Normalizes key names across bundle formats.
@@ -96,11 +96,11 @@ def _load_model() -> Optional[dict]:
 
 
 # Lazy-loaded model singleton
-_model_bundle: Optional[dict] = None
+_model_bundle: Optional[dict[str, Any]] = None
 _model_loaded: bool = False
 
 
-def _get_model() -> Optional[dict]:
+def _get_model() -> Optional[dict[str, Any]]:
     """Get cached model bundle, loading on first call."""
     global _model_bundle, _model_loaded
     if not _model_loaded:
@@ -121,7 +121,7 @@ def _ema_frames_to_array(ema_frames: list[EMAFrame]) -> np.ndarray:
     return ema
 
 
-def _compute_kinematics(ema: np.ndarray, ix: int, iy: int) -> dict:
+def _compute_kinematics(ema: np.ndarray, ix: int, iy: int) -> dict[str, np.ndarray]:
     """Compute velocity, acceleration, jerk for a 2D articulatory point.
 
     Matches overnight_pipeline.py's compute_kinematics() logic.
@@ -143,7 +143,7 @@ def _compute_kinematics(ema: np.ndarray, ix: int, iy: int) -> dict:
     return {"vel": vel, "accel": accel, "jerk": jerk}
 
 
-def _extract_features(ema: np.ndarray) -> dict:
+def _extract_features(ema: np.ndarray) -> dict[str, float]:
     """Extract feature vector from EMA trajectory.
 
     MUST match overnight_pipeline.py's feature extraction exactly.
@@ -171,7 +171,7 @@ def _extract_features(ema: np.ndarray) -> dict:
     return features
 
 
-def classify_ema_frames(ema_frames: list[EMAFrame]) -> Optional[dict]:
+def classify_ema_frames(ema_frames: list[EMAFrame]) -> Optional[dict[str, Any]]:
     """Run GBM classifier on EMA frames and return prediction.
 
     Args:

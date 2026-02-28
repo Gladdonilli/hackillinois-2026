@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """CSIS — Core Science Integration Smoke-test.
 
+STANDALONE SCRIPT — not imported by app.py or any other module.
+Uses pipeline.py classes directly for validation testing.
+
 Runs the existing parselmouth→formant→velocity pipeline against real vs deepfake
 WAV files and reports whether there's any velocity separation signal.
 

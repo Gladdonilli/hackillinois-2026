@@ -1,6 +1,12 @@
-# Shared API Conventions
+# Shared API Conventions (SUPERSEDED)
 
-Every LARYNX endpoint follows these conventions. No exceptions. Consistency here means the frontend can rely on a stable API contract without surprise format changes.
+> **⚠️ SUPERSEDED by [FROZEN-CONTRACT-W0.md](./FROZEN-CONTRACT-W0.md)**
+>
+> This file is kept for historical reference only. The frozen contract is the
+> canonical API specification. All new work MUST conform to FROZEN-CONTRACT-W0.md.
+>
+> Key differences: error format changed from `ApiError|null` to `{code, message}`,
+> SSE event `result` renamed to `verdict`, rate limit changed from 5 to 20 req/min.
 
 ---
 

@@ -62,7 +62,6 @@ class FormantExtractor:
             window_length=WINDOW_LENGTH,
         )
         pitch = sound.to_pitch_ac(time_step=FORMANT_TIME_STEP, pitch_floor=PITCH_FILTER_HZ)
-        pitch = sound.to_pitch_ac(time_step=0.01, pitch_floor=80.0)
         
         num_frames = formants.get_number_of_frames()
         
@@ -240,7 +239,7 @@ def analyze_audio(audio_bytes: bytes, filename: str) -> Generator[AnalysisProgre
         is_genuine=is_genuine,
         confidence=round(confidence, 3),
         peak_velocity=round(peak_v, 2),
-        threshold=22.0,
+        threshold=ABSOLUTE_MAX_VELOCITY,
         anomalous_frame_count=anomalous,
         total_frame_count=total,
         anomaly_ratio=round(ratio, 4),
