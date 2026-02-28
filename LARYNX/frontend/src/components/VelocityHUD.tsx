@@ -37,32 +37,27 @@ export function VelocityHUD() {
       return;
     }
 
-    const frame = frames[currentFrame] as any;
-    const prevFrame = currentFrame > 0 ? (frames[currentFrame - 1] as any) : frame;
+    const frame = frames[currentFrame];
+    const prevFrame = currentFrame > 0 ? frames[currentFrame - 1] : frame;
 
-    const tongueSpeed = typeof frame.tongueVelocity === 'number' ? frame.tongueVelocity : 0;
-    
-    const calculateEstVelocity = (currentPos?: any, prevPos?: any) => {
-      if (!currentPos || !prevPos) return null;
-      let dx = 0;
-      let dy = 0;
-      if (Array.isArray(currentPos) && Array.isArray(prevPos)) {
-        dx = currentPos[0] - prevPos[0];
-        dy = currentPos[1] - prevPos[1];
-      } else if (typeof currentPos === 'object' && typeof prevPos === 'object') {
-        dx = (currentPos.x || 0) - (prevPos.x || 0);
-        dy = (currentPos.y || 0) - (prevPos.y || 0);
-      }
-      return Math.sqrt(dx * dx + dy * dy) * 30; // approx cm/s assuming 30fps and 1 unit = 1cm
+    const getSensorVelocity = (sensorName: string): number | null => {
+      const sensor = frame.sensors[sensorName as keyof typeof frame.sensors];
+      if (sensor && typeof sensor.velocity === 'number') return sensor.velocity;
+      // Fallback: compute from position delta
+      const prev = prevFrame.sensors[sensorName as keyof typeof prevFrame.sensors];
+      if (!sensor || !prev) return null;
+      const dx = sensor.x - prev.x;
+      const dy = sensor.y - prev.y;
+      return Math.sqrt(dx * dx + dy * dy) * 30; // ~cm/s at 30fps
     };
 
     setSensors([
-      { label: 'T1', velocity: tongueSpeed, threshold: tTongue },
-      { label: 'T2', velocity: tongueSpeed * 0.8, threshold: tTongue }, // Approximations for visually separate gauges
-      { label: 'T3', velocity: tongueSpeed * 0.6, threshold: tTongue },
-      { label: 'JAW', velocity: calculateEstVelocity(frame.jaw, prevFrame.jaw), threshold: tJaw },
-      { label: 'UL', velocity: calculateEstVelocity(frame.ul, prevFrame.ul), threshold: tLip },
-      { label: 'LL', velocity: calculateEstVelocity(frame.ll, prevFrame.ll), threshold: tLip },
+      { label: 'T1', velocity: getSensorVelocity('T1'), threshold: tTongue },
+      { label: 'T2', velocity: getSensorVelocity('T2'), threshold: tTongue },
+      { label: 'T3', velocity: getSensorVelocity('T3'), threshold: tTongue },
+      { label: 'JAW', velocity: getSensorVelocity('JAW'), threshold: tJaw },
+      { label: 'UL', velocity: getSensorVelocity('UL'), threshold: tLip },
+      { label: 'LL', velocity: getSensorVelocity('LL'), threshold: tLip },
     ]);
   }, [frames, currentFrame]);
 

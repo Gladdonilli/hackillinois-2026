@@ -77,22 +77,22 @@ export function VerdictPanel() {
           >
             <div ref={badgeRef}>
               <Badge 
-                variant={(verdict as any).isGenuine ? "genuine" : "deepfake"} 
+                variant={verdict.isGenuine ? "genuine" : "deepfake"} 
                 className={cn(
                   "text-2xl font-bold px-6 py-3 border-none shadow-lg",
-                  (verdict as any).isGenuine ? "bg-[#00FF88] text-black" : "bg-[#FF3366] text-white"
+                  verdict.isGenuine ? "bg-[#00FF88] text-black" : "bg-[#FF3366] text-white"
                 )}
               >
-                {(verdict as any).isGenuine ? "GENUINE" : "DEEPFAKE"}
+                {verdict.isGenuine ? "GENUINE" : "DEEPFAKE"}
               </Badge>
             </div>
             
             <div ref={confidenceRef} className="font-mono text-lg font-semibold tracking-wide text-text">
-              {((verdict as any).confidence || 0).toFixed(1)}% confidence
+              {(verdict.confidence * 100).toFixed(1)}% confidence
             </div>
             
             <div ref={evidenceRef} className="font-mono text-sm text-dim">
-              Peak velocity: {((verdict as any).peakVelocity || 0).toFixed(1)} cm/s (threshold: {((verdict as any).threshold || 0).toFixed(1)} cm/s)
+              Peak velocity: {verdict.peakVelocity.toFixed(1)} cm/s (threshold: {verdict.threshold.toFixed(1)} cm/s)
             </div>
           </motion.div>
         )}
