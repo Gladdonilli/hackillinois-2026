@@ -309,14 +309,17 @@ def download_librispeech() -> list[tuple[str, bytes]]:
         .apt_install("ffmpeg")
         .pip_install("requests")
     ),
-    timeout=3600,
+    timeout=600,
     secrets=[modal.Secret.from_name("elevenlabs-api-key")],
+    concurrency_limit=50,  # Max 50 parallel containers for TTS generation
 )
-def generate_elevenlabs_deepfakes() -> list[tuple[str, bytes]]:
-    """Generate N_FAKE_SAMPLES ElevenLabs deepfakes with diverse voices.
+def generate_elevenlabs_chunk(chunk: list[tuple[int, str, str, str, str]]) -> list[tuple[str, bytes]]:
+    """Generate a chunk of ElevenLabs deepfakes in one container.
 
-    Returns (filename, wav_bytes) pairs where filename encodes the voice name
-    for GroupKFold speaker tracking.
+    Args:
+        chunk: List of (idx, voice_id, voice_name, model_id, sentence) tuples
+    Returns:
+        List of (filename, wav_bytes) pairs
     """
     import requests
     import subprocess
@@ -330,24 +333,13 @@ def generate_elevenlabs_deepfakes() -> list[tuple[str, bytes]]:
         raise ValueError("ELEVENLABS_API_KEY not set")
 
     items = []
-    errors = 0
-    n_voices = len(ELEVENLABS_VOICES)
-    n_sentences = len(SENTENCES)
-
-    for idx in range(N_FAKE_SAMPLES):
-        voice_id, voice_name = ELEVENLABS_VOICES[idx % n_voices]
-        sentence = SENTENCES[idx % n_sentences]
-        # Alternate between V2 and V3 models for synthesis diversity
-        model_id = "eleven_v3" if idx % 2 == 0 else "eleven_multilingual_v2"
-        model_tag = "v3" if idx % 2 == 0 else "v2"
-        # Encode voice name + model version in filename for speaker tracking
+    for idx, voice_id, voice_name, model_id, sentence in chunk:
+        model_tag = "v3" if "v3" in model_id else "v2"
         filename = f"elevenlabs_{voice_name}_{model_tag}_{idx:04d}"
-
         mp3_path = work_dir / f"{filename}.mp3"
         wav_path = work_dir / f"{filename}.wav"
 
         try:
-            # ElevenLabs TTS API
             resp = requests.post(
                 f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
                 headers={
@@ -367,11 +359,9 @@ def generate_elevenlabs_deepfakes() -> list[tuple[str, bytes]]:
             )
             resp.raise_for_status()
 
-            # Save MP3
             with open(mp3_path, "wb") as f:
                 f.write(resp.content)
 
-            # Convert to 16kHz mono WAV
             subprocess.run(
                 ["ffmpeg", "-y", "-i", str(mp3_path), "-ar", "16000", "-ac", "1", str(wav_path)],
                 capture_output=True, check=True,
@@ -380,26 +370,17 @@ def generate_elevenlabs_deepfakes() -> list[tuple[str, bytes]]:
             with open(wav_path, "rb") as f:
                 wav_bytes = f.read()
 
-            # Cleanup
             mp3_path.unlink(missing_ok=True)
             wav_path.unlink(missing_ok=True)
-
             items.append((f"{filename}.wav", wav_bytes))
-
-            if (idx + 1) % 50 == 0:
-                print(f"  Generated {idx + 1}/{N_FAKE_SAMPLES} ElevenLabs deepfakes...")
 
         except Exception as e:
             print(f"  FAIL {filename}: {e}")
-            errors += 1
-            # Rate limit backoff
             if "429" in str(e) or "rate" in str(e).lower():
-                print("  Rate limited, waiting 60s...")
                 import time
-                time.sleep(60)
+                time.sleep(30)
             continue
 
-    print(f"Generated {len(items)} ElevenLabs deepfakes ({errors} errors)")
     return items
 
 

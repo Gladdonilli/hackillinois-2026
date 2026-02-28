@@ -1,12 +1,5 @@
-// Type shims for packages without proper declarations
-// and fixes for @types/three@0.169.0 moduleResolution:"bundler" issues
-
-// Fix: @types/three@0.169.0 resolves `import * as THREE from 'three'` to
-// build/three.module which doesn't re-export namespace members under bundler resolution.
-// Re-export everything from the proper source path.
-declare module 'three' {
-  export * from 'three/src/Three.js'
-}
+// Ambient type declarations for packages without proper .d.ts
+// NOTE: No top-level imports here — this must remain an ambient declaration file (script).
 
 // three/examples/jsm loaders
 declare module 'three/examples/jsm/loaders/GLTFLoader.js' {
@@ -95,13 +88,3 @@ declare module '@react-three/postprocessing' {
   export const Vignette: React.FC<VignetteProps>
 }
 
-// Tone.js v15 removed RecursivePartial — provide a global shim
-// NOTE: Do NOT use `declare module 'tone'` — it shadows all existing Tone exports.
-  // Instead, declare the type globally so SoundEngine can use it.
-    type RecursivePartial<T> = {
-  [P in keyof T]?: T[P] extends (infer U)[]
-    ? RecursivePartial<U>[]
-    : T[P] extends object
-      ? RecursivePartial<T[P]>
-      : T[P]
-}
