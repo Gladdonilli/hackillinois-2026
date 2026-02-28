@@ -1,4 +1,4 @@
-import {
+import type {
   ApiResponse,
   GenerateRequest,
   GenerateData,
@@ -10,13 +10,6 @@ import {
   SteerData
 } from '../types';
 
-declare global {
-  interface ImportMeta {
-    env: {
-      VITE_API_URL?: string;
-    };
-  }
-}
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 

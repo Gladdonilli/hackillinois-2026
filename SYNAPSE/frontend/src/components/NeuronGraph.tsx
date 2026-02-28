@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { useRef, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useSynapseStore } from '../store';
+import { useStore as useSynapseStore } from '../store';
 import { FeatureTooltip } from './FeatureTooltip';
 import type { Feature } from '../types';
 
@@ -32,7 +32,7 @@ export function NeuronGraph() {
     for (let i = 0; i < count; i++) {
       const feature = features[i];
       const isSelected = feature.feature_id === selectedFeatureId;
-      const isAblated = ablations.has(feature.feature_id);
+      const isAblated = feature.feature_id in ablations;
       
       let targetEmi = 0.8;
       if (isSelected) {
@@ -56,7 +56,8 @@ export function NeuronGraph() {
       currentColors[i].lerp(scratchColor, 0.1);
       meshRef.current.setColorAt(i, currentColors[i]);
 
-      const targetPos = scratchObject.position.set(...feature.umap_xyz);
+      const [x, y, z] = feature.umap_xyz;
+      const targetPos = scratchObject.position.set(x, y, z);
       currentPositions[i].lerp(targetPos, 0.1);
       
       const targetScale = 0.05 + Math.log1p(feature.activation_strength) * 0.1;

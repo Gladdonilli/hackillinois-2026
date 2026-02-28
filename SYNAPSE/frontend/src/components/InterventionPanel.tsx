@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
 import { useSynapseStore } from '../store';
-import { Feature } from '../types';
+import type { Feature } from '../types';
 import { Button } from './ui/button';
 import { Slider } from './ui/slider';
 import { cn } from '../lib/utils';
@@ -21,33 +20,33 @@ export function InterventionPanel() {
     const startTime = performance.now();
 
     try {
-      const resp = await ablateFeatures({
-        job_id: store.jobId || '',
-        ablations: ablations
+      // ablateFeatures() already unwraps ApiResponse — returns AblateData directly
+      const data = await ablateFeatures({
+        job_id: store.currentJobId || '',
+        ablations: Object.entries(ablations).map(([feature_id, strength]) => ({
+          feature_id,
+          strength,
+        })),
       });
 
-      if (!resp.success || !resp.data) {
-        throw new Error(resp.error || 'Ablation failed');
-      }
-
-      store.setSteeredResponse(resp.data.steered_text);
+      store.setSteeredResponse(data.steered_response);
       store.setPhase('idle');
       
       const endTime = performance.now();
-      store.setGenerationTime((endTime - startTime) / 1000); // reuse for ablation time
+      store.setGenerationTime((endTime - startTime) / 1000);
 
-    } catch (err: any) {
-      store.setError(err.message || 'An unknown error occurred during ablation');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An unknown error occurred during ablation';
+      store.setError(message);
       store.setPhase('error');
     }
   };
 
   const getSliderColor = (val: number) => {
-      // interpolate from dim to warn
       const pct = val;
       if (pct === 0) return '#333333';
       if (pct < 0.5) return '#992244';
-      return '#FF3366'; // warning red
+      return '#FF3366';
   };
 
   if (features.length === 0) {
@@ -60,7 +59,6 @@ export function InterventionPanel() {
     );
   }
 
-  // take top 20
   const topFeatures = [...features].sort((a, b) => b.activation_strength - a.activation_strength).slice(0, 20);
 
   return (
@@ -91,18 +89,18 @@ export function InterventionPanel() {
 
       <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-[#333333] scrollbar-track-transparent">
         {topFeatures.map((f: Feature) => {
-            const val = ablations[f.id] || 0.0;
-            const isSelected = selectedFeatureId === f.id;
+            const val = ablations[f.feature_id] || 0.0;
+            const isSelected = selectedFeatureId === f.feature_id;
             
             return (
               <div 
-                key={f.id} 
+                key={f.feature_id} 
                 className={cn("flex flex-col space-y-2 p-2 rounded transition-colors cursor-pointer group", isSelected ? "bg-[#1F1F1F]/50 ring-1 ring-[#00FFFF]/30" : "hover:bg-[#1A1A1A]")}
-                onClick={() => setSelectedFeatureId(f.id)}
+                onClick={() => setSelectedFeatureId(f.feature_id)}
               >
                   <div className="flex justify-between items-center text-xs">
                      <span className={cn("font-sans truncate pr-2 flex-1", isSelected ? "text-[#EDEDED]" : "text-[#A0A0A0] group-hover:text-[#EDEDED]")}>
-                         {f.label || `Feature ${f.id}`}
+                         {f.label || `Feature ${f.feature_id}`}
                      </span>
                      <span className="text-[10px] font-mono bg-[#111111] px-1 rounded text-[#00FFFF] border border-[#00FFFF]/20">L{f.layer}</span>
                   </div>
@@ -119,7 +117,7 @@ export function InterventionPanel() {
                          min={0.0}
                          max={1.0}
                          step={0.05}
-                         onValueChange={([v]) => setAblation(f.id, v)}
+                         onValueChange={([v]) => setAblation(f.feature_id, v)}
                          disabled={isBusy}
                          className={cn(
                              "[&_[role=slider]]:border-none [&_[role=slider]]:h-3 [&_[role=slider]]:w-3 transition-colors", 

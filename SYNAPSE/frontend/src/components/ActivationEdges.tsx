@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useSynapseStore } from '../store';
+import { useStore as useSynapseStore } from '../store';
 import gsap from 'gsap';
 
 const BASE_COLOR = new THREE.Color('#00FFFF');
@@ -50,7 +50,7 @@ export function ActivationEdges() {
       positions[posIdx++] = posB[1];
       positions[posIdx++] = posB[2];
       
-      const isAblated = ablations.has(featA) || ablations.has(featB);
+      const isAblated = (featA in ablations) || (featB in ablations);
       // dim cyan at 20% opacity base, scaled by correlation
       const targetOpacity = isAblated ? 0 : correlation * 0.2;
       

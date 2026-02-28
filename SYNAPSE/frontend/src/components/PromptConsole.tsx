@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useSynapseStore } from '../store';
 import { generate, extractFeatures } from '../api/client';
 import { Button } from './ui/button';
@@ -34,33 +34,28 @@ export function PromptConsole() {
     const startTime = performance.now();
 
     try {
-      const genRes = await generate({
+      // generate() already unwraps ApiResponse — returns GenerateData directly
+      const genData = await generate({
         prompt: prompt,
         temperature: temperature[0],
-        max_tokens: maxTokens[0]
+        max_new_tokens: maxTokens[0]
       });
 
-      if (!genRes.success || !genRes.data) {
-        throw new Error(genRes.error || 'Generation failed');
-      }
-
-      store.setOriginalResponse(genRes.data.text);
+      store.setOriginalResponse(genData.response);
       store.setPhase('extracting');
 
-      const extRes = await extractFeatures(genRes.data.job_id);
-      
-      if (!extRes.success || !extRes.data) {
-        throw new Error(extRes.error || 'Feature extraction failed');
-      }
+      // extractFeatures() already unwraps ApiResponse — returns FeaturesData directly
+      const featData = await extractFeatures(genData.job_id);
 
-      store.setFeatures(extRes.data.features);
+      store.setFeatures(featData);
       store.setPhase('idle');
       
       const endTime = performance.now();
       store.setGenerationTime((endTime - startTime) / 1000);
 
-    } catch (err: any) {
-      store.setError(err.message || 'An unknown error occurred');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An unknown error occurred';
+      store.setError(message);
       store.setPhase('error');
     }
   };

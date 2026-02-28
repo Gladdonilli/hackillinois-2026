@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSynapseStore } from '../store';
-import { Button } from './ui/button';
 import { cn } from '../lib/utils';
-import { diffWords, Change } from 'diff';
+import { diffWords, type Change } from 'diff';
 import { Copy, Check, Clock, FileText } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 export function ResponseComparator() {
   const { originalResponse, steeredResponse, phase, generationTime } = useSynapseStore();

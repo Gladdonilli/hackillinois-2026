@@ -38,7 +38,7 @@ export default function BrainView() {
           />
         </mesh>
 
-        <EffectComposer disableNormalPass>
+        <EffectComposer enableNormalPass={false}>
           <Bloom 
             luminanceThreshold={1.0} 
             intensity={1.5} 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import {
+import type {
   AppPhase,
   Feature,
   GenerateData,
@@ -16,21 +16,27 @@ interface AppState {
   steeredResponse: string | null;
   features: Feature[];
   edges: [string, string, number][];
-  ablations: Map<string, number>;
+  ablations: Record<string, number>;
   selectedFeatureId: string | null;
   error: string | null;
-  generationTimeMs: number | null;
+  generationTime: number | undefined;
+  isAmplifyMode: boolean;
 
   setPrompt: (prompt: string) => void;
   setPhase: (phase: AppPhase) => void;
   setGenerateResult: (data: GenerateData) => void;
   setFeatures: (data: FeaturesData) => void;
-  toggleAblation: (featureId: string, strength: number) => void;
+  setOriginalResponse: (text: string) => void;
+  setSteeredResponse: (text: string) => void;
+  setAblation: (featureId: string, strength: number) => void;
   clearAblations: () => void;
   setAblateResult: (data: AblateData) => void;
   setSteerResult: (data: SteerData) => void;
   selectFeature: (featureId: string | null) => void;
-  setError: (error: string) => void;
+  setSelectedFeatureId: (featureId: string | null) => void;
+  setError: (error: string | null) => void;
+  setGenerationTime: (time: number | undefined) => void;
+  toggleAmplifyMode: () => void;
   reset: () => void;
 }
 
@@ -42,10 +48,11 @@ export const useStore = create<AppState>((set) => ({
   steeredResponse: null,
   features: [],
   edges: [],
-  ablations: new Map(),
+  ablations: {},
   selectedFeatureId: null,
   error: null,
-  generationTimeMs: null,
+  generationTime: undefined,
+  isAmplifyMode: false,
 
   setPrompt: (prompt) => set({ prompt }),
   
@@ -54,7 +61,7 @@ export const useStore = create<AppState>((set) => ({
   setGenerateResult: (data) => set({
     currentJobId: data.job_id,
     originalResponse: data.response,
-    generationTimeMs: data.generation_time_ms,
+    generationTime: data.generation_time_ms / 1000,
     phase: 'ready',
   }),
   
@@ -62,18 +69,21 @@ export const useStore = create<AppState>((set) => ({
     features: data.features,
     edges: data.co_activation_edges,
   }),
+
+  setOriginalResponse: (text) => set({ originalResponse: text }),
+  setSteeredResponse: (text) => set({ steeredResponse: text }),
   
-  toggleAblation: (featureId, strength) => set((state) => {
-    const newAblations = new Map(state.ablations);
+  setAblation: (featureId, strength) => set((state) => {
+    const newAblations = { ...state.ablations };
     if (strength === 0) {
-      newAblations.delete(featureId);
+      delete newAblations[featureId];
     } else {
-      newAblations.set(featureId, strength);
+      newAblations[featureId] = strength;
     }
     return { ablations: newAblations };
   }),
   
-  clearAblations: () => set({ ablations: new Map() }),
+  clearAblations: () => set({ ablations: {} }),
   
   setAblateResult: (data) => set({
     originalResponse: data.original_response,
@@ -86,8 +96,13 @@ export const useStore = create<AppState>((set) => ({
   }),
   
   selectFeature: (selectedFeatureId) => set({ selectedFeatureId }),
+  setSelectedFeatureId: (selectedFeatureId) => set({ selectedFeatureId }),
   
-  setError: (error) => set({ error, phase: 'error' }),
+  setError: (error) => set(error ? { error, phase: 'error' as const } : { error: null }),
+  
+  setGenerationTime: (generationTime) => set({ generationTime }),
+
+  toggleAmplifyMode: () => set((state) => ({ isAmplifyMode: !state.isAmplifyMode })),
   
   reset: () => set({
     phase: 'idle',
@@ -97,9 +112,13 @@ export const useStore = create<AppState>((set) => ({
     steeredResponse: null,
     features: [],
     edges: [],
-    ablations: new Map(),
+    ablations: {},
     selectedFeatureId: null,
     error: null,
-    generationTimeMs: null,
+    generationTime: undefined,
+    isAmplifyMode: false,
   })
 }));
+
+// Alias for components that import as useSynapseStore
+export const useSynapseStore = useStore;

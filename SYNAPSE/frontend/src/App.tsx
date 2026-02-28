@@ -1,4 +1,3 @@
-import { ReactNode } from "react";
 import BrainView from "./components/BrainView";
 
 function App() {
