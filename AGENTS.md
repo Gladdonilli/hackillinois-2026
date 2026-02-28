@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Project:** HackIllinois 2026 — LARYNX (Deepfake Voice Detection via Articulatory Physics)
-**Updated:** 2026-02-28 (Deployment Sprint Complete)
+**Updated:** 2026-02-28 (Cloudflare Stack Finalized)
 
 ## OVERVIEW
 
@@ -24,8 +24,8 @@ hackillinois/
 ├── research/            # Sound design, architecture research
 ├── competitive-intel/   # 13 competitor dossiers from Discord #find-a-team
 ├── _intel/              # Ideation sweep outputs (deep/artistry/ultrabrain analyses)
-├── scripts/             # auto-push.sh (5-min interval backup to GitHub)
-├── package.json         # Root shim for Aedify (delegates build to LARYNX/frontend)
+├── scripts/             # Utility scripts (auto-push removed)
+├── package.json         # Root shim (build delegates to LARYNX/frontend)
 ├── ATTENDEE_GUIDE.md    # Logistics, shuttles, food, WiFi
 └── RESOURCES.md         # API keys, Figma, Modal credits, CF config
 ```
@@ -49,10 +49,9 @@ hackillinois/
 
 | Service | URL | Notes |
 |---------|-----|-------|
-| Frontend (CF Pages) | `larynx.pages.dev` / `voxlarynx.tech` | Vite static build, deployed via `wrangler pages deploy dist` |
+| Frontend (CF Pages) | `larynx.pages.dev` / `voxlarynx.tech` / `www.voxlarynx.tech` | Vite static build, deployed via `wrangler pages deploy dist`. Custom domains verified. |
 | Worker API | `larynx-api.tianyi35.workers.dev` / `api.voxlarynx.tech` | Hono router, proxies to Modal |
 | Modal Backend | `gladdonilli--larynx-analyze.modal.run` | POST only, SSE streaming |
-| Aedify | Auto-deploys from GitHub | Container via Nixpacks, port 8000, root package.json shim |
 
 ### CF Products (7 — targeting $5K prize)
 
@@ -61,7 +60,7 @@ hackillinois/
 3. **R2** — `larynx-audio` (audio file storage)
 4. **Workers AI** — AI binding (embeddings via `@cf/baai/bge-base-en-v1.5`)
 5. **Vectorize** — `larynx-signatures` (768 dims, cosine metric)
-6. **Pages** — `larynx.pages.dev` (static frontend)
+6. **Pages** — `larynx.pages.dev` + custom domains `voxlarynx.tech`, `www.voxlarynx.tech` (static frontend)
 7. **AI Gateway** — `larynx-gateway` (rate limiting, caching, logging)
 
 ### Frontend→Backend Wiring
@@ -93,7 +92,7 @@ CF Pages → CF Worker (/api/analyze, /api/compare, /api/history) → Modal SSE
 - **API envelope**: Every endpoint returns `ApiResponse<T>` = `{ success: boolean, data?: T, error?: string }`
 - **SSE streaming**: Progress events use `event: progress\ndata: {step, progress, message}\n\n` format
 - **Animation state**: Zustand transient store (`useStore.getState()`) or `useRef`. **NEVER `useState`** for per-frame data
-- **Modal backend**: Single `modal.App("hackillinois")` with `LarynxProcessor` class. Shared `/model-cache` volume. `keep_warm=1`
+- **Modal backend**: Single `modal.App("hackillinois")` with `LarynxProcessor` class. Shared `/model-cache` volume. `min_containers=1`
 - **Versions**: Pin exact versions in STACK.md. Key constraints: `modal==1.3.4`, `praat-parselmouth==0.4.5`, `librosa==0.10.2.post1`
 - **Desktop only**: Min-width 1280px. No responsive mobile
 
@@ -110,14 +109,14 @@ CF Pages → CF Worker (/api/analyze, /api/compare, /api/history) → Modal SSE
 ## COMMANDS
 
 ```bash
-# Auto-push backup (already running as PID, logs to /tmp/auto-push.log)
-./scripts/auto-push.sh &
-
 # JJ (not git)
 jj log                    # View history
 jj describe -m "msg"      # Commit message
 jj new                    # New change
 jj git push               # Push to GitHub
+
+# Deploy frontend to CF Pages
+cd LARYNX/frontend && npx wrangler pages deploy dist/
 ```
 
 ## JJ CONFIG
@@ -165,6 +164,20 @@ requires `jj file untrack <path>` and history rewriting to avoid pushing bloated
 - **Identity**: Gladdonilli / tianyi35@illinois.edu
 - **Strategy**: Modal track. LARYNX is fundamentally GPU inference (AAI model) — perfect fit for sponsor track
 - **Primary threat**: Aryan Keluskar (3x Modal track winner), Krish Golcha (HackPrinceton Overall Winner)
+
+## TRAINING DATASET (Run 6)
+
+**Location:** `/home/li859/datasets/larynx-5k/` (OUTSIDE repo — not tracked by JJ)
+
+| Split | Count | Prefix Pattern | Source |
+|-------|-------|---------------|--------|
+| Real | 5,000 | `libri_*.wav` | LibriSpeech train-clean-100 (seed=42) |
+| Fake | 1,102 | `elkey1_*.wav` | ElevenLabs multilingual_v2 |
+| Fake | 891 | `elkey2_*.wav` | ElevenLabs flash_v2_5 |
+| Fake | 3,007 | `wf_WF[1-7]_*.wav` | WaveFake (7 vocoders from HF `ajaykarthick/wavefake-audio`) |
+
+**Format:** 16kHz mono 16-bit WAV, 2.8GB total
+**Backup:** `/home/li859/datasets/larynx-merged/` (4,877 fake + 33,302 real, all sources)
 
 ## AGENT-BROWSER SETUP
 

@@ -1,14 +1,14 @@
 """
-LARYNX Overnight Training Pipeline — Run 3
+LARYNX Overnight Training Pipeline — Run 6
 =============================================
-Loads local merged dataset (4321 real + 4321 fake) → AAI inference
-on Modal → acoustic features → trains ensemble classifier with GroupKFold by speaker.
+Loads external balanced dataset (5000 real + 5000 fake) → AAI inference
+on Modal B200 → acoustic features → trains ensemble classifier with GroupKFold by speaker.
 
 Usage:
   source ~/modal-env/bin/activate
   modal run LARYNX/backend/overnight_pipeline.py
 
-Estimated: ~2-4 hours on Modal A100 (10 passes × ~8642 samples)
+Estimated: ~1-2 hours on Modal B200 (30 passes × 10000 samples, volume-cached)
 """
 
 import modal
@@ -96,8 +96,8 @@ image = (
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-MERGED_REAL_DIR = Path(__file__).resolve().parent / "training_data" / "datasets" / "merged" / "real"
-MERGED_FAKE_DIR = Path(__file__).resolve().parent / "training_data" / "datasets" / "merged" / "fake"
+MERGED_REAL_DIR = Path("/home/li859/datasets/larynx-5k/real")
+MERGED_FAKE_DIR = Path("/home/li859/datasets/larynx-5k/fake")
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
 INFERENCE_PASSES = 30
@@ -192,7 +192,7 @@ ELEVENLABS_VOICES = [
     timeout=600,
     retries=3,
     max_containers=10,            # 10 GPU cap on Modal account
-    keep_warm=1,                  # 1 container always hot — models in VRAM, zero cold start
+    min_containers=1,              # 1 container always hot — models in VRAM, zero cold start
     )
 @modal.concurrent(max_inputs=20) # 20 concurrent batches per container — model loaded once, GPU stays saturated
 def predict_ema_batch(wav_paths: list[str]) -> list[dict]:
@@ -504,7 +504,7 @@ def main():
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     print("=" * 80)
-    print("LARYNX PIPELINE — RUN 3 (Local Merged Dataset + GroupKFold)")
+    print("LARYNX PIPELINE — RUN 6 (5k×5k Balanced Dataset + B200 + GroupKFold)")
     print("=" * 80)
     start_time = time.time()
 
@@ -649,28 +649,22 @@ def main():
         y.append(1 if r["label"] == "deepfake" else 0)
         filenames.append(r["filename"])
         # Extract speaker from filename for GroupKFold:
-        # libri_tc100_NNNNN.wav → speaker from LibriSpeech (251 speakers via modulo)
-        # gs_real_NNNN.wav / gs_fake_NNNN.wav → "gs_NNNN" (garystafford sample ID)
-        # el_key1_NNNN.wav / el_key2_NNNN.wav → "el_key1" / "el_key2" (ElevenLabs recovery)
-        # sk_fake_NNNN.wav → "sk" (skypro1111, all ElevenLabs)
-        # asset_real_NNNN.wav / asset_fake_NNNN.wav → "asset"
+        # libri_NNNNN.wav → speaker from LibriSpeech (251 speakers via modulo)
+        # elkey1_NNNN.wav / elkey2_NNNN.wav → "elkey1" / "elkey2" (ElevenLabs)
+        # wf_WF1_NNNN.wav .. wf_WF7_NNNN.wav → "wf_WF1" .. "wf_WF7" (WaveFake vocoders)
         fn = r["filename"]
-        if fn.startswith("libri_tc100_"):
+        if fn.startswith("libri_"):
             # Use sample index as pseudo-speaker (251 speakers mapped by seed)
-            idx = fn.replace("libri_tc100_", "").replace(".wav", "")
+            idx = fn.replace("libri_", "").replace(".wav", "")
             speaker = f"libri_{int(idx) % 251}"
-        elif fn.startswith("gs_real_") or fn.startswith("gs_fake_"):
-            # garystafford — use sample index for diversity
-            idx = fn.split("_")[-1].replace(".wav", "")
-            speaker = f"gs_{idx}"
-        elif fn.startswith("el_key1_"):
-            speaker = "el_key1"
-        elif fn.startswith("el_key2_"):
-            speaker = "el_key2"
-        elif fn.startswith("sk_fake_"):
-            speaker = "sk"
-        elif fn.startswith("asset_"):
-            speaker = "asset"
+        elif fn.startswith("elkey1_"):
+            speaker = "elkey1"
+        elif fn.startswith("elkey2_"):
+            speaker = "elkey2"
+        elif fn.startswith("wf_"):
+            # wf_WF3_0042.wav → speaker = "wf_WF3"
+            parts = fn.split("_")
+            speaker = f"{parts[0]}_{parts[1]}" if len(parts) >= 3 else "wf_unknown"
         else:
             speaker = fn.split("_")[0]
         speakers.append(speaker)
@@ -828,7 +822,7 @@ def main():
     medium = sum(1 for s in best_signals if 10 < s[0] <= 20)
 
     print(f"\n{'=' * 80}")
-    print(f"RUN 3 COMPLETE")
+    print(f"RUN 6 COMPLETE")
     print(f"{'=' * 80}")
     print(f"  Samples: {len(real_results)} real + {len(fake_results)} fake = {len(good_results)} total")
     print(f"  Features: {len(feature_keys)}")
