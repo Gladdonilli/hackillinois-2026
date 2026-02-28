@@ -1,0 +1,29 @@
+# Qodo Merge (PR-Agent) Configuration
+
+[pr_agent]
+auto_describe = true
+auto_review = false
+auto_improve = false
+auto_test = false
+
+[review]
+focus_only_on_problems = true
+ignore_patterns = [
+    "SYNAPSE/**",
+    "competitive-intel/**",
+    "_intel/**",
+    "research/**",
+    "shared/**/*.md",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/package-lock.json",
+    "**/bun.lock",
+    "**/*.config.js",
+    "**/*.config.ts",
+]
+
+[describe]
+publish_labels = true
+
+[improve]
+focused_suggestions = ["security", "performance"]

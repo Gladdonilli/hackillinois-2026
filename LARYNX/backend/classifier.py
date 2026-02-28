@@ -114,11 +114,21 @@ def _ema_frames_to_array(ema_frames: list[EMAFrame]) -> np.ndarray:
     """Convert EMAFrame list to (n_frames, 12) numpy array with classifier column layout."""
     n = len(ema_frames)
     ema = np.zeros((n, 12))
-    for i, frame in enumerate(ema_frames):
-        for sensor_name, col_start in SENSOR_TO_CLASSIFIER.items():
+    # Build per-sensor x/y lists in a single pass over frames
+    sensor_xs: dict[str, list[float]] = {name: [] for name in SENSOR_TO_CLASSIFIER}
+    sensor_ys: dict[str, list[float]] = {name: [] for name in SENSOR_TO_CLASSIFIER}
+    for frame in ema_frames:
+        for sensor_name in SENSOR_TO_CLASSIFIER:
             if sensor_name in frame.sensors:
-                ema[i, col_start] = frame.sensors[sensor_name].x
-                ema[i, col_start + 1] = frame.sensors[sensor_name].y
+                sensor_xs[sensor_name].append(frame.sensors[sensor_name].x)
+                sensor_ys[sensor_name].append(frame.sensors[sensor_name].y)
+            else:
+                sensor_xs[sensor_name].append(0.0)
+                sensor_ys[sensor_name].append(0.0)
+    # Assign to numpy columns with vectorized slicing
+    for sensor_name, col_start in SENSOR_TO_CLASSIFIER.items():
+        ema[:, col_start] = sensor_xs[sensor_name]
+        ema[:, col_start + 1] = sensor_ys[sensor_name]
     return ema
 
 

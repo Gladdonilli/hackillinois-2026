@@ -133,10 +133,39 @@ class VelocityAnalyzer:
         
         if not sensor_frames:
             return []
-            
+        
+        n = len(sensor_frames)
+        sensor_names = list(sensor_frames[0].keys())
+        
+        # Extract all sensor x/y values into numpy arrays upfront
+        coords: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        for name in sensor_names:
+            xs = np.array([frame[name].x for frame in sensor_frames])
+            ys = np.array([frame[name].y for frame in sensor_frames])
+            coords[name] = (xs, ys)
+        
+        # Vectorized velocity computation for all sensors
+        scale = VELOCITY_SCALE / dt / 10.0
+        velocities: dict[str, np.ndarray] = {}
+        for name in sensor_names:
+            xs, ys = coords[name]
+            dx = np.diff(xs)
+            dy = np.diff(ys)
+            velocities[name] = np.sqrt(dx * dx + dy * dy) * scale
+        
+        # Vectorized anomaly detection across all frames
+        is_anomalous = np.zeros(n - 1, dtype=bool)
+        for name in sensor_names:
+            threshold = VELOCITY_THRESHOLDS.get(name, 100.0)
+            is_anomalous |= velocities[name] > threshold
+        
+        # Vectorized tongue velocity
+        tongue_vel = (velocities["T1"] + velocities["T2"] + velocities["T3"]) / 3.0
+        
+        # First frame: set velocities to 0.0
         for name, sensor in sensor_frames[0].items():
             sensor.velocity = 0.0
-            
+        
         ema_frames.append(EMAFrame(
             sensors=sensor_frames[0],
             tongue_velocity=0.0,
@@ -144,32 +173,19 @@ class VelocityAnalyzer:
             is_anomalous=False
         ))
         
-        for i in range(1, len(sensor_frames)):
-            prev = sensor_frames[i-1]
-            curr = sensor_frames[i]
-            
-            is_anom = False
-            
-            for name in curr:
-                dx = curr[name].x - prev[name].x
-                dy = curr[name].y - prev[name].y
-                
-                # convert mm/frame to cm/s with scale factor
-                vel = math.sqrt(dx*dx + dy*dy) * VELOCITY_SCALE / dt / 10.0
-                curr[name].velocity = vel
-                
-                if vel > VELOCITY_THRESHOLDS.get(name, 100.0):
-                    is_anom = True
-                    
-            tongue_vel = (curr["T1"].velocity + curr["T2"].velocity + curr["T3"].velocity) / 3.0
+        # Remaining frames: assign computed velocities and construct EMAFrame objects
+        for i in range(n - 1):
+            curr = sensor_frames[i + 1]
+            for name in sensor_names:
+                curr[name].velocity = float(velocities[name][i])
             
             ema_frames.append(EMAFrame(
                 sensors=curr,
-                tongue_velocity=tongue_vel,
-                timestamp=i * dt,
-                is_anomalous=is_anom
+                tongue_velocity=float(tongue_vel[i]),
+                timestamp=(i + 1) * dt,
+                is_anomalous=bool(is_anomalous[i])
             ))
-            
+        
         return ema_frames
 
 

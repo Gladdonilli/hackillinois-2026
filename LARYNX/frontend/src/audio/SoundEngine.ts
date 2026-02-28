@@ -160,8 +160,8 @@ const ensureInitializedGraph = (): void => {
   ambientOsc.connect(ambientGain)
   ambientGain.connect(masterCompressor)
   ambientLfo.connect(ambientOsc.frequency)
-  ambientOsc.start()
-  ambientLfo.start()
+  // Oscillators NOT started here — deferred to startDrone() to avoid burning Web Audio thread on silence
+  let ambientOscsStarted = false
 
   ambientOsc2 = new Tone.Oscillator({
     type: 'sine',
@@ -169,14 +169,14 @@ const ensureInitializedGraph = (): void => {
     volume: -25,
   })
   ambientOsc2.connect(ambientGain)
-  ambientOsc2.start()
+  // ambientOsc2 NOT started here — deferred to startDrone()
 
   // --- Background ambient layer (3 detuned sines) ---
   bgLayerGain = new Tone.Gain(0)
   bgLayerGain.connect(masterCompressor)
   bgLayerLfo = new Tone.LFO({ frequency: 0.05, min: 0.3, max: 0.7 })
   bgLayerLfo.connect(bgLayerGain.gain)
-  bgLayerLfo.start()
+  // bgLayerLfo NOT started here — deferred to startBackgroundLayer()
 
   bgLayer1 = new Tone.Oscillator({ type: 'sine', frequency: 148, volume: -35 })
   bgLayer2 = new Tone.Oscillator({ type: 'sine', frequency: 150, volume: -35 })
@@ -184,9 +184,8 @@ const ensureInitializedGraph = (): void => {
   bgLayer1.connect(bgLayerGain)
   bgLayer2.connect(bgLayerGain)
   bgLayer3.connect(bgLayerGain)
-  bgLayer1.start()
-  bgLayer2.start()
-  bgLayer3.start()
+  // bgLayers NOT started here — deferred to startBackgroundLayer() to avoid burning Web Audio thread on silence
+  let bgLayersStarted = false
 
   // --- Upload sounds ---
   uploadSine = new Tone.Synth({
@@ -518,6 +517,13 @@ export const SoundEngine = {
 
   startDrone: (): void => {
     if (!requireAudioReady() || !ambientGain) return
+    // Start oscillators on first use (they can only be started once in Tone.js)
+    if (!ambientOscsStarted) {
+      ambientOsc?.start()
+      ambientLfo?.start()
+      ambientOsc2?.start()
+      ambientOscsStarted = true
+    }
     const now = Tone.now()
     ambientGain.gain.setTargetAtTime(1, now, 0.3)
   },
@@ -530,6 +536,14 @@ export const SoundEngine = {
 
   startBackgroundLayer: (): void => {
     if (!requireAudioReady() || !bgLayerGain) return
+    // Start oscillators + LFO on first use
+    if (!bgLayersStarted) {
+      bgLayer1?.start()
+      bgLayer2?.start()
+      bgLayer3?.start()
+      bgLayerLfo?.start()
+      bgLayersStarted = true
+    }
     const now = Tone.now()
     bgLayerGain.gain.setTargetAtTime(0.5, now, 0.5)
   },
@@ -695,6 +709,13 @@ export const SoundEngine = {
     const now = Tone.now()
     subImpact?.triggerAttackRelease('C1', '2n', now)
     if (ambientGain) {
+      // Ensure oscillators are running before ramping gain
+      if (!ambientOscsStarted) {
+        ambientOsc?.start()
+        ambientLfo?.start()
+        ambientOsc2?.start()
+        ambientOscsStarted = true
+      }
       ambientGain.gain.setTargetAtTime(0.02, now, 0.01)
       ambientGain.gain.setTargetAtTime(0.15, now + 4, 1)
     }
@@ -705,6 +726,13 @@ export const SoundEngine = {
     const now = Tone.now()
     noiseBurst?.triggerAttackRelease('8n', now)
     if (ambientGain) {
+      // Ensure oscillators are running before ramping gain
+      if (!ambientOscsStarted) {
+        ambientOsc?.start()
+        ambientLfo?.start()
+        ambientOsc2?.start()
+        ambientOscsStarted = true
+      }
       ambientGain.gain.setTargetAtTime(0.02, now, 0.01)
       ambientGain.gain.setTargetAtTime(0.15, now + 4, 1)
     }
