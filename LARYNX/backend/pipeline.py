@@ -30,6 +30,7 @@ from LARYNX.backend.config import (
     WINDOW_LENGTH,
 )
 from LARYNX.backend.models import AnalysisProgress, EMAFrame, FormantData, SensorPosition, Verdict
+from LARYNX.backend.classifier import classify_ema_frames
 
 class AudioPreprocessor:
     def load(self, audio_bytes: bytes, filename: str) -> tuple[np.ndarray, int]:
@@ -193,22 +194,46 @@ def analyze_audio(audio_bytes: bytes, filename: str) -> Generator[AnalysisProgre
     analyzer = VelocityAnalyzer()
     ema_frames = analyzer.compute(sensor_frames)
     
+    yield AnalysisProgress(step="running_classifier", progress=0.85, message="Running ensemble classifier...")
+
+    # Run GBM classifier (optional — falls back gracefully)
+    classifier_result = classify_ema_frames(ema_frames)
+
     yield AnalysisProgress(step="verdict", progress=0.90, message="Computing verdict...")
-    
+
     # Yield all frames
     for frame in ema_frames:
         yield frame
-    
-    # Compute verdict
+
+    # Compute formant-based verdict
     anomalous = sum(1 for f in ema_frames if f.is_anomalous)
     total = len(ema_frames)
     peak_v = max((f.tongue_velocity for f in ema_frames), default=0.0)
     ratio = anomalous / total if total > 0 else 0.0
-    
+
     # Genuine if < 5% of frames are anomalous
     is_genuine = ratio < 0.05
-    confidence = 1.0 - min(ratio * 5, 1.0)
-    
+    formant_confidence = 1.0 - min(ratio * 5, 1.0)
+
+    # Compute ensemble score: 0.6 * formant + 0.4 * classifier
+    classifier_score = None
+    classifier_model = None
+    ensemble_score = None
+
+    if classifier_result is not None:
+        classifier_score = round(classifier_result["score"], 4)
+        classifier_model = classifier_result["model_name"]
+        # classifier_score is P(deepfake), so confidence-of-genuine = 1 - P(deepfake)
+        classifier_confidence = 1.0 - classifier_score
+        ensemble_score = round(0.6 * formant_confidence + 0.4 * classifier_confidence, 4)
+        # Override verdict if ensemble disagrees with formant-only
+        is_genuine = ensemble_score > 0.5
+        confidence = ensemble_score
+    else:
+        # Fallback: formant-only
+        confidence = formant_confidence
+        ensemble_score = None
+
     yield Verdict(
         is_genuine=is_genuine,
         confidence=round(confidence, 3),
@@ -217,6 +242,9 @@ def analyze_audio(audio_bytes: bytes, filename: str) -> Generator[AnalysisProgre
         anomalous_frame_count=anomalous,
         total_frame_count=total,
         anomaly_ratio=round(ratio, 4),
+        classifier_score=classifier_score,
+        classifier_model=classifier_model,
+        ensemble_score=ensemble_score,
     )
-    
+
     yield AnalysisProgress(step="complete", progress=1.0, message="Analysis complete")

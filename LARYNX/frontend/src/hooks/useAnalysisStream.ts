@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { useLarynxStore } from '@/store/useLarynxStore'
 
-const BACKEND_URL = 'https://gladdonilli--larynx-analyze-dev.modal.run'
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://gladdonilli--larynx-analyze-dev.modal.run'
 
 export function useAnalysisStream() {
   const abortRef = useRef<AbortController | null>(null)
@@ -103,6 +103,11 @@ export function useAnalysisStream() {
                   confidence: parsed.confidence,
                   peakVelocity: parsed.peakVelocity,
                   threshold: parsed.threshold,
+                  anomalousFrameCount: parsed.anomalousFrameCount,
+                  totalFrameCount: parsed.totalFrameCount,
+                  anomalyRatio: parsed.anomalyRatio,
+                  reportId: parsed.reportId,
+                  processingTimeMs: parsed.processingTimeMs,
                 })
                 store.setStatus('complete')
                 store.setProgress({ message: 'Analysis complete', percent: 100 })

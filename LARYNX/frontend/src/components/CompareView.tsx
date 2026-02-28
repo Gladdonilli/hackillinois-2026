@@ -1,13 +1,23 @@
 import { useRef, useEffect, Suspense, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-
+import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup';
+import { useLarynxStore } from '@/store/useLarynxStore';
+import type { EMAFrame } from '@/types/larynx';
 // ----------------------------------------------------------------------------
 // CANVAS MINI MODEL
 // ----------------------------------------------------------------------------
 const MiniModel = ({ isFake = false }: { isFake?: boolean }) => {
-  const { scene } = useGLTF('/models/facecap.glb');
+  const { gl } = useThree();
+  const { scene } = useGLTF(
+    '/models/facecap.glb',
+    false,
+    true,
+    (loader) => {
+      configureKTX2ForGLTFLoader(loader, gl);
+    }
+  );
   const clone = useMemo(() => scene.clone(), [scene]);
   const headMeshRef = useRef<THREE.Mesh | null>(null);
   const time = useRef(0);
@@ -61,7 +71,7 @@ const MiniModel = ({ isFake = false }: { isFake?: boolean }) => {
 // ----------------------------------------------------------------------------
 // RAW CANVAS VELOCITY GRAPH
 // ----------------------------------------------------------------------------
-const VelocityGraph = ({ isFake }: { isFake: boolean }) => {
+const VelocityGraph = ({ isFake, frames }: { isFake: boolean; frames?: EMAFrame[] }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timeInfo = useRef({ time: 0, history: [] as number[], lastPeak: 0 });
   const valueRef = useRef<HTMLDivElement>(null);
@@ -78,11 +88,15 @@ const VelocityGraph = ({ isFake }: { isFake: boolean }) => {
 
     const render = () => {
       timeInfo.current.time += 0.05;
-      
+
       let nextVal = 0;
-      if (isFake) {
+      // Use real frame data if available, otherwise simulate
+      if (frames && frames.length > 0) {
+        const frameIdx = Math.floor(timeInfo.current.time * 20) % frames.length;
+        nextVal = frames[frameIdx]?.tongueVelocity ?? 0;
+      } else if (isFake) {
         nextVal = 30 + Math.random() * 60;
-        if (Math.random() > 0.85) nextVal += 80 + Math.random() * 120; // spikes up to ~230
+        if (Math.random() > 0.85) nextVal += 80 + Math.random() * 120;
       } else {
         const t = timeInfo.current.time;
         nextVal = 10 + Math.sin(t) * 1.5 + Math.cos(t * 0.8) * 1.2 + Math.random() * 0.5;
@@ -147,7 +161,7 @@ const VelocityGraph = ({ isFake }: { isFake: boolean }) => {
 
     reqId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(reqId);
-  }, [isFake]);
+  }, [isFake, frames]);
 
   return (
     <div className="flex flex-col relative pt-4">
@@ -165,33 +179,63 @@ const VelocityGraph = ({ isFake }: { isFake: boolean }) => {
 // MAIN LAYOUT
 // ----------------------------------------------------------------------------
 export const CompareView = () => {
+  const comparison = useLarynxStore((s) => s.comparison);
+  const status = useLarynxStore((s) => s.status);
+  const progress = useLarynxStore((s) => s.progress);
+
+  const hasRealData = comparison.channelFrames[0].length > 0 || comparison.channelFrames[1].length > 0;
+  const verdictA = comparison.channelVerdicts[0];
+  const verdictB = comparison.channelVerdicts[1];
+
+  const labelA = verdictA ? (verdictA.isGenuine ? 'GENUINE' : 'DEEPFAKE') : 'HUMAN';
+  const labelB = verdictB ? (verdictB.isGenuine ? 'GENUINE' : 'DEEPFAKE') : 'AI GENERATED';
+  const isFakeA = verdictA ? !verdictA.isGenuine : false;
+  const isFakeB = verdictB ? !verdictB.isGenuine : true;
+
   return (
     <div className="fixed inset-0 z-50 bg-[#050510] flex flex-col justify-center items-center overflow-hidden p-8 backdrop-blur-md">
-      
+
+      {/* Progress bar when comparing */}
+      {status === 'comparing' && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+          <div className="text-white/60 font-mono text-sm tracking-widest">{progress.message}</div>
+          <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-[#00FFFF] to-[#FF3366] transition-all duration-300" style={{ width: `${progress.percent}%` }} />
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-11 w-full max-w-[1400px] h-[80vh] border-glow hud-panel">
-        
-        {/* LEFT SIDE: REAL */}
+
+        {/* LEFT SIDE: FILE A */}
         <div className="col-span-5 flex flex-col h-full bg-black/40 relative border-r border-[#00ffff]/20">
           <div className="p-6 border-b border-[#00ffff]/20 flex justify-between items-center bg-gradient-to-r from-[#00ffff]/10 to-transparent">
-            <h2 className="text-3xl font-black tracking-widest text-[#00FFFF] text-glow-cyan">HUMAN</h2>
-            <div className="px-4 py-1 rounded bg-[#00FF88]/20 border border-[#00FF88]/40 text-[#00FF88] text-glow-genuine font-bold tracking-wide">
-              GENUINE
+            <h2 className={`text-3xl font-black tracking-widest ${isFakeA ? 'text-[#FF3366] text-glow-warn' : 'text-[#00FFFF] text-glow-cyan'}`}>
+              {hasRealData ? 'FILE A' : 'HUMAN'}
+            </h2>
+            <div className={`px-4 py-1 rounded border font-bold tracking-wide ${
+              isFakeA
+                ? 'bg-[#FF3366]/20 border-[#FF3366]/40 text-[#FF3366] text-glow-warn animate-pulse-glow'
+                : 'bg-[#00FF88]/20 border-[#00FF88]/40 text-[#00FF88] text-glow-genuine'
+            }`}>
+              {labelA}
+              {verdictA && <span className="ml-2 text-xs opacity-70">({(verdictA.confidence * 100).toFixed(0)}%)</span>}
             </div>
           </div>
-          
+
           <div className="flex-1 relative overflow-hidden">
             <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>
               <Suspense fallback={null}>
                 <Environment preset="city" />
                 <ambientLight intensity={0.5} />
-                <directionalLight position={[10, 10, 5]} intensity={1} color="#00ffff" />
-                <MiniModel isFake={false} />
+                <directionalLight position={[10, 10, 5]} intensity={1} color={isFakeA ? '#ff3366' : '#00ffff'} />
+                <MiniModel isFake={isFakeA} />
               </Suspense>
             </Canvas>
           </div>
-          
+
           <div className="h-[160px] border-t border-[#00ffff]/20 bg-black/60 relative">
-            <VelocityGraph isFake={false} />
+            <VelocityGraph isFake={isFakeA} frames={hasRealData ? comparison.channelFrames[0] : undefined} />
           </div>
         </div>
 
@@ -203,49 +247,62 @@ export const CompareView = () => {
           </div>
         </div>
 
-        {/* RIGHT SIDE: FAKE */}
+        {/* RIGHT SIDE: FILE B */}
         <div className="col-span-5 flex flex-col h-full bg-black/40 relative border-l border-[#ff3366]/20">
           <div className="p-6 border-b border-[#ff3366]/20 flex justify-between items-center bg-gradient-to-l from-[#ff3366]/10 to-transparent">
-            <div className="px-4 py-1 rounded bg-[#FF3366]/20 border border-[#FF3366]/40 text-[#FF3366] text-glow-warn font-bold tracking-wide animate-pulse-glow glitch-text" data-text="DEEPFAKE">
-              DEEPFAKE
+            <div className={`px-4 py-1 rounded border font-bold tracking-wide ${
+              isFakeB
+                ? 'bg-[#FF3366]/20 border-[#FF3366]/40 text-[#FF3366] text-glow-warn animate-pulse-glow glitch-text'
+                : 'bg-[#00FF88]/20 border-[#00FF88]/40 text-[#00FF88] text-glow-genuine'
+            }` + (isFakeB ? '" data-text="DEEPFAKE"' : '')}>
+              {labelB}
+              {verdictB && <span className="ml-2 text-xs opacity-70">({(verdictB.confidence * 100).toFixed(0)}%)</span>}
             </div>
-            <h2 className="text-3xl font-black tracking-widest text-[#FF3366] text-glow-warn" data-text="AI GENERATED">AI GENERATED</h2>
+            <h2 className={`text-3xl font-black tracking-widest ${isFakeB ? 'text-[#FF3366] text-glow-warn' : 'text-[#00FFFF] text-glow-cyan'}`}>
+              {hasRealData ? 'FILE B' : 'AI GENERATED'}
+            </h2>
           </div>
-          
+
           <div className="flex-1 relative overflow-hidden">
             <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>
               <Suspense fallback={null}>
                 <Environment preset="city" />
                 <ambientLight intensity={0.5} />
                 <directionalLight position={[-10, -10, -5]} intensity={2} color="#ff3366" />
-                <directionalLight position={[10, 10, 5]} intensity={1} color="#ff0000" />
-                <MiniModel isFake={true} />
+                <directionalLight position={[10, 10, 5]} intensity={1} color={isFakeB ? '#ff0000' : '#00ffff'} />
+                <MiniModel isFake={isFakeB} />
               </Suspense>
             </Canvas>
-            
-            {/* SPORADIC FLASH OVERLAY */}
-            <div className="absolute inset-0 pointer-events-none bg-[#ff3366]/5 animate-flicker mix-blend-screen"></div>
+
+            {/* SPORADIC FLASH OVERLAY for fake */}
+            {isFakeB && (
+              <div className="absolute inset-0 pointer-events-none bg-[#ff3366]/5 animate-flicker mix-blend-screen"></div>
+            )}
           </div>
-          
+
           <div className="h-[160px] border-t border-[#ff3366]/20 bg-black/60 relative">
-            <VelocityGraph isFake={true} />
+            <VelocityGraph isFake={isFakeB} frames={hasRealData ? comparison.channelFrames[1] : undefined} />
           </div>
         </div>
       </div>
 
       <div className="mt-8 flex flex-col items-center gap-2">
-        <div className="flex items-center gap-4 text-white/60 font-mono text-sm tracking-widest">
-          <div className="w-8 h-[1px] border-b border-dashed border-white/40"></div>
-          <span>HUMAN TONGUE MAX: 22 CM/S</span>
-          <div className="w-8 h-[1px] border-b border-dashed border-white/40"></div>
-        </div>
-        <div className="text-xl font-bold tracking-[0.2em] opacity-80 mt-2">
-          THE PHYSICS DON'T LIE.
-        </div>
+        {comparison.comparisonSummary ? (
+          <div className="text-lg font-mono text-white/80 max-w-2xl text-center">{comparison.comparisonSummary}</div>
+        ) : (
+          <>
+            <div className="flex items-center gap-4 text-white/60 font-mono text-sm tracking-widest">
+              <div className="w-8 h-[1px] border-b border-dashed border-white/40"></div>
+              <span>HUMAN TONGUE MAX: 22 CM/S</span>
+              <div className="w-8 h-[1px] border-b border-dashed border-white/40"></div>
+            </div>
+            <div className="text-xl font-bold tracking-[0.2em] opacity-80 mt-2">
+              THE PHYSICS DON'T LIE.
+            </div>
+          </>
+        )}
       </div>
 
     </div>
   );
 };
-
-useGLTF.preload('/models/facecap.glb');

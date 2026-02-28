@@ -23,6 +23,32 @@ export interface Verdict {
   confidence: number
   peakVelocity: number
   threshold: number
+  anomalousFrameCount?: number
+  totalFrameCount?: number
+  anomalyRatio?: number
+  reportId?: string
+  processingTimeMs?: number
+}
+
+export interface ChannelVerdict extends Verdict {
+  channel: 0 | 1
+}
+
+export interface ComparisonResult {
+  verdicts: [Verdict, Verdict]
+  summary: string
+}
+
+export interface ChannelProgress extends AnalysisProgress {
+  channel: 0 | 1
+}
+
+export interface ChannelFrame {
+  channel: 0 | 1
+  sensors: Record<SensorName, EMASensor>
+  tongueVelocity: number
+  timestamp: number
+  isAnomalous: boolean
 }
 
 export interface AnalysisProgress {

@@ -1,9 +1,10 @@
 import { useRef, useEffect, useMemo } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Sparkles, Stars, useGLTF } from '@react-three/drei'
 import { EffectComposer, Bloom, ChromaticAberration } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
+import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup'
 
 // Shared ref for chromatic aberration offset
 const chromaticOffset = new THREE.Vector2(0, 0)
@@ -63,7 +64,15 @@ function SoundWaveRings() {
 }
 
 function FaceModel() {
-  const { scene } = useGLTF('/models/facecap.glb')
+  const { gl } = useThree()
+  const { scene } = useGLTF(
+    '/models/facecap.glb',
+    false,
+    true,
+    (loader) => {
+      configureKTX2ForGLTFLoader(loader, gl)
+    }
+  )
   const solidRef = useRef<THREE.Group>(null)
 
   const clonedSolidScene = useMemo(() => scene.clone(), [scene])
@@ -239,5 +248,3 @@ export function LandingScene() {
     </Canvas>
   )
 }
-
-useGLTF.preload('/models/facecap.glb')

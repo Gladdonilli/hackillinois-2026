@@ -6,7 +6,7 @@ acoustic features locally → trains ensemble classifier.
 
 Usage:
   source ~/modal-env/bin/activate
-  python3 LARYNX/backend/overnight_pipeline.py
+  modal run LARYNX/backend/overnight_pipeline.py
 
 Estimated: ~1-2 hours on Modal A100, ~$15-20 credits
 """
@@ -38,21 +38,16 @@ image = (
         "soundfile==0.12.1",
         "gdown==5.2.0",
         "pyyaml",
-        "scipy==1.13.1",
+        "scipy==1.11.4",
         "numpy<2",
     )
     .run_commands(
         "pip install git+https://github.com/articulatory/articulatory.git",
-        # Force scipy pin AFTER articulatory install (it may override)
-        "pip install scipy==1.13.1",
-        # Patch ALL scipy.signal kaiser imports in articulatory package
-        "find /usr/local/lib/python3.11 -name '*.py' -path '*/articulatory/*' "
-        "-exec sed -i 's/from scipy\\.signal import kaiser/from scipy.signal.windows import kaiser/g' {} +",
-        # Also patch any bare 'scipy.signal.kaiser' calls
-        "find /usr/local/lib/python3.11 -name '*.py' -path '*/articulatory/*' "
-        "-exec sed -i 's/scipy\\.signal\\.kaiser/scipy.signal.windows.kaiser/g' {} +",
-        # Verify the patch worked
-        "python3 -c 'from scipy.signal.windows import kaiser; print(\"scipy kaiser OK\")'",
+        # Articulatory currently imports kaiser from scipy.signal directly.
+        # Keep scipy <1.12 to preserve that API surface.
+        "pip install --no-cache-dir scipy==1.11.4",
+        "python3 -c \"from scipy.signal import kaiser; print('scipy.signal.kaiser import OK')\"",
+    )
 )
 
 # ---------------------------------------------------------------------------
@@ -164,7 +159,7 @@ def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
 
     # --- Download checkpoint if needed ---
     ckpt_dir = Path("/model-cache/aai/hprc_h2")
-    ckpt_path = ckpt_dir / "best_mel_ckpt"
+    ckpt_path = ckpt_dir / "best_mel_ckpt.pkl"
     config_path = ckpt_dir / "config.yml"
 
     if not ckpt_path.exists():
@@ -188,15 +183,9 @@ def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
     with open(config_path) as f:
         inversion_config = yaml.safe_load(f)
 
-    from articulatory.models.ema_synthesizer import EMASynthesizer
-    gen_conf = inversion_config.get("generator_params", inversion_config)
-    model = EMASynthesizer(**gen_conf)
+    from articulatory.utils import load_model
 
-    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
-    if "model" in ckpt:
-        model.load_state_dict(ckpt["model"]["generator"])
-    else:
-        model.load_state_dict(ckpt)
+    model = load_model(str(ckpt_path), inversion_config)
     model.remove_weight_norm()
     model.to(device).eval()
     print("Models loaded.")
@@ -310,7 +299,11 @@ def download_librispeech() -> list[tuple[str, bytes]]:
 
 
 @app.function(
-    image=modal.Image.debian_slim(python_version="3.11").pip_install("edge-tts", "aiofiles"),
+    image=(
+        modal.Image.debian_slim(python_version="3.11")
+        .apt_install("ffmpeg")
+        .pip_install("edge-tts", "aiofiles")
+    ),
     timeout=1800,
 )
 def generate_deepfakes() -> list[tuple[str, bytes]]:

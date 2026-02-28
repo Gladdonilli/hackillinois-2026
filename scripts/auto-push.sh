@@ -1,9 +1,9 @@
 #!/bin/bash
 # Auto-commit and push to GitHub every N minutes
 # Usage: ./scripts/auto-push.sh [interval_minutes]
-# Default: every 5 minutes
+# Default: every 30 minutes
 
-INTERVAL=${1:-5}
+INTERVAL=${1:-30}
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "[auto-push] Watching $REPO_DIR every ${INTERVAL}m"

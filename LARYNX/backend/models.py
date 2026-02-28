@@ -50,7 +50,9 @@ class Verdict(BaseModel):
     anomalous_frame_count: int = Field(default=0, description="Number of frames exceeding threshold")
     total_frame_count: int = Field(default=0, description="Total frames analyzed")
     anomaly_ratio: float = Field(default=0.0, description="Ratio of anomalous frames")
-
+    classifier_score: Optional[float] = Field(default=None, description="GBM classifier P(deepfake) 0-1")
+    classifier_model: Optional[str] = Field(default=None, description="Classifier model name")
+    ensemble_score: Optional[float] = Field(default=None, description="Hybrid ensemble score 0-1")
 
 class AnalysisProgress(BaseModel):
     """Progress update during analysis."""

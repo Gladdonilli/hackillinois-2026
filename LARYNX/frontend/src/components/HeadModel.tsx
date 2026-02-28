@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { MeshTransmissionMaterial, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useLarynxStore } from '@/store/useLarynxStore';
+import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 type FacecapGLTF = GLTF & {
@@ -14,7 +15,14 @@ export function HeadModel() {
   const groupRef = useRef<THREE.Group>(null);
   const headMeshRef = useRef<THREE.Mesh>(null);
   const { gl } = useThree();
-  const { nodes } = useGLTF('/models/facecap.glb') as unknown as FacecapGLTF;
+  const { nodes } = useGLTF(
+    '/models/facecap.glb',
+    false,
+    true,
+    (loader) => {
+      configureKTX2ForGLTFLoader(loader, gl);
+    }
+  ) as unknown as FacecapGLTF;
 
   useEffect(() => {
     gl.localClippingEnabled = true;
@@ -91,5 +99,3 @@ export function HeadModel() {
     </group>
   );
 }
-
-useGLTF.preload('/models/facecap.glb');

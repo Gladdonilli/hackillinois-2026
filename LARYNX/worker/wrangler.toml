@@ -1,17 +1,22 @@
-name = "larynx-proxy"
+name = "larynx-api"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-ENVIRONMENT = "production"
+MODAL_API_URL = "https://gladdonilli--larynx-analyze-dev.modal.run"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "larynx-db"
-database_id = "PLACEHOLDER_FILL_AFTER_CREATE"
-migrations_dir = "migrations"
+database_name = "larynx-analysis"
+database_id = "placeholder-set-on-deploy"
 
 [[r2_buckets]]
 binding = "AUDIO_BUCKET"
 bucket_name = "larynx-audio"
+
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "larynx-api-limit"
+simple = { limit = 20, period = 60 }
