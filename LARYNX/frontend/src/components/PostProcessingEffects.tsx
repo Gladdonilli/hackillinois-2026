@@ -7,8 +7,8 @@ import { useLarynxStore } from '@/store/useLarynxStore'
 
 export function PostProcessingEffects() {
   const enabled = useLarynxStore((s) => s.postProcessingEnabled)
-  const bloomIntensityRef = useRef(0.5)
-  const offsetRef = useRef(new THREE.Vector2(0.002, 0.002))
+  const bloomIntensityRef = useRef(0.3)
+  const offsetRef = useRef(new THREE.Vector2(0.0004, 0.0004))
   const scanlineDensityRef = useRef(1.5)
   
   const frameCount = useRef(0)
@@ -41,10 +41,10 @@ export function PostProcessingEffects() {
 
     bloomIntensityRef.current += (targetIntensity - bloomIntensityRef.current) * 10 * delta
 
-    let targetOffset = 0.002
-    if (velocity > 80) targetOffset = 0.08
-    else if (velocity > 50) targetOffset = 0.03
-    else if (velocity > 22) targetOffset = 0.01
+    let targetOffset = 0.0004
+    if (velocity > 80) targetOffset = 0.015
+    else if (velocity > 50) targetOffset = 0.006
+    else if (velocity > 22) targetOffset = 0.002
 
     offsetRef.current.x += (targetOffset - offsetRef.current.x) * 10 * delta
     offsetRef.current.y += (targetOffset - offsetRef.current.y) * 10 * delta

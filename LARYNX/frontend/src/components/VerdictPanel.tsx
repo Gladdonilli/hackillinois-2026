@@ -105,8 +105,8 @@ export function VerdictPanel() {
         // Border pulse
         if (containerRef.current) {
           tl.to(containerRef.current, {
-            borderColor: 'rgba(255, 51, 102, 0.8)',
-            boxShadow: '0 0 20px rgba(255, 51, 102, 0.4)',
+            borderColor: 'rgba(255, 0, 60, 0.8)',
+            boxShadow: '0 0 20px rgba(255, 0, 60, 0.4)',
             duration: 0.125,
             repeat: 15,
             yoyo: true,
@@ -117,7 +117,7 @@ export function VerdictPanel() {
         // Genuine effect
         if (containerRef.current) {
           tl.to(containerRef.current, {
-             boxShadow: '0 0 40px rgba(0, 255, 136, 0.4)',
+             boxShadow: '0 0 40px rgba(45, 212, 191, 0.4)',
              duration: 1.5,
              ease: 'power2.inOut'
           }, badgePopTime);
@@ -171,7 +171,7 @@ export function VerdictPanel() {
         if (!verdict.isGenuine) {
           Array.from(evidenceRef.current.children).forEach((child, i) => {
             tl.to(child.children, {
-              color: '#FF3366',
+              color: '#FF003C',
               duration: 0.1,
               yoyo: true,
               repeat: 1,
@@ -215,7 +215,7 @@ export function VerdictPanel() {
               exit={{ opacity: 0, y: -10 }}
               className="flex flex-col items-center gap-2"
             >
-              <div className="text-[10px] font-mono text-[#666] tracking-[0.3em] uppercase mb-1">
+              <div className="text-[10px] font-mono text-dim tracking-[0.3em] uppercase mb-1">
                 {progress.message || "ANALYZING..."}
               </div>
               <div className="w-48 gauge-track h-1 relative">
@@ -235,7 +235,7 @@ export function VerdictPanel() {
               animate={{ opacity: 1 }}
               className={cn(
                 "hud-panel p-8 min-w-[340px] max-w-sm mx-auto flex flex-col items-center gap-6 animate-breathe",
-                verdict.isGenuine ? "glow-genuine border-[#00FF88]/30" : "glow-warn border-[#FF3366]/30"
+                verdict.isGenuine ? "glow-genuine border-genuine/30" : "glow-warn border-violation/30"
               )}
             >
               {/* BADGE */}
@@ -244,7 +244,7 @@ export function VerdictPanel() {
                   variant={verdict.isGenuine ? "genuine" : "deepfake"} 
                   className={cn(
                     "text-xl font-bold px-8 py-2 border-none shadow-lg tracking-widest",
-                    verdict.isGenuine ? "bg-[#00FF88] text-black" : "bg-[#FF3366] text-white"
+                    verdict.isGenuine ? "bg-genuine text-black" : "bg-violation text-white"
                   )}
                 >
                   {verdict.isGenuine && <span ref={checkIconRef} className="inline-block mr-2 origin-center">✓</span>}
@@ -258,29 +258,29 @@ export function VerdictPanel() {
               <div ref={confidenceRef} className="flex flex-col items-center gap-1">
                   <div className={cn(
                       "text-5xl font-mono tabular-nums font-bold leading-none",
-                      verdict.isGenuine ? "text-[#00FF88] text-glow-genuine" : "text-[#FF3366] text-glow-warn"
+                      verdict.isGenuine ? "text-genuine text-glow-genuine" : "text-violation text-glow-warn"
                   )}>
                       {displayConfidence}%
                   </div>
-                  <div className="text-[10px] text-[#666] tracking-[0.2em] font-mono">CONFIDENCE</div>
+                  <div className="text-[10px] text-dim tracking-[0.2em] font-mono">CONFIDENCE</div>
               </div>
               
               {/* EVIDENCE */}
               <div ref={evidenceRef} className="flex flex-col gap-2 w-full pt-4 border-t border-white/5">
                 <div className="flex justify-between items-center font-mono text-xs">
-                  <span className="text-[#444]">Peak Velocity:</span>
-                  <span className="text-[#666]"><span className="text-[#EDEDED]">{verdict.peakVelocity.toFixed(1)}</span> cm/s</span>
+                  <span className="text-zinc-700">Peak Velocity:</span>
+                  <span className="text-dim"><span className="text-white/90">{(verdict.peakVelocity ?? 0).toFixed(1)}</span> cm/s</span>
                 </div>
                 <div className="flex justify-between items-center font-mono text-xs">
-                  <span className="text-[#444]">Threshold:</span>
-                  <span className="text-[#666]"><span className="text-[#EDEDED]">{verdict.threshold.toFixed(1)}</span> cm/s</span>
+                  <span className="text-zinc-700">Threshold:</span>
+                  <span className="text-dim"><span className="text-white/90">{(verdict.threshold ?? 0).toFixed(1)}</span> cm/s</span>
                 </div>
                 <div className="flex justify-between items-center font-mono text-xs">
-                  <span className="text-[#444]">Anomalous Frames:</span>
+                  <span className="text-zinc-700">Anomalous Frames:</span>
                   <span className={cn(
-                      "text-[#666]", 
+                      "text-dim",
                       !verdict.isGenuine && "text-warn"
-                  )}><span className={cn("text-[#EDEDED]", !verdict.isGenuine && "text-warn")}>{Math.round((1 - verdict.confidence) * 120)}</span>/120</span>
+                  )}><span className={cn("text-white/90", !verdict.isGenuine && "text-warn")}>{Math.round((1 - verdict.confidence) * 120)}</span>/120</span>
                 </div>
               </div>
             </motion.div>

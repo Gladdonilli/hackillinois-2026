@@ -167,7 +167,7 @@ export default function App() {
             {/* LARYNX title overlay */}
             <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none">
               <h1 className="text-5xl font-mono tracking-[0.5em] text-white/90 text-glow-cyan glitch-text">LARYNX.</h1>
-              <p className="text-xs font-mono tracking-[0.3em] text-cyan/50 mt-2">DEEPFAKE VOICE DETECTION</p>
+              <p className="text-xs font-mono tracking-[0.3em] text-dim mt-2">DEEPFAKE VOICE DETECTION</p>
             </div>
             {/* Hide upload panel during portal transition to focus on mouth opening */}
             {!isPortalTransition && <UploadPanel />}
@@ -296,6 +296,32 @@ export default function App() {
             >
               CLOSING →
             </motion.button>
+          </motion.div>
+        )}
+
+        {appState === 'error' && (
+          <motion.div
+            key="error"
+            className="absolute inset-0 z-10 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="hud-panel p-12 max-w-md text-center flex flex-col items-center gap-6">
+              <div className="text-warn text-6xl font-mono">⚠</div>
+              <h2 className="text-2xl font-mono tracking-[0.2em] text-white/90">ANALYSIS FAILED</h2>
+              <p className="text-sm font-mono text-dim leading-relaxed">
+                Pipeline encountered an error during processing. This may be due to audio format incompatibility or a backend timeout.
+              </p>
+              <button
+                className="px-6 py-3 border border-warn/40 bg-black/60 backdrop-blur-sm text-warn font-mono text-sm tracking-wider hover:bg-warn/10 hover:border-warn/60 transition-all rounded-sm"
+                onClick={() => useLarynxStore.getState().reset()}
+                data-interactive
+              >
+                TRY AGAIN
+              </button>
+            </div>
           </motion.div>
         )}
 
