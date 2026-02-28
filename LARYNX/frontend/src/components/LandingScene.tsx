@@ -5,6 +5,8 @@ import { EffectComposer, Bloom, ChromaticAberration } from '@react-three/postpro
 import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
 import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup'
+import { useLarynxStore } from '@/store/useLarynxStore'
+import gsap from 'gsap'
 
 // Shared ref for chromatic aberration offset
 const chromaticOffset = new THREE.Vector2(0, 0)
@@ -63,7 +65,46 @@ function SoundWaveRings() {
   )
 }
 
-function FaceModel() {
+function PortalCameraController({ portalState, setPortalState }: { portalState: string, setPortalState: (s: any) => void }) {
+  const { camera } = useThree()
+  const tlRef = useRef<gsap.core.Timeline | null>(null)
+  
+  useEffect(() => {
+    if (portalState === 'entering') {
+      // Kill any existing timeline
+      if (tlRef.current) tlRef.current.kill()
+      
+      const c = camera as THREE.PerspectiveCamera
+      
+      tlRef.current = gsap.timeline({
+        onComplete: () => {
+          setPortalState('warping')
+        }
+      })
+      
+      tlRef.current.to(c.position, {
+        x: 0,
+        y: 0.3,
+        z: 0.1, // Zoom past the teeth into the throat
+        duration: 1.5,
+        ease: 'power2.in',
+      }, 0).to(c, {
+        fov: 110, // Extreme warp field of view
+        duration: 1.5,
+        ease: 'power3.in',
+        onUpdate: () => c.updateProjectionMatrix()
+      }, 0)
+    }
+    
+    return () => {
+      if (tlRef.current) tlRef.current.kill()
+    }
+  }, [portalState, camera, setPortalState])
+  
+  return null
+}
+
+function FaceModel({ portalState }: { portalState: string }) {
   const { gl } = useThree()
   const { scene } = useGLTF(
     '/models/facecap.glb',
@@ -157,6 +198,8 @@ function FaceModel() {
     })
   }, [clonedSolidScene, clonedWireScene, customShader])
 
+  const portalTimeRef = useRef(0)
+
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
 
@@ -169,6 +212,13 @@ function FaceModel() {
     }
 
     // Morph targets
+    const portalEntering = portalState === 'entering' || portalState === 'warping'
+    if (portalEntering) {
+      portalTimeRef.current += clock.getDelta()
+    } else {
+      portalTimeRef.current = 0
+    }
+
     const morphScenes = [clonedSolidScene, clonedWireScene]
     morphScenes.forEach((s) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -178,7 +228,13 @@ function FaceModel() {
           const influences = child.morphTargetInfluences
 
           if (dict['jawOpen'] !== undefined) {
-             influences[dict['jawOpen']] = (Math.sin(t * 1.5) + 1) * 0.1
+             if (portalEntering) {
+               // Smoothly open jaw to ~0.95 during portal sequence
+               const target = Math.min(0.95, portalTimeRef.current * 0.8)
+               influences[dict['jawOpen']] += (target - influences[dict['jawOpen']]) * 0.1
+             } else {
+               influences[dict['jawOpen']] = (Math.sin(t * 1.5) + 1) * 0.1
+             }
           }
           if (dict['mouthSmile'] !== undefined) {
              influences[dict['mouthSmile']] = (Math.sin(t * 0.8) + 1) * 0.2
@@ -216,12 +272,15 @@ function FaceModel() {
     <group ref={solidRef} scale={2.5} position={[0, 0.5, 0]}>
       <primitive object={clonedWireScene} />
       <primitive object={clonedSolidScene} />
-      <SoundWaveRings />
+      { portalState !== 'entering' && portalState !== 'warping' && <SoundWaveRings /> }
     </group>
   )
 }
 
 export function LandingScene() {
+  const portalState = useLarynxStore((state) => state.portalState)
+  const setPortalState = useLarynxStore((state) => state.setPortalState)
+
   return (
     <Canvas
       camera={{ position: [0, 0, 8], fov: 60 }}
@@ -229,6 +288,8 @@ export function LandingScene() {
       dpr={[1, 1.5]}
       style={{ position: 'fixed', inset: 0, zIndex: 0 }}
     >
+      <PortalCameraController portalState={portalState} setPortalState={setPortalState} />
+      
       <fog attach="fog" args={['#000000', 8, 40]} />
       <ambientLight intensity={0.15} />
       <pointLight position={[0, 5, 5]} intensity={0.8} color="#00FFFF" />
@@ -238,7 +299,7 @@ export function LandingScene() {
       <Sparkles count={150} scale={15} size={2.5} speed={0.3} opacity={0.6} color="#00FFFF" />
       <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade speed={1} />
 
-      <FaceModel />
+      <FaceModel portalState={portalState} />
       <GlitchEffectHandler />
 
       <EffectComposer>

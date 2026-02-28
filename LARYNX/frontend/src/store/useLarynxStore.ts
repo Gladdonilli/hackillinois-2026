@@ -45,8 +45,11 @@ interface LarynxState {
   addComparisonFrame: (channel: 0 | 1, frame: EMAFrame) => void
   setComparisonVerdict: (channel: 0 | 1, verdict: Verdict) => void
   setComparisonSummary: (summary: string) => void
-}
 
+  // Portal animation state
+  portalState: 'idle' | 'entering' | 'warping' | 'done'
+  setPortalState: (state: 'idle' | 'entering' | 'warping' | 'done') => void
+}
 
 const initialComparison: ComparisonState = {
   channelFrames: [[], []],
@@ -67,6 +70,7 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   postProcessingEnabled: true,
   formants: [],
   comparison: { ...initialComparison },
+  portalState: 'idle',
 
   setAudioFile: (file) => {
     const currentUrl = get().audioUrl
@@ -104,9 +108,6 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   setVerdict: (verdict) => set({ verdict }),
 
   startAnalysis: () => {
-    // No-op stub — real analysis flow uses useAnalysisStream hook
-    // which streams EMA frames from the Modal backend via SSE.
-    // This method exists only as interface compliance.
     console.warn('startAnalysis() is a no-op. Use useAnalysisStream hook for real analysis.')
   },
 
@@ -125,10 +126,10 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
       tongueT1: { x: 0, y: 0 },
       formants: [],
       comparison: { ...initialComparison, channelFrames: [[], []], channelVerdicts: [null, null] },
+      portalState: 'idle'
     })
   },
 
-  // Comparison actions
   resetComparison: () => set({ comparison: { ...initialComparison, channelFrames: [[], []], channelVerdicts: [null, null] } }),
 
   addComparisonFrame: (channel, frame) => {
@@ -152,6 +153,8 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
     const state = get()
     set({ comparison: { ...state.comparison, comparisonSummary: summary } })
   },
+
+  setPortalState: (state) => set({ portalState: state }),
 }))
 
 export { useLarynxStore }

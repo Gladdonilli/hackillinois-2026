@@ -11,6 +11,7 @@ import { IntroSequence } from '@/components/IntroSequence'
 import { SoundEngine } from '@/audio/SoundEngine'
 import { LandingScene } from '@/components/LandingScene'
 import { CustomCursor } from '@/components/CustomCursor'
+import { WarpTransition } from '@/components/WarpTransition'
 const CompareView = lazy(() => import('@/components/CompareView').then(m => ({ default: m.CompareView })))
 const TechnicalDetailPanel = lazy(() => import('@/components/TechnicalDetailPanel').then(m => ({ default: m.TechnicalDetailPanel })))
 const ClosingScreen = lazy(() => import('@/components/ClosingScreen').then(m => ({ default: m.ClosingScreen })))
@@ -113,18 +114,31 @@ export default function App() {
     }
   }, [status, showIntro])
 
+  // In portal transition state, we show landing state but portal handles its own view
+  const isPortalTransition = ['entering', 'warping'].includes(useLarynxStore(state => state.portalState))
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black text-white/90">
+      <WarpTransition 
+        isActive={useLarynxStore(state => state.portalState) === 'warping'} 
+        onComplete={() => {
+          // Safe update at end of animation
+          setTimeout(() => {
+            useLarynxStore.getState().setPortalState('done')
+            useLarynxStore.getState().setStatus('uploading')
+          }, 10)
+        }}
+      />
+
       {/* Background effects — always visible */}
       <div className="grid-bg" />
       <div className="vignette" />
-      
       <AnimatePresence mode="wait">
         {appState === 'intro' && (
           <IntroSequence key="intro" onComplete={() => setShowIntro(false)} />
         )}
         
-        {appState === 'idle' && (
+        {(appState === 'idle' || isPortalTransition) && (
           <motion.div 
             key="landing" 
             className="relative z-10 flex items-center justify-center h-screen"
@@ -134,12 +148,13 @@ export default function App() {
             transition={{ duration: 0.6 }}
           >
             <LandingScene />
-            <UploadPanel />
+            {/* Hide upload panel during portal transition to focus on mouth opening */}
+            {!isPortalTransition && <UploadPanel />}
           </motion.div>
         )}
         
-        {(appState === 'analyzing' || appState === 'uploading') && (
-          <motion.div 
+        {(appState === 'analyzing' || (appState === 'uploading' && !isPortalTransition)) && (
+          <motion.div
             key="analysis" 
             className="absolute inset-0 z-10"
             initial={{ opacity: 0, scale: 1.05 }} 

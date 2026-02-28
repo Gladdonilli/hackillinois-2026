@@ -56,6 +56,9 @@ image = (
 LIBRISPEECH_URL = "https://openslr.trmal.net/resources/12/dev-clean.tar.gz"
 N_REAL_SAMPLES = 300
 N_FAKE_SAMPLES = 300
+# Long-run control: repeat full AAI inference passes to build a much larger
+# training table overnight without changing I/O plumbing.
+INFERENCE_PASSES = 130
 
 # Phonetically diverse sentences for TTS generation
 SENTENCES = [
@@ -372,6 +375,7 @@ def generate_deepfakes() -> list[tuple[str, bytes]]:
 @app.local_entrypoint()
 def main():
     import numpy as np
+    import random
     from pathlib import Path
 
     PROJECT_DIR = Path("/home/li859/projects/hackillinois")
@@ -417,39 +421,61 @@ def main():
     all_fake = existing_fake + fake_items
     print(f"  Total: {len(all_real)} real + {len(all_fake)} fake = {len(all_real) + len(all_fake)} samples")
 
-    # ---- Step 2: AAI inference on Modal (batched) ----
-    print(f"\n🧠 Step 2: Running AAI inference on {len(all_real) + len(all_fake)} samples...")
+    # ---- Step 2: AAI inference on Modal (batched, multi-pass overnight mode) ----
+    n_samples_once = len(all_real) + len(all_fake)
+    print(
+        f"\n🧠 Step 2: Running AAI inference on {n_samples_once} samples "
+        f"for {INFERENCE_PASSES} passes (~{n_samples_once * INFERENCE_PASSES} total inferences)..."
+    )
 
     # Batch into groups of 30 for parallel GPU processing
     BATCH_SIZE = 30
     all_items_labeled = [(f, b, "real") for f, b in all_real] + [(f, b, "deepfake") for f, b in all_fake]
+    labels = {f: l for f, _, l in all_items_labeled}
 
-    # Create batches of (filename, bytes) for Modal
-    batches = []
-    labels = {}
-    for i in range(0, len(all_items_labeled), BATCH_SIZE):
-        batch_items = all_items_labeled[i:i + BATCH_SIZE]
-        batch = [(f, b) for f, b, _ in batch_items]
-        for f, _, l in batch_items:
-            labels[f] = l
-        batches.append(batch)
-
-    print(f"  Dispatching {len(batches)} batches of ~{BATCH_SIZE} samples each...")
-
-    # Launch all batches in parallel
-    handles = [predict_ema_batch.spawn(batch) for batch in batches]
-
-    # Collect results
     all_results = []
-    for i, handle in enumerate(handles):
-        batch_results = handle.get()
-        all_results.extend(batch_results)
-        print(f"  ✅ Batch {i+1}/{len(batches)} complete ({len(batch_results)} results)")
+    for pass_idx in range(INFERENCE_PASSES):
+        pass_start = time.time()
+        pass_items = all_items_labeled.copy()
+        random.Random(42 + pass_idx).shuffle(pass_items)
 
-    # Add labels
-    for r in all_results:
-        if "filename" in r:
-            r["label"] = labels.get(r["filename"], "unknown")
+        batches = []
+        for i in range(0, len(pass_items), BATCH_SIZE):
+            batch_items = pass_items[i:i + BATCH_SIZE]
+            batch = [(f, b) for f, b, _ in batch_items]
+            batches.append(batch)
+
+        print(f"  🔁 Pass {pass_idx + 1}/{INFERENCE_PASSES}: dispatching {len(batches)} batches")
+        handles = [predict_ema_batch.spawn(batch) for batch in batches]
+
+        pass_results = []
+        for i, handle in enumerate(handles):
+            batch_results = handle.get()
+            for r in batch_results:
+                if "filename" in r:
+                    r["pass_idx"] = pass_idx + 1
+            pass_results.extend(batch_results)
+            if (i + 1) % 5 == 0 or i + 1 == len(batches):
+                print(
+                    f"    ✅ Pass {pass_idx + 1}: batch {i + 1}/{len(batches)} "
+                    f"complete ({len(batch_results)} results)"
+                )
+
+        # Add labels for this pass and append to global results.
+        for r in pass_results:
+            if "filename" in r:
+                r["label"] = labels.get(r["filename"], "unknown")
+        all_results.extend(pass_results)
+
+        pass_good = sum(1 for r in pass_results if "error" not in r)
+        pass_err = len(pass_results) - pass_good
+        elapsed_hours = (time.time() - start_time) / 3600
+        pass_minutes = (time.time() - pass_start) / 60
+        print(
+            f"  ✅ Pass {pass_idx + 1}/{INFERENCE_PASSES} complete: "
+            f"{pass_good} success, {pass_err} errors, {pass_minutes:.1f} min "
+            f"(elapsed {elapsed_hours:.2f}h)"
+        )
 
     # Filter out errors
     good_results = [r for r in all_results if "error" not in r]
@@ -508,20 +534,50 @@ def main():
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Stratified 5-fold CV (much better than LOO for 600+ samples)
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    # Scale model selection with dataset size to keep overnight run stable.
+    n_samples = len(y)
+    if n_samples > 5000:
+        from sklearn.ensemble import HistGradientBoostingClassifier
 
-    models = {
-        "GradientBoosting": GradientBoostingClassifier(
-            n_estimators=500, max_depth=3, learning_rate=0.05,
-            subsample=0.8, random_state=42
-        ),
-        "RandomForest": RandomForestClassifier(
-            n_estimators=1000, max_depth=5, random_state=42
-        ),
-        "SVM_RBF": SVC(kernel="rbf", probability=True, random_state=42),
-        "LogisticRegression": LogisticRegression(max_iter=2000, random_state=42),
-    }
+        cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+        models = {
+            "HistGradientBoosting": HistGradientBoostingClassifier(
+                max_depth=8,
+                learning_rate=0.05,
+                max_iter=400,
+                random_state=42,
+            ),
+            "RandomForest": RandomForestClassifier(
+                n_estimators=400,
+                max_depth=12,
+                random_state=42,
+                n_jobs=-1,
+            ),
+            "LogisticRegression": LogisticRegression(
+                max_iter=4000,
+                solver="saga",
+                random_state=42,
+                n_jobs=-1,
+            ),
+        }
+    else:
+        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        models = {
+            "GradientBoosting": GradientBoostingClassifier(
+                n_estimators=500,
+                max_depth=3,
+                learning_rate=0.05,
+                subsample=0.8,
+                random_state=42,
+            ),
+            "RandomForest": RandomForestClassifier(
+                n_estimators=1000,
+                max_depth=5,
+                random_state=42,
+            ),
+            "SVM_RBF": SVC(kernel="rbf", probability=True, random_state=42),
+            "LogisticRegression": LogisticRegression(max_iter=2000, random_state=42),
+        }
 
     best_acc = 0
     best_model_name = ""
