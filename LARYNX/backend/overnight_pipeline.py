@@ -1,14 +1,14 @@
 """
-LARYNX Overnight Training Pipeline — Wave 2
+LARYNX Overnight Training Pipeline — Run 3
 =============================================
-Downloads LibriSpeech real speech + generates ElevenLabs deepfakes → AAI inference
+Loads local merged dataset (4321 real + 4321 fake) → AAI inference
 on Modal → acoustic features → trains ensemble classifier with GroupKFold by speaker.
 
 Usage:
   source ~/modal-env/bin/activate
-  ELEVENLABS_API_KEY=<key> modal run LARYNX/backend/overnight_pipeline.py
+  modal run LARYNX/backend/overnight_pipeline.py
 
-Estimated: ~3-6 hours on Modal A100 (10 passes × ~5400 samples)
+Estimated: ~2-4 hours on Modal A100 (10 passes × ~8642 samples)
 """
 
 import modal
@@ -53,9 +53,8 @@ image = (
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-LIBRISPEECH_URL = "https://openslr.trmal.net/resources/12/dev-clean.tar.gz"
-N_REAL_SAMPLES = 1200
-N_FAKE_SAMPLES = 1200
+MERGED_REAL_DIR = Path(__file__).resolve().parent / "training_data" / "datasets" / "merged" / "real"
+MERGED_FAKE_DIR = Path(__file__).resolve().parent / "training_data" / "datasets" / "merged" / "fake"
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
 INFERENCE_PASSES = 10
@@ -457,107 +456,25 @@ def main():
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     print("=" * 80)
-    print("LARYNX OVERNIGHT PIPELINE — WAVE 2 (ElevenLabs + GroupKFold)")
+    print("LARYNX PIPELINE — RUN 3 (Local Merged Dataset + GroupKFold)")
     print("=" * 80)
     start_time = time.time()
 
-    # ---- Step 1: Generate data in parallel ----
-    print("\n\U0001f4e6 Step 1: Downloading LibriSpeech + generating ElevenLabs deepfakes (parallel)...")
-    libri_handle = download_librispeech.spawn()
-    # Check volume cache for existing ElevenLabs fakes first
-    cached_fakes = load_elevenlabs_cache.remote()
-    if len(cached_fakes) >= N_FAKE_SAMPLES:
-        print(f"  \u2705 Loaded {len(cached_fakes)} cached ElevenLabs fakes from volume (skipping generation)")
-        fake_items = cached_fakes[:N_FAKE_SAMPLES]
-        el_results_iter = None
-    else:
-        # Build ElevenLabs work items: split across 3 models for diversity
-        import random as _rng
-        el_rng = _rng.Random(42)
-        el_items: list[tuple[int, str, str, str, str]] = []
-        # Exclude already-cached filenames
-        cached_names = {fname for fname, _ in cached_fakes}
-        n_per_model = (N_FAKE_SAMPLES - len(cached_fakes)) // 3
-        remainder = (N_FAKE_SAMPLES - len(cached_fakes)) % 3
-        models = [
-            ("eleven_flash_v2_5", n_per_model + remainder),  # Flash gets remainder
-            ("eleven_multilingual_v2", n_per_model),
-            ("eleven_v3", n_per_model),
-        ]
-        idx = 0
-        for model_id, count in models:
-            for _ in range(count):
-                voice_id, voice_name = el_rng.choice(ELEVENLABS_VOICES)
-                sentence = el_rng.choice(SENTENCES)
-                el_items.append((idx, voice_id, voice_name, model_id, sentence))
-                idx += 1
+    # ---- Step 1: Load local merged dataset ----
+    print("\n📦 Step 1: Loading local merged dataset...")
 
-        CHUNK_SIZE = 300  # Larger chunks — only 3 containers, process serially within each
-        el_chunks = [el_items[i:i + CHUNK_SIZE] for i in range(0, len(el_items), CHUNK_SIZE)]
-        print(f"  Dispatching {len(el_items)} ElevenLabs calls across {len(el_chunks)} chunks...")
+    all_real: list[tuple[str, bytes]] = []
+    all_fake: list[tuple[str, bytes]] = []
 
-        el_results_iter = generate_elevenlabs_chunk.map(el_chunks, return_exceptions=True, wrap_returned_exceptions=False)
-        fake_items = []
-
-    # Also load existing local samples while ElevenLabs runs remotely
-    existing_real: list[tuple[str, bytes]] = []
-    existing_fake: list[tuple[str, bytes]] = []
-    real_dir = PROJECT_DIR / "shared" / "assets" / "audio" / "real"
-    fake_dir = PROJECT_DIR / "shared" / "assets" / "audio" / "deepfake"
-
-    for wav_path in sorted(real_dir.glob("*-16k.wav")):
+    for wav_path in sorted(MERGED_REAL_DIR.glob("*.wav")):
         with open(wav_path, "rb") as f:
-            existing_real.append((wav_path.name, f.read()))
-    for wav_path in sorted(fake_dir.glob("*-16k.wav")):
+            all_real.append((wav_path.name, f.read()))
+
+    for wav_path in sorted(MERGED_FAKE_DIR.glob("*.wav")):
         with open(wav_path, "rb") as f:
-            existing_fake.append((wav_path.name, f.read()))
+            all_fake.append((wav_path.name, f.read()))
 
-    print(f"  Existing: {len(existing_real)} real + {len(existing_fake)} fake")
-
-    # Collect remote results
-    print("  Waiting for LibriSpeech download...")
-    libri_items = libri_handle.get()
-    print(f"  \u2705 LibriSpeech: {len(libri_items)} real utterances")
-
-    if el_results_iter is not None:
-        print("  Collecting ElevenLabs deepfakes from parallel containers...")
-        el_errors = 0
-        for chunk_idx, chunk_result in enumerate(el_results_iter):
-            if isinstance(chunk_result, Exception):
-                print(f"    \u26a0\ufe0f Chunk {chunk_idx + 1} failed: {chunk_result}")
-                el_errors += 1
-                continue
-            fake_items.extend(chunk_result)
-        print(f"  \u2705 ElevenLabs: {len(fake_items)} deepfakes ({el_errors} chunk failures)")
-    # Combine all samples
-    all_real = existing_real + libri_items
-    all_fake = existing_fake + fake_items
-    print(f"  Total: {len(all_real)} real + {len(all_fake)} fake = {len(all_real) + len(all_fake)} samples")
-
-    # ---- Save generated WAVs locally for JJ snapshot + auto-push backup ----
-    from pathlib import Path as _LP
-    local_audio_dir = _LP(__file__).resolve().parent / "training_data" / "audio"
-    real_dir = local_audio_dir / "real"
-    fake_dir = local_audio_dir / "fake"
-    real_dir.mkdir(parents=True, exist_ok=True)
-    fake_dir.mkdir(parents=True, exist_ok=True)
-
-    saved_real = saved_fake = 0
-    for fname, wav_bytes in all_real:
-        out = real_dir / fname
-        if not out.exists():
-            with open(out, "wb") as f:
-                f.write(wav_bytes)
-            saved_real += 1
-    for fname, wav_bytes in all_fake:
-        out = fake_dir / fname
-        if not out.exists():
-            with open(out, "wb") as f:
-                f.write(wav_bytes)
-            saved_fake += 1
-    if saved_real or saved_fake:
-        print(f"  \U0001f4be Saved locally: {saved_real} new real + {saved_fake} new fake WAVs")
-        print(f"     → {local_audio_dir} (JJ will snapshot, auto-push will back up)")
+    print(f"  ✅ Loaded {len(all_real)} real + {len(all_fake)} fake = {len(all_real) + len(all_fake)} samples")
 
     # ---- Step 2: AAI inference on Modal (batched, multi-pass overnight mode) ----
     n_samples_once = len(all_real) + len(all_fake)
@@ -667,25 +584,31 @@ def main():
         X.append(row)
         y.append(1 if r["label"] == "deepfake" else 0)
         filenames.append(r["filename"])
-        # Extract speaker from filename:
-        # Real: "libri_1234-56789-0001.wav" → speaker = "1234"
-        # Fake: "elevenlabs_Rachel_0042.wav" → speaker = "Rachel"
-        # Existing: "slt-arctic-0001-16k.wav" → speaker = "slt"
+        # Extract speaker from filename for GroupKFold:
+        # libri_tc100_NNNNN.wav → speaker from LibriSpeech (251 speakers via modulo)
+        # gs_real_NNNN.wav / gs_fake_NNNN.wav → "gs_NNNN" (garystafford sample ID)
+        # el_key1_NNNN.wav / el_key2_NNNN.wav → "el_key1" / "el_key2" (ElevenLabs recovery)
+        # sk_fake_NNNN.wav → "sk" (skypro1111, all ElevenLabs)
+        # asset_real_NNNN.wav / asset_fake_NNNN.wav → "asset"
         fn = r["filename"]
-        if fn.startswith("libri_"):
-            # LibriSpeech speaker ID is first number segment
-            speaker = fn.replace("libri_", "").split("-")[0]
-        elif fn.startswith("elevenlabs_"):
-            # ElevenLabs voice name + model version as separate speaker
-            # e.g. "elevenlabs_Rachel_v3_0042.wav" → speaker = "Rachel_v3"
-            parts = fn.replace("elevenlabs_", "").split("_")
-            if len(parts) >= 2:
-                speaker = f"{parts[0]}_{parts[1]}"  # VoiceName_v2 or VoiceName_v3
-            else:
-                speaker = parts[0] if parts else "unknown"
+        if fn.startswith("libri_tc100_"):
+            # Use sample index as pseudo-speaker (251 speakers mapped by seed)
+            idx = fn.replace("libri_tc100_", "").replace(".wav", "")
+            speaker = f"libri_{int(idx) % 251}"
+        elif fn.startswith("gs_real_") or fn.startswith("gs_fake_"):
+            # garystafford — use sample index for diversity
+            idx = fn.split("_")[-1].replace(".wav", "")
+            speaker = f"gs_{idx}"
+        elif fn.startswith("el_key1_"):
+            speaker = "el_key1"
+        elif fn.startswith("el_key2_"):
+            speaker = "el_key2"
+        elif fn.startswith("sk_fake_"):
+            speaker = "sk"
+        elif fn.startswith("asset_"):
+            speaker = "asset"
         else:
-            # Existing local files — use filename prefix as speaker
-            speaker = fn.split("-")[0]
+            speaker = fn.split("_")[0]
         speakers.append(speaker)
 
     X = np.array(X, dtype=np.float64)
@@ -841,7 +764,7 @@ def main():
     medium = sum(1 for s in best_signals if 10 < s[0] <= 20)
 
     print(f"\n{'=' * 80}")
-    print(f"WAVE 2 COMPLETE")
+    print(f"RUN 3 COMPLETE")
     print(f"{'=' * 80}")
     print(f"  Samples: {len(real_results)} real + {len(fake_results)} fake = {len(good_results)} total")
     print(f"  Features: {len(feature_keys)}")
