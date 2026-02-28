@@ -259,9 +259,9 @@ export default function UploadPanel() {
               >
                 <Button 
                   onClick={handleAnalyze} 
+                  onMouseEnter={() => playHover()}
                   disabled={status === "analyzing"}
                   className={cn(
-                    "w-full h-12 bg-transparent border border-[var(--cyan)] text-[var(--cyan)] uppercase tracking-[0.2em] font-mono text-sm hover:bg-[var(--cyan)]/10 hover:glow-cyan transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
                     status === "idle" && "animate-pulse-glow"
                   )}
                 >

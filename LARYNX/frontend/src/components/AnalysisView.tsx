@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { HeadModel } from '@/components/HeadModel';
 import { TongueModel } from '@/components/TongueModel';
 import { EMAMarkers } from '@/components/EMAMarkers';
+import { VelocityRibbons } from '@/components/VelocityRibbons';
 import { PostProcessingEffects } from '@/components/PostProcessingEffects';
 import { CameraController } from '@/components/CameraController';
 import { ParticleField } from '@/components/ParticleField';
@@ -95,6 +96,7 @@ export function AnalysisView() {
             </Float>
             <TongueModel />
             <EMAMarkers />
+<VelocityRibbons />
             <ParticleField />
             <SkullClipEffect />
             <GridFloor />
