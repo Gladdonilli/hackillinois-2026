@@ -187,6 +187,7 @@ export const CompareView = () => {
   const verdictA = comparison.channelVerdicts[0];
   const verdictB = comparison.channelVerdicts[1];
 
+  const labelA = verdictA ? (verdictA.isGenuine ? 'GENUINE' : 'DEEPFAKE') : 'HUMAN';
   const labelB = verdictB ? (verdictB.isGenuine ? 'GENUINE' : 'DEEPFAKE') : 'AI GENERATED';
   const isFakeA = verdictA ? !verdictA.isGenuine : false;
   const isFakeB = verdictB ? !verdictB.isGenuine : true;
@@ -198,7 +199,7 @@ export const CompareView = () => {
       {status === 'comparing' && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
           <div className="text-white/60 font-mono text-sm tracking-widest">{progress.message}</div>
-          <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
+            <div className="w-64 h-1 bg-white/10 rounded-sm overflow-hidden">
             <div className="h-full bg-gradient-to-r from-cyan to-violation transition-all duration-300" style={{ width: `${progress.percent}%` }} />
           </div>
         </div>
@@ -216,9 +217,9 @@ export const CompareView = () => {
               isFakeA
                 ? 'bg-violation/20 border-violation/40 text-violation text-glow-warn animate-pulse-glow'
                 : 'bg-genuine/20 border-genuine/40 text-genuine text-glow-genuine'
-            }`}>
+            }>
+              {labelA}
               {verdictA && <span className="ml-2 text-xs opacity-70">({(verdictA.confidence * 100).toFixed(0)}%)</span>}
-            </div>
           </div>
 
           <div className="flex-1 relative overflow-hidden">
@@ -240,7 +241,7 @@ export const CompareView = () => {
         {/* CENTER DIVIDER */}
         <div className="col-span-1 flex flex-col items-center justify-center relative bg-black/80 z-10">
           <div className="absolute inset-y-0 w-[1px] bg-gradient-to-b from-cyan/0 via-cyan/50 to-violation/50"></div>
-          <div className="bg-[#050510] border border-cyan/30 rounded-full w-12 h-12 flex items-center justify-center relative z-20 shadow-[0_0_20px_rgba(56,189,248,0.2)]">
+          <div className="bg-[#050510] border border-cyan/30 rounded-sm w-12 h-12 flex items-center justify-center relative z-20 shadow-[0_0_20px_rgba(56,189,248,0.2)]">
             <span className="font-bold text-white opacity-80">VS</span>
           </div>
         </div>

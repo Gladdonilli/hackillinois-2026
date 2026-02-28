@@ -35,7 +35,7 @@ export default function App() {
   useEffect(() => {
     const handleInteraction = () => {
       if (!initRef.current) {
-        SoundEngine.init().then(() => {
+        SoundEngine.init().catch(() => { /* AudioContext init may fail silently */ }).then(() => {
           SoundEngine.startBackgroundLayer()
         })
         initRef.current = true
@@ -120,22 +120,13 @@ export default function App() {
 
   // Portal state sound effects
   const portalState = useLarynxStore((state) => state.portalState)
-  useEffect(() => {
-    if (!SoundEngine.isInitialized()) return
-    if (portalState === 'entering') {
-      SoundEngine.playPortalEntry()
-    } else if (portalState === 'warping') {
-      SoundEngine.playWarpTransition()
-    }
-  }, [portalState])
+  const isPortalTransition = portalState === 'entering' || portalState === 'warping'
 
-  // In portal transition state, we show landing state but portal handles its own view
-  const isPortalTransition = ['entering', 'warping'].includes(useLarynxStore(state => state.portalState))
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black text-white/90">
       <WarpTransition 
-        isActive={useLarynxStore(state => state.portalState) === 'warping'} 
+        isActive={portalState === 'warping'} 
         onComplete={() => {
           // Safe update at end of animation
           setTimeout(() => {

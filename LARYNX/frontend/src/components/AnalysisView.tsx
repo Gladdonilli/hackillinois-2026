@@ -105,6 +105,11 @@ export function AnalysisView() {
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
           dpr={[1, 1.5]}
           style={{ background: 'transparent' }}
+          onCreated={({ gl }) => {
+            const canvas = gl.domElement;
+            canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[LARYNX] WebGL context lost (AnalysisView)'); });
+            canvas.addEventListener('webglcontextrestored', () => { console.warn('[LARYNX] WebGL context restored (AnalysisView)'); });
+          }}
         >
           <Suspense fallback={null}> {/* Loader is outside Canvas */}
             <fogExp2 attach="fog" args={['#050510', 0.15]} />

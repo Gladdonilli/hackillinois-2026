@@ -1,4 +1,4 @@
-import { motion } from 'motion/react'
+import { useRef } from 'react'
 import { SoundEngine } from '@/audio/SoundEngine'
 import { COLORS } from '@/constants'
 
@@ -37,7 +37,10 @@ export function ClosingScreen({ onReset }: ClosingScreenProps) {
     }
   };
 
+  const hasPlayedRef = useRef(false);
   const playBeepSafe = () => {
+    if (hasPlayedRef.current) return;
+    hasPlayedRef.current = true;
     try {
       SoundEngine.playBeep();
     } catch (e) {
@@ -128,11 +131,8 @@ export function ClosingScreen({ onReset }: ClosingScreenProps) {
         Try it yourself <span className="inline-block transition-transform group-hover:translate-x-2">→</span>
       </motion.button>
 
-      {/* Decorative HUD corners */}
-      <div className="absolute top-8 left-8 w-12 h-12 border-t border-l border-cyan/30 pointer-events-none" />
-      <div className="absolute top-8 right-8 w-12 h-12 border-t border-r border-cyan/30 pointer-events-none" />
-      <div className="absolute bottom-8 left-8 w-12 h-12 border-b border-l border-cyan/30 pointer-events-none" />
-      <div className="absolute bottom-8 right-8 w-12 h-12 border-b border-r border-cyan/30 pointer-events-none" />
+      {/* Decorative HUD corners — using .hud-panel pseudo-elements via a positioned container */}
+      <div className="absolute top-6 left-6 right-6 bottom-6 hud-panel pointer-events-none bg-transparent border-cyan/20" />
     </motion.div>
   );
 }

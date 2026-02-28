@@ -281,7 +281,7 @@ export function VerdictPanel() {
                   <span className={cn(
                       "text-dim",
                       !verdict.isGenuine && "text-warn"
-                  )}><span className={cn("text-white/90", !verdict.isGenuine && "text-warn")}>{Math.round((1 - verdict.confidence) * 120)}</span>/120</span>
+                  )}>  <span className={cn("text-white/90", !verdict.isGenuine && "text-warn")}>{Math.round((1 - (verdict.confidence ?? 0)) * 120)}</span>/120</span>
                 </div>
               </div>
             </motion.div>

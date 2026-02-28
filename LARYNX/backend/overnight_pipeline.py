@@ -145,12 +145,12 @@ ELEVENLABS_VOICES = [
 @app.function(
     image=image,
     volumes={"/model-cache": model_cache},
-    gpu="A100",
+    gpu="A100-80GB",                  # 80GB VRAM ($2.50/hr) — fits 4 concurrent batches
     timeout=600,
     retries=3,
-    max_containers=100,           # Maximize GPU parallelism (100 A100s)
+    max_containers=10,            # 10 GPU cap on Modal account
     )
-@modal.concurrent(max_inputs=2)  # 2 batches per container = overlap I/O with compute
+@modal.concurrent(max_inputs=4)  # 4 batches per container — 80GB fits ~4×8GB model instances
 def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
     """Process a batch of WAV files through AAI model. Each item is (filename, wav_bytes)."""
     import torch

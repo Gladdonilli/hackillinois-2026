@@ -56,7 +56,7 @@ function FileCard({
               e.stopPropagation()
               clearFile()
             }}
-            className="p-1 rounded-full text-[#666] hover:text-[var(--warn)] hover:bg-[var(--warn)]/10 transition-colors shrink-0 pointer-events-auto"
+            className="p-1 rounded-full text-dim hover:text-[var(--warn)] hover:bg-[var(--warn)]/10 transition-colors shrink-0 pointer-events-auto"
             aria-label="Remove file"
           >
             <X className="h-4 w-4" />
@@ -74,22 +74,27 @@ export default function UploadPanel() {
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [duration, setDuration] = useState<number | null>(null)
+  const isProcessingRef = useRef(false)
   const audioFile = useLarynxStore((s) => s.audioFile)
   const setAudioFile = useLarynxStore((s) => s.setAudioFile)
   const setPortalState = useLarynxStore((s) => s.setPortalState)
   const { startStream } = useAnalysisStream()
 
   const validateAndProcessFile = async (file: File) => {
+    if (isProcessingRef.current) return
+    isProcessingRef.current = true
     setError(null)
     
     const isExtValid = ALLOWED_EXTS.some(ext => file.name.toLowerCase().endsWith(ext))
     if (!isExtValid && !ALLOWED_TYPES.includes(file.type)) {
       setError("Invalid file format. Please upload .wav, .mp3, .ogg, or .flac")
+      isProcessingRef.current = false
       return
     }
 
     if (file.size > MAX_FILE_SIZE) {
       setError(`File size exceeds 10MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`)
+      isProcessingRef.current = false
       return
     }
 
@@ -109,6 +114,8 @@ export default function UploadPanel() {
     } catch (err) {
       console.error("Failed to decode audio", err)
       setError("Failed to decode audio file.")
+    } finally {
+      isProcessingRef.current = false
     }
   }
 

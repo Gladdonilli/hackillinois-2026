@@ -87,7 +87,7 @@ export function HeadModel() {
                 anisotropy={0.3}
                 color="#a8d8ea"
                 backside={true}
-                samples={6}
+                samples={2}
                 resolution={512}
                 clippingPlanes={clippingPlanes}
                 clipShadows={true}
