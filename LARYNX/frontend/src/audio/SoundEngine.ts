@@ -46,7 +46,7 @@ let horrorLfo: Tone.LFO | null = null
 let horrorTremolo: Tone.Tremolo | null = null
 
 // Scanner / ticking
-let scannerBeepSynth: Tone.Synth | null = null
+let scannerBeepSynth: Tone.FMSynth | null = null
 let processingTickSynth: Tone.MetalSynth | null = null
 let processingTickLoop: Tone.Loop | null = null
 let tickingActive = false
@@ -85,7 +85,7 @@ let warpFilter: Tone.Filter | null = null
 let warpChirp: Tone.Synth | null = null
 
 // Scan sweep SFX
-let scanSweepSynth: Tone.Synth | null = null
+let scanSweepSynth: Tone.FMSynth | null = null
 
 // Data point ping
 let dataPointSynth: Tone.Synth | null = null
@@ -93,6 +93,21 @@ let dataPointSynth: Tone.Synth | null = null
 // Verdict sub rumble
 let verdictSub: Tone.Oscillator | null = null
 let verdictSubGain: Tone.Gain | null = null
+
+// Generative soundtrack
+let soundtrackSynth: Tone.PolySynth | null = null
+let soundtrackFilter: Tone.Filter | null = null
+let soundtrackGain: Tone.Gain | null = null
+let soundtrackLoop: Tone.Loop | null = null
+let soundtrackChordIndex = 0
+let soundtrackActive = false
+
+// Acoustic vacuum state
+let vacuumActive = false
+let preVacuumAmbientGain = 0
+let preVacuumBgGain = 0
+let preVacuumTensionGain = 0
+let preVacuumSoundtrackGain = 0
 
 const MIN_MASTER_GAIN = 0.0001
 const DEFAULT_TICK_BPM = 60
@@ -192,7 +207,7 @@ const ensureInitializedGraph = (): void => {
   subImpact = new Tone.MembraneSynth({
     pitchDecay: 0.05,
     octaves: 6,
-    oscillator: { type: 'sine' },
+    oscillator: { type: 'custom', partials: [0, 1, 0.75, 0.5, 0.25] } as unknown as Tone.RecursivePartial<Tone.OmniOscillatorOptions>,
     envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 1.4 },
     volume: -5,
   }).connect(masterCompressor)
@@ -220,9 +235,13 @@ const ensureInitializedGraph = (): void => {
   horrorSynth.chain(horrorTremolo, masterCompressor)
 
   // --- Scanner beep ---
-  scannerBeepSynth = new Tone.Synth({
-    oscillator: { type: 'sine' },
+  scannerBeepSynth = new Tone.FMSynth({
+    harmonicity: 2,
+    modulationIndex: 8,
+    oscillator: { type: 'square' },
+    modulation: { type: 'sine' },
     envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
+    modulationEnvelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 },
     volume: -18,
   }).connect(masterCompressor)
 
@@ -307,7 +326,7 @@ const ensureInitializedGraph = (): void => {
     volume: -10,
   }).connect(masterCompressor)
 
-  portalSub = new Tone.Oscillator({ type: 'sine', frequency: 40, volume: -18 })
+  portalSub = new Tone.Oscillator({ type: 'custom', partials: [0, 1, 0.75, 0.5, 0.25], frequency: 40, volume: -18 } as unknown as Tone.RecursivePartial<Tone.OmniOscillatorOptions>)
   portalSubGain = new Tone.Gain(0)
   portalFilter = new Tone.Filter({ type: 'lowpass', frequency: 200 })
   portalSub.connect(portalFilter)
@@ -332,9 +351,13 @@ const ensureInitializedGraph = (): void => {
   }).connect(masterCompressor)
 
   // --- Scan sweep ---
-  scanSweepSynth = new Tone.Synth({
-    oscillator: { type: 'sine' },
+  scanSweepSynth = new Tone.FMSynth({
+    harmonicity: 3,
+    modulationIndex: 12,
+    oscillator: { type: 'square' },
+    modulation: { type: 'sine' },
     envelope: { attack: 0.01, decay: 0.25, sustain: 0, release: 0.05 },
+    modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.05 },
     volume: -18,
   }).connect(masterCompressor)
 
@@ -346,7 +369,7 @@ const ensureInitializedGraph = (): void => {
   }).connect(masterCompressor)
 
   // --- Verdict sub rumble ---
-  verdictSub = new Tone.Oscillator({ type: 'sine', frequency: 30, volume: -40 })
+  verdictSub = new Tone.Oscillator({ type: 'custom', partials: [0, 1, 0.75, 0.5, 0.25], frequency: 30, volume: -40 } as unknown as Tone.RecursivePartial<Tone.OmniOscillatorOptions>)
   verdictSubGain = new Tone.Gain(0)
   verdictSub.connect(verdictSubGain)
   verdictSubGain.connect(masterCompressor)
