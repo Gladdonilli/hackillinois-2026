@@ -4,11 +4,11 @@ import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import * as THREE from 'three'
 import { useLarynxStore } from '@/store/useLarynxStore'
-
+import { VELOCITY_THRESHOLDS, POST_PROCESSING } from '@/constants'
 export function PostProcessingEffects() {
   const enabled = useLarynxStore((s) => s.postProcessingEnabled)
-  const bloomIntensityRef = useRef(0.3)
-  const offsetRef = useRef(new THREE.Vector2(0.0004, 0.0004))
+  const bloomIntensityRef = useRef(POST_PROCESSING.BLOOM_BASELINE)
+  const offsetRef = useRef(new THREE.Vector2(POST_PROCESSING.CA_BASELINE, POST_PROCESSING.CA_BASELINE))
   const scanlineDensityRef = useRef(1.5)
   
   const frameCount = useRef(0)
@@ -35,38 +35,38 @@ export function PostProcessingEffects() {
     const velocity = state.tongueVelocity || 0
 
     let targetIntensity = 0.3
-    if (velocity > 80) targetIntensity = 3.0
-    else if (velocity > 50) targetIntensity = 2.0
-    else if (velocity > 22) targetIntensity = 1.0
+    if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP) targetIntensity = 3.0
+    else if (velocity > VELOCITY_THRESHOLDS.GLITCH) targetIntensity = 2.0
+    else if (velocity > VELOCITY_THRESHOLDS.HUMAN_MAX) targetIntensity = 1.0
 
     bloomIntensityRef.current += (targetIntensity - bloomIntensityRef.current) * 10 * delta
 
-    let targetOffset = 0.0004
-    if (velocity > 80) targetOffset = 0.015
-    else if (velocity > 50) targetOffset = 0.006
-    else if (velocity > 22) targetOffset = 0.002
+    let targetOffset: number = POST_PROCESSING.CA_BASELINE
+    if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP) targetOffset = POST_PROCESSING.CA_TIER_3
+    else if (velocity > VELOCITY_THRESHOLDS.GLITCH) targetOffset = POST_PROCESSING.CA_TIER_2
+    else if (velocity > VELOCITY_THRESHOLDS.HUMAN_MAX) targetOffset = POST_PROCESSING.CA_TIER_1
 
     offsetRef.current.x += (targetOffset - offsetRef.current.x) * 10 * delta
     offsetRef.current.y += (targetOffset - offsetRef.current.y) * 10 * delta
 
     let targetScanline = 1.5
-    if (velocity > 80) targetScanline = 3.0
+    if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP) targetScanline = 3.0
     scanlineDensityRef.current += (targetScanline - scanlineDensityRef.current) * 10 * delta
 
     let currentGlitchMode = GlitchMode.DISABLED
     let currentDelay: [number, number] = [0.5, 1]
-    if (velocity > 80) {
+    if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP) {
       currentGlitchMode = GlitchMode.CONSTANT_WILD
       currentDelay = [0, 0]
-    } else if (velocity > 50) {
+    } else if (velocity > VELOCITY_THRESHOLDS.GLITCH) {
       currentGlitchMode = GlitchMode.SPORADIC
       currentDelay = [0.5, 1]
     }
 
-    if (velocity > 80 && !wasAbove80.current) {
+    if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP && !wasAbove80.current) {
         flashOpacityRef.current = 1.0
     }
-    wasAbove80.current = velocity > 80
+    wasAbove80.current = velocity > VELOCITY_THRESHOLDS.SKULL_CLIP
 
     if (flashOpacityRef.current > 0) {
         flashOpacityRef.current = Math.max(0, flashOpacityRef.current - delta * 5)

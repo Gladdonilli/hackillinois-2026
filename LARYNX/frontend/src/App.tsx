@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { TIMING, SPRING, COLORS_RGBA } from '@/constants'
 import { motion, AnimatePresence } from 'motion/react'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import UploadPanel from '@/components/UploadPanel'
@@ -20,8 +21,6 @@ export default function App() {
   const status = useLarynxStore((state) => state.status)
   const [showIntro, setShowIntro] = useState(true)
   const initRef = useRef(false)
-  // DEBUG: expose store for visual audit (remove before demo)
-  useEffect(() => { (window as any).__LARYNX_STORE = useLarynxStore; }, [])
 
   // Preload demo panels when analysis starts
   useEffect(() => {
@@ -163,7 +162,7 @@ export default function App() {
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(4px)' }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: TIMING.VIEW_TRANSITION }}
           >
             <LandingScene />
             {/* LARYNX title overlay */}
@@ -183,7 +182,7 @@ export default function App() {
             initial={{ opacity: 0, scale: 1.05 }} 
             animate={{ opacity: 1, scale: 1 }} 
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
+            transition={{ duration: TIMING.COMPLETE_FADE_IN, ease: "easeOut" }}
           >
             <div className="canvas-container w-full h-full">
               <AnalysisView />
@@ -211,28 +210,20 @@ export default function App() {
             className="absolute inset-0 z-10"
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
-            transition={{ duration: 0.8 }}
+            transition={{ duration: TIMING.COMPLETE_FADE_IN }}
           >
             <div className="canvas-container w-full h-full opacity-30">
               <AnalysisView />
             </div>
             
-            <div className="hud-overlay absolute top-4 left-4 z-10 opacity-50">
-              <WaveformDisplay />
-            </div>
-            
-            <div className="hud-overlay absolute top-4 right-4 z-10 opacity-50">
-              <VelocityHUD />
-            </div>
-            
-            {/* Verdict gets major emphasis */}
+            {/* Verdict gets major emphasis — HUD panels hidden to avoid overlap */}
             <motion.div 
               className="hud-overlay absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl z-20"
               initial={{ scale: 0.9, y: "-40%" }}
               animate={{ scale: 1, y: "-50%" }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 20 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: SPRING.VERDICT_STIFFNESS, damping: SPRING.VERDICT_DAMPING }}
             >
-              <div className="shadow-[0_0_100px_rgba(56,189,248,0.15)] rounded-sm">
+              <div className={`shadow-[0_0_100px_${COLORS_RGBA.CYAN_15}] rounded-sm`}>
                 <VerdictPanel />
               </div>
             </motion.div>
@@ -242,7 +233,7 @@ export default function App() {
               className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.5 }}
+              transition={{ delay: TIMING.VERDICT_NAV_DELAY }}
               onClick={() => useLarynxStore.getState().setStatus('comparing')}
               data-interactive
             >
@@ -258,7 +249,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: TIMING.VIEW_TRANSITION }}
           >
             <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
               <CompareView />
@@ -267,7 +258,7 @@ export default function App() {
               className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
+              transition={{ delay: TIMING.NAV_BUTTON_DELAY }}
               onClick={() => useLarynxStore.getState().setStatus('technical')}
               data-interactive
             >
@@ -283,7 +274,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: TIMING.VIEW_TRANSITION }}
           >
             <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
               <TechnicalDetailPanel />
@@ -292,7 +283,7 @@ export default function App() {
               className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
+              transition={{ delay: TIMING.NAV_BUTTON_DELAY }}
               onClick={() => useLarynxStore.getState().setStatus('closing')}
               data-interactive
             >
@@ -308,7 +299,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: TIMING.VIEW_TRANSITION }}
           >
             <div className="hud-panel p-12 max-w-md text-center flex flex-col items-center gap-6">
               <div className="text-warn text-6xl font-mono">⚠</div>
@@ -334,7 +325,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: TIMING.COMPLETE_FADE_IN }}
           >
             <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
               <ClosingScreen onReset={() => useLarynxStore.getState().reset()} />

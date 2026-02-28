@@ -11,7 +11,7 @@ import { PostProcessingEffects } from '@/components/PostProcessingEffects';
 import { CameraController } from '@/components/CameraController';
 import { ParticleField } from '@/components/ParticleField';
 import { SkullClipEffect } from '@/components/SkullClipEffect';
-
+import { CAMERA } from '@/constants';
 function ScannerLoader() {
   return (
     <div className="fixed inset-0 z-20 flex flex-col items-center justify-center bg-black">
@@ -101,7 +101,7 @@ export function AnalysisView() {
     <div className="w-full h-full absolute inset-0 bg-black">
       <Suspense fallback={<ScannerLoader />}>
         <Canvas
-          camera={{ position: [0, 0, 5], fov: 45, near: 0.1, far: 100 }}
+          camera={{ position: [0, 0, 5], fov: CAMERA.DEFAULT_FOV, near: 0.1, far: 100 }}
           gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
           dpr={[1, 1.5]}
           style={{ background: 'transparent' }}

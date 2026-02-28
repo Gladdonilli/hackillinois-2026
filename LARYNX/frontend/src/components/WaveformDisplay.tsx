@@ -8,8 +8,16 @@ export function WaveformDisplay() {
   const audioUrl = useLarynxStore((state) => state.audioUrl);
   const [duration, setDuration] = useState('00:00.00');
   
+  // Refs for element access to avoid React re-renders
   const waveformDataRef = useRef<Float32Array | null>(null);
   const durationRef = useRef<number>(0);
+  const f1ValRef = useRef<HTMLDivElement>(null);
+  const f2ValRef = useRef<HTMLDivElement>(null);
+  const f3ValRef = useRef<HTMLDivElement>(null);
+  const levelBarRef = useRef<HTMLDivElement>(null);
+  const levelValRef = useRef<HTMLSpanElement>(null);
+  const statusTextRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!audioUrl) {
@@ -271,59 +279,52 @@ export function WaveformDisplay() {
 
       // Update DOM values directly to avoid React state re-renders
       if (formantsData && currentFrame > 0 && currentFrame < formantsData.length) {
-         const f1El = document.getElementById('wave-f1-val');
-         const f2El = document.getElementById('wave-f2-val');
-         const f3El = document.getElementById('wave-f3-val');
          const frameData: any = formantsData[currentFrame];
          if (frameData) {
-            if(f1El) f1El.textContent = `F1: ${Math.round(frameData.f1 || 0)} Hz`;
-            if(f2El) f2El.textContent = `F2: ${Math.round(frameData.f2 || 0)} Hz`;
-            if(f3El) f3El.textContent = `F3: ${Math.round(frameData.f3 || 0)} Hz`;
+            if(f1ValRef.current) f1ValRef.current.textContent = `F1: ${Math.round(frameData.f1 || 0)} Hz`;
+            if(f2ValRef.current) f2ValRef.current.textContent = `F2: ${Math.round(frameData.f2 || 0)} Hz`;
+            if(f3ValRef.current) f3ValRef.current.textContent = `F3: ${Math.round(frameData.f3 || 0)} Hz`;
          }
-      }
+         }
 
       // Update Audio Level meter
-      const levelBar = document.getElementById('wave-level-bar');
-      const levelVal = document.getElementById('wave-level-val');
-      if (levelBar) {
-          levelBar.style.width = `${currentLevel.toFixed(1)}%`;
+      if (levelBarRef.current) {
+          levelBarRef.current.style.width = `${currentLevel.toFixed(1)}%`;
           if (tongueVelocity > 80) {
+              levelBarRef.current.style.background = 'linear-gradient(90deg, #38BDF8, #FF0000)';
           } else if (tongueVelocity > 50) {
-              levelBar.style.background = 'linear-gradient(90deg, #38BDF8, #FF0000)';
+              levelBarRef.current.style.background = 'linear-gradient(90deg, #38BDF8, #FFA500)';
           } else {
-              levelBar.style.background = 'linear-gradient(90deg, #38BDF8, #FFA500)';
-              levelBar.style.background = ''; // Use CSS default
+              levelBarRef.current.style.background = ''; // Use CSS default
           }
       }
-      if (levelVal) levelVal.textContent = `${currentLevel.toFixed(0)}%`;
+      if (levelValRef.current) levelValRef.current.textContent = `${currentLevel.toFixed(0)}%`;
 
       // Update Status Text directly
-      const statusEl = document.getElementById('wave-status-text');
-      if (statusEl) {
+      if (statusTextRef.current) {
          if (status === 'idle') {
-            statusEl.textContent = 'STANDBY';
-            statusEl.className = 'font-mono text-[9px] text-dim tracking-widest w-1/4 text-right truncate pl-2';
+            statusTextRef.current.textContent = 'STANDBY';
+            statusTextRef.current.className = 'font-mono text-[9px] text-dim tracking-widest w-1/4 text-right truncate pl-2';
          } else if (status === 'uploading') {
-            statusEl.textContent = 'INGESTING...';
-            statusEl.className = 'font-mono text-[9px] text-cyan animate-pulse tracking-widest w-1/4 text-right truncate pl-2';
+            statusTextRef.current.textContent = 'INGESTING...';
+            statusTextRef.current.className = 'font-mono text-[9px] text-cyan animate-pulse tracking-widest w-1/4 text-right truncate pl-2';
          } else if (status === 'analyzing') {
-            statusEl.textContent = 'SCANNING FORMANTS';
-            statusEl.className = 'font-mono text-[9px] text-cyan animate-pulse tracking-widest w-1/4 text-right truncate pl-2';
+            statusTextRef.current.textContent = 'SCANNING FORMANTS';
+            statusTextRef.current.className = 'font-mono text-[9px] text-cyan animate-pulse tracking-widest w-1/4 text-right truncate pl-2';
          } else if (status === 'complete') {
-            statusEl.textContent = 'ANALYSIS COMPLETE';
-            statusEl.className = `font-mono text-[9px] tracking-widest w-1/4 text-right truncate pl-2 ${verdict && !verdict.isGenuine ? 'text-warn [text-shadow:0_0_8px_rgba(220,38,38,0.6)]' : 'text-genuine'}`;
+            statusTextRef.current.textContent = 'ANALYSIS COMPLETE';
+            statusTextRef.current.className = `font-mono text-[9px] tracking-widest w-1/4 text-right truncate pl-2 ${verdict && !verdict.isGenuine ? 'text-warn [text-shadow:0_0_8px_rgba(220,38,38,0.6)]' : 'text-genuine'}`;
          }
       }
 
       // Update breathing border
-      let containerEl = document.getElementById('waveform-container');
-      if (containerEl) {
+      if (containerRef.current) {
          if (analyzing) {
+           containerRef.current.style.boxShadow = `0 0 15px rgba(56, 189, 248, ${breathingAlpha})`;
+           containerRef.current.style.borderColor = `rgba(56, 189, 248, ${Math.max(0.1, breathingAlpha + 0.1)})`;
          } else {
-           containerEl.style.boxShadow = `0 0 15px rgba(56, 189, 248, ${breathingAlpha})`;
-           containerEl.style.borderColor = `rgba(56, 189, 248, ${Math.max(0.1, breathingAlpha + 0.1)})`;
-           containerEl.style.boxShadow = '';
-           containerEl.style.borderColor = '';
+           containerRef.current.style.boxShadow = '';
+           containerRef.current.style.borderColor = '';
          }
       }
 
@@ -335,11 +336,11 @@ export function WaveformDisplay() {
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, []);
+  }, [audioUrl]);
 
   return (
     <motion.div
-      id="waveform-container"
+      ref={containerRef}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
@@ -371,20 +372,20 @@ export function WaveformDisplay() {
       <div className="mt-2 flex items-center gap-2">
         <span className="text-[8px] font-mono text-[#444] tracking-wider uppercase">LEVEL</span>
         <div className="flex-1 gauge-track relative h-1 bg-[#1a1a1a]">
-          <div id="wave-level-bar" className="gauge-fill absolute top-0 left-0 h-full transition-all duration-75 bg-cyan" style={{ width: '0%' }} />
+          <div ref={levelBarRef} className="gauge-fill absolute top-0 left-0 h-full transition-all duration-75 bg-cyan" style={{ width: '0%' }} />
           {/* Tick marks */}
           <div className="absolute top-0 bottom-0 left-1/4 w-[1px] bg-white/20" />
           <div className="absolute top-0 bottom-0 left-2/4 w-[1px] bg-white/40" />
           <div className="absolute top-0 bottom-0 left-3/4 w-[1px] bg-white/20" />
         </div>
-        <span id="wave-level-val" className="text-[8px] font-mono text-[#555] w-6 text-right">0%</span>
+        <span ref={levelValRef} className="text-[8px] font-mono text-[#555] w-6 text-right">0%</span>
       </div>
 
       <div className="flex flex-row justify-between items-center mt-2 border-t border-border/30 pt-2">
-        <div id="wave-f1-val" className="font-mono text-[9px] text-[#555] w-1/4">F1: --- Hz</div>
-        <div id="wave-f2-val" className="font-mono text-[9px] text-[#555] w-1/4 text-center">F2: --- Hz</div>
-        <div id="wave-f3-val" className="font-mono text-[9px] text-[#555] w-1/4 text-center">F3: --- Hz</div>
-        <div id="wave-status-text" className="font-mono text-[9px] text-[#666] tracking-widest w-1/4 text-right truncate pl-2">STANDBY</div>
+        <div ref={f1ValRef} className="font-mono text-[9px] text-[#555] w-1/4">F1: --- Hz</div>
+        <div ref={f2ValRef} className="font-mono text-[9px] text-[#555] w-1/4 text-center">F2: --- Hz</div>
+        <div ref={f3ValRef} className="font-mono text-[9px] text-[#555] w-1/4 text-center">F3: --- Hz</div>
+        <div ref={statusTextRef} className="font-mono text-[9px] text-[#666] tracking-widest w-1/4 text-right truncate pl-2">STANDBY</div>
       </div>
     </motion.div>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import gsap from 'gsap'
-
+import { TIMING } from '@/constants'
 interface WarpTransitionProps {
   isActive: boolean
   onComplete?: () => void
@@ -25,7 +25,7 @@ export function WarpTransition({ isActive, onComplete }: WarpTransitionProps) {
       tl.to(tunnelRef.current, {
         scale: 4,
         opacity: 1,
-        duration: 0.15,
+        duration: TIMING.WARP_PHASE_FREEZE,
         ease: 'power2.in'
       })
       .to(overlayRef.current, {
@@ -35,7 +35,7 @@ export function WarpTransition({ isActive, onComplete }: WarpTransitionProps) {
       }, "-=0.05")
       .to(overlayRef.current, {
         opacity: 0,
-        duration: 0.8,
+        duration: TIMING.WARP_PHASE_EXPAND,
         ease: 'power3.in',
       })
       .to(tunnelRef.current, {

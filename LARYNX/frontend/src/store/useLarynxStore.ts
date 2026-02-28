@@ -108,7 +108,7 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   setVerdict: (verdict) => set({ verdict }),
 
   startAnalysis: () => {
-    console.warn('startAnalysis() is a no-op. Use useAnalysisStream hook for real analysis.')
+    // No-op — use useAnalysisStream hook for real analysis
   },
 
   reset: () => {

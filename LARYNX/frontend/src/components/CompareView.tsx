@@ -1,5 +1,6 @@
 import { useRef, useEffect, Suspense, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { COLORS, SCENE, CAMERA } from '@/constants';
 import { useGLTF, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup';
@@ -34,8 +35,8 @@ const MiniModel = ({ isFake = false }: { isFake?: boolean }) => {
           const mat = mesh.material as THREE.MeshStandardMaterial;
           mat.transparent = true;
           mat.opacity = isFake ? 0.9 : 0.6;
-          mat.color.set(isFake ? '#FF3366' : '#00FFFF');
-          mat.emissive.set(isFake ? '#330011' : '#001122');
+          mat.color.set(isFake ? COLORS.VIOLATION : COLORS.CYAN);
+          mat.emissive.set(isFake ? COLORS.VIOLATION : COLORS.CYAN);
           mat.emissiveIntensity = 0.5;
           if (isFake) mat.wireframe = true;
         }
@@ -64,7 +65,7 @@ const MiniModel = ({ isFake = false }: { isFake?: boolean }) => {
   });
 
   return (
-    <primitive object={clone} scale={1.2} position={[0, -1.5, 0]} rotation={[0, -Math.PI / 8, 0]} />
+    <primitive object={clone} scale={SCENE.COMPARE_MODEL_SCALE} position={[0, SCENE.COMPARE_MODEL_Y, 0]} rotation={[0, -Math.PI / 8, 0]} />
   );
 };
 
@@ -138,21 +139,20 @@ const VelocityGraph = ({ isFake, frames }: { isFake: boolean; frames?: EMAFrame[
         else ctx.lineTo(x, y);
       }
 
-      ctx.strokeStyle = isFake ? '#FF3366' : '#00FFFF';
+      ctx.strokeStyle = isFake ? COLORS.VIOLATION : COLORS.CYAN;
       ctx.lineWidth = 2;
       ctx.stroke();
 
       ctx.lineTo(width, height);
       ctx.lineTo(0, height);
-      ctx.fillStyle = isFake ? 'rgba(255, 51, 102, 0.15)' : 'rgba(0, 255, 255, 0.15)';
+      ctx.fillStyle = isFake ? 'rgba(255, 0, 60, 0.15)' : 'rgba(56, 189, 248, 0.15)';
       ctx.fill();
-
       // Flashing text logic for fake peak
       if (isFake && valueRef.current) {
          if (nextVal > 150) {
-            valueRef.current.className = `text-2xl font-bold font-mono text-glow-warn animate-flicker text-warn whitespace-nowrap`;
+            valueRef.current.className = `text-2xl font-bold font-mono text-glow-warn animate-flicker text-violation whitespace-nowrap`;
          } else {
-            valueRef.current.className = `text-2xl font-bold font-mono text-glow-warn text-warn whitespace-nowrap`;
+            valueRef.current.className = `text-2xl font-bold font-mono text-glow-warn text-violation whitespace-nowrap`;
          }
       }
 
@@ -166,7 +166,7 @@ const VelocityGraph = ({ isFake, frames }: { isFake: boolean; frames?: EMAFrame[
   return (
     <div className="flex flex-col relative pt-4">
       <div className="absolute top-0 right-2 z-10 flex justify-end min-w-[200px]">
-         <div ref={valueRef} className={`text-2xl font-bold font-mono whitespace-nowrap ${isFake ? 'text-glow-warn text-warn' : 'text-glow-cyan text-cyan'}`}>
+         <div ref={valueRef} className={`text-2xl font-bold font-mono whitespace-nowrap ${isFake ? 'text-glow-warn text-violation' : 'text-glow-cyan text-cyan'}`}>
            Peak: 0.0 cm/s
          </div>
       </div>
@@ -187,7 +187,6 @@ export const CompareView = () => {
   const verdictA = comparison.channelVerdicts[0];
   const verdictB = comparison.channelVerdicts[1];
 
-  const labelA = verdictA ? (verdictA.isGenuine ? 'GENUINE' : 'DEEPFAKE') : 'HUMAN';
   const labelB = verdictB ? (verdictB.isGenuine ? 'GENUINE' : 'DEEPFAKE') : 'AI GENERATED';
   const isFakeA = verdictA ? !verdictA.isGenuine : false;
   const isFakeB = verdictB ? !verdictB.isGenuine : true;
@@ -200,7 +199,7 @@ export const CompareView = () => {
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
           <div className="text-white/60 font-mono text-sm tracking-widest">{progress.message}</div>
           <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-[#00FFFF] to-[#FF3366] transition-all duration-300" style={{ width: `${progress.percent}%` }} />
+            <div className="h-full bg-gradient-to-r from-cyan to-violation transition-all duration-300" style={{ width: `${progress.percent}%` }} />
           </div>
         </div>
       )}
@@ -208,79 +207,78 @@ export const CompareView = () => {
       <div className="grid grid-cols-11 w-full max-w-[1400px] h-[80vh] border-glow hud-panel">
 
         {/* LEFT SIDE: FILE A */}
-        <div className="col-span-5 flex flex-col h-full bg-black/40 relative border-r border-[#00ffff]/20">
-          <div className="p-6 border-b border-[#00ffff]/20 flex justify-between items-center bg-gradient-to-r from-[#00ffff]/10 to-transparent">
-            <h2 className={`text-3xl font-black tracking-widest ${isFakeA ? 'text-[#FF3366] text-glow-warn' : 'text-[#00FFFF] text-glow-cyan'}`}>
+        <div className="col-span-5 flex flex-col h-full bg-black/40 relative border-r border-cyan/20">
+          <div className="p-6 border-b border-cyan/20 flex justify-between items-center bg-gradient-to-r from-cyan/10 to-transparent">
+            <h2 className={`text-3xl font-black tracking-widest ${isFakeA ? 'text-violation text-glow-warn' : 'text-cyan text-glow-cyan'}`}>
               {hasRealData ? 'FILE A' : 'HUMAN'}
             </h2>
             <div className={`px-4 py-1 rounded border font-bold tracking-wide ${
               isFakeA
-                ? 'bg-[#FF3366]/20 border-[#FF3366]/40 text-[#FF3366] text-glow-warn animate-pulse-glow'
-                : 'bg-[#00FF88]/20 border-[#00FF88]/40 text-[#00FF88] text-glow-genuine'
+                ? 'bg-violation/20 border-violation/40 text-violation text-glow-warn animate-pulse-glow'
+                : 'bg-genuine/20 border-genuine/40 text-genuine text-glow-genuine'
             }`}>
-              {labelA}
               {verdictA && <span className="ml-2 text-xs opacity-70">({(verdictA.confidence * 100).toFixed(0)}%)</span>}
             </div>
           </div>
 
           <div className="flex-1 relative overflow-hidden">
-            <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>
+            <Canvas camera={{ position: CAMERA.COMPARE_POSITION, fov: 45 }}>
               <Suspense fallback={null}>
                 <Environment preset="city" />
                 <ambientLight intensity={0.5} />
-                <directionalLight position={[10, 10, 5]} intensity={1} color={isFakeA ? '#ff3366' : '#00ffff'} />
+                <directionalLight position={[10, 10, 5]} intensity={1} color={isFakeA ? COLORS.VIOLATION : COLORS.CYAN} />
                 <MiniModel isFake={isFakeA} />
               </Suspense>
             </Canvas>
           </div>
 
-          <div className="h-[160px] border-t border-[#00ffff]/20 bg-black/60 relative">
+          <div className="h-[160px] border-t border-cyan/20 bg-black/60 relative">
             <VelocityGraph isFake={isFakeA} frames={hasRealData ? comparison.channelFrames[0] : undefined} />
           </div>
         </div>
 
         {/* CENTER DIVIDER */}
         <div className="col-span-1 flex flex-col items-center justify-center relative bg-black/80 z-10">
-          <div className="absolute inset-y-0 w-[1px] bg-gradient-to-b from-[#00ffff]/0 via-[#00ffff]/50 to-[#ff3366]/50"></div>
-          <div className="bg-[#050510] border border-[#00ffff]/30 rounded-full w-12 h-12 flex items-center justify-center relative z-20 shadow-[0_0_20px_rgba(0,255,255,0.2)]">
+          <div className="absolute inset-y-0 w-[1px] bg-gradient-to-b from-cyan/0 via-cyan/50 to-violation/50"></div>
+          <div className="bg-[#050510] border border-cyan/30 rounded-full w-12 h-12 flex items-center justify-center relative z-20 shadow-[0_0_20px_rgba(56,189,248,0.2)]">
             <span className="font-bold text-white opacity-80">VS</span>
           </div>
         </div>
 
         {/* RIGHT SIDE: FILE B */}
-        <div className="col-span-5 flex flex-col h-full bg-black/40 relative border-l border-[#ff3366]/20">
-          <div className="p-6 border-b border-[#ff3366]/20 flex justify-between items-center bg-gradient-to-l from-[#ff3366]/10 to-transparent">
+        <div className="col-span-5 flex flex-col h-full bg-black/40 relative border-l border-violation/20">
+          <div className="p-6 border-b border-violation/20 flex justify-between items-center bg-gradient-to-l from-violation/10 to-transparent">
             <div className={`px-4 py-1 rounded border font-bold tracking-wide ${
               isFakeB
-                ? 'bg-[#FF3366]/20 border-[#FF3366]/40 text-[#FF3366] text-glow-warn animate-pulse-glow glitch-text'
-                : 'bg-[#00FF88]/20 border-[#00FF88]/40 text-[#00FF88] text-glow-genuine'
-            }` + (isFakeB ? '" data-text="DEEPFAKE"' : '')}>
+                ? 'bg-violation/20 border-violation/40 text-violation text-glow-warn animate-pulse-glow glitch-text'
+                : 'bg-genuine/20 border-genuine/40 text-genuine text-glow-genuine'
+            }`}>
               {labelB}
               {verdictB && <span className="ml-2 text-xs opacity-70">({(verdictB.confidence * 100).toFixed(0)}%)</span>}
             </div>
-            <h2 className={`text-3xl font-black tracking-widest ${isFakeB ? 'text-[#FF3366] text-glow-warn' : 'text-[#00FFFF] text-glow-cyan'}`}>
+            <h2 className={`text-3xl font-black tracking-widest ${isFakeB ? 'text-violation text-glow-warn' : 'text-cyan text-glow-cyan'}`}>
               {hasRealData ? 'FILE B' : 'AI GENERATED'}
             </h2>
           </div>
 
           <div className="flex-1 relative overflow-hidden">
-            <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>
+            <Canvas camera={{ position: CAMERA.COMPARE_POSITION, fov: 45 }}>
               <Suspense fallback={null}>
                 <Environment preset="city" />
                 <ambientLight intensity={0.5} />
-                <directionalLight position={[-10, -10, -5]} intensity={2} color="#ff3366" />
-                <directionalLight position={[10, 10, 5]} intensity={1} color={isFakeB ? '#ff0000' : '#00ffff'} />
+                <directionalLight position={[-10, -10, -5]} intensity={2} color={COLORS.VIOLATION} />
+                <directionalLight position={[10, 10, 5]} intensity={1} color={isFakeB ? COLORS.VIOLATION : COLORS.CYAN} />
                 <MiniModel isFake={isFakeB} />
               </Suspense>
             </Canvas>
 
             {/* SPORADIC FLASH OVERLAY for fake */}
             {isFakeB && (
-              <div className="absolute inset-0 pointer-events-none bg-[#ff3366]/5 animate-flicker mix-blend-screen"></div>
+              <div className="absolute inset-0 pointer-events-none bg-violation/5 animate-flicker mix-blend-screen"></div>
             )}
           </div>
 
-          <div className="h-[160px] border-t border-[#DC2626]/20 bg-black/60 relative">
+          <div className="h-[160px] border-t border-violation/20 bg-black/60 relative">
             <VelocityGraph isFake={isFakeB} frames={hasRealData ? comparison.channelFrames[1] : undefined} />
           </div>
         </div>

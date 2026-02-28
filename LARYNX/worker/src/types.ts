@@ -1,7 +1,7 @@
 export interface Env {
   DB: D1Database;
   AUDIO_BUCKET: R2Bucket;
-  RATE_LIMITER: {
+  RATE_LIMITER?: {
     limit: (opts: { key: string }) => Promise<{ success: boolean }>;
   };
   MODAL_API_URL: string;

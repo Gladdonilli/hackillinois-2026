@@ -1,9 +1,44 @@
+# ── Dependencies ──
 node_modules/
+
+# ── Build artifacts ──
 dist/
 .vite/
+.wrangler/
+
+# ── Environment ──
 *.local
 .env
 .env.*
 !.env.example
+
+# ── OS / Editor ──
 .DS_Store
 *.log
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# ── Training data & datasets (14GB+ of WAVs, too large for git) ──
+LARYNX/backend/training_data/datasets/
+LARYNX/backend/training_data/audio/
+LARYNX/backend/training_data/aai_results.json
+LARYNX/backend/training_data/aai_results_checkpoint.json
+LARYNX/backend/training_data/ema_outputs/
+
+# ── Keep the trained model (small, <1MB) ──
+!LARYNX/backend/training_data/ensemble_model.pkl
+
+# ── Raw dataset downloads ──
+*.zip
+*.tar.gz
+*.tar.bz2

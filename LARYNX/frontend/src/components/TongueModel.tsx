@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import { useLarynxStore } from '@/store/useLarynxStore';
 import * as THREE from 'three';
-
+import { TONGUE } from '@/constants';
 export function TongueModel() {
   const meshRef = useRef<THREE.Mesh>(null);
   const matRef = useRef<any>(null); // MeshDistortMaterial ref
@@ -61,7 +61,7 @@ export function TongueModel() {
     wasAbove80Ref.current = velocity > 80;
 
     if (scalePulseRef.current > 1.0) {
-        scalePulseRef.current = Math.max(1.0, scalePulseRef.current - delta * 3.0); // 1.3 -> 1.0 in ~100ms
+        scalePulseRef.current = Math.max(1.0, scalePulseRef.current - delta * TONGUE.PULSE_DECAY); // 1.3 -> 1.0 in ~100ms
     }
     meshRef.current.scale.setScalar(scalePulseRef.current);
   });

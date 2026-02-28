@@ -4,7 +4,7 @@ import gsap from "gsap"
 import * as THREE from "three"
 import { useLarynxStore } from "@/store/useLarynxStore"
 import type { AnalysisStatus } from "@/types/larynx"
-
+import { CAMERA } from "@/constants"
 const CAMERA_PRESETS: Record<
   AnalysisStatus,
   { position: [number, number, number]; target: [number, number, number] }
@@ -36,9 +36,9 @@ export function CameraController() {
   const zTo = useRef<gsap.QuickToFunc>(null!)
 
   useEffect(() => {
-    xTo.current = gsap.quickTo(camera.position, "x", { duration: 0.3 })
-    yTo.current = gsap.quickTo(camera.position, "y", { duration: 0.3 })
-    zTo.current = gsap.quickTo(camera.position, "z", { duration: 0.3 })
+    xTo.current = gsap.quickTo(camera.position, "x", { duration: CAMERA.QUICK_TO_DURATION })
+    yTo.current = gsap.quickTo(camera.position, "y", { duration: CAMERA.QUICK_TO_DURATION })
+    zTo.current = gsap.quickTo(camera.position, "z", { duration: CAMERA.QUICK_TO_DURATION })
   }, [camera.position])
 
   useEffect(() => {
@@ -71,8 +71,8 @@ export function CameraController() {
             ease: "power2.out",
           }, 0)
         } else {
-          const initialX = camera.position.x
-          const initialY = camera.position.y
+          const initialX = CAMERA_PRESETS.analyzing.position[0] * CAMERA.ZOOM_FACTOR // Approximate the camera position when zooming in
+          const initialY = CAMERA_PRESETS.analyzing.position[1] * CAMERA.ZOOM_FACTOR
           
           const shakeIntervalId = window.setInterval(() => {
             camera.position.x = initialX + (Math.random() - 0.5) * 0.1

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import { cn } from '@/lib/utils';
+import { TIMING, SPRING, GLITCH, COLORS, COLORS_RGBA } from '@/constants';
 
 export function VerdictPanel() {
   const status = useLarynxStore((state) => state.status);
@@ -32,7 +33,7 @@ export function VerdictPanel() {
       
       // Flash screen effect
       if (flashRef.current) {
-        gsap.to(flashRef.current, { opacity: 0, duration: 0.3 });
+        gsap.to(flashRef.current, { opacity: 0, duration: TIMING.VERDICT_FLASH });
       }
       
       // Reset
@@ -50,7 +51,7 @@ export function VerdictPanel() {
       // Badge Elastic pop
       tl.to(badgeRef.current, {
         scale: 1,
-        ease: 'elastic.out(1, 0.4)',
+        ease: SPRING.BADGE_EASE,
         duration: 0.8,
         onStart: () => {
           if (verdict.isGenuine) {
@@ -62,10 +63,10 @@ export function VerdictPanel() {
       if (!verdict.isGenuine) {
         // Screen shake
         tl.to(containerRef.current, { 
-          x: 'random(-5, 5)', 
-          y: 'random(-3, 3)', 
+          x: `random(-${SPRING.SHAKE_X}, ${SPRING.SHAKE_X})`, 
+          y: `random(-${SPRING.SHAKE_Y}, ${SPRING.SHAKE_Y})`, 
           duration: 0.05, 
-          repeat: 6, 
+          repeat: SPRING.SHAKE_REPEATS, 
           yoyo: true,
           clearProps: 'x,y',
           onComplete: () => {
@@ -76,8 +77,8 @@ export function VerdictPanel() {
         // Glitch text
         if (badgeTextRef.current) {
           let cycles = 0;
-          const chars = "!<>-_\\/[]{}—=+*^?#";
-          const interval = setInterval(() => {
+          const chars = GLITCH.CHARS;
+          const interval = window.setInterval(() => {
             if (badgeTextRef.current) {
               const glitched = Array.from("DEEPFAKE")
                 .map(c => Math.random() > 0.4 ? chars[Math.floor(Math.random() * chars.length)] : c)
@@ -86,27 +87,27 @@ export function VerdictPanel() {
               badgeTextRef.current.setAttribute('data-text', glitched);
             }
             cycles++;
-            if (cycles >= 4) {
-              clearInterval(interval);
+            if (cycles >= GLITCH.CYCLES) {
+              window.clearInterval(interval);
               if (badgeTextRef.current) {
                 badgeTextRef.current.innerText = "DEEPFAKE";
                 badgeTextRef.current.setAttribute('data-text', "DEEPFAKE");
               }
             }
-          }, 100);
+          }, GLITCH.INTERVAL_MS);
         }
 
         // Static noise overlay
         if (noiseRef.current) {
           tl.set(noiseRef.current, { opacity: 0.1 }, badgePopTime);
-          tl.to(noiseRef.current, { opacity: 0, duration: 2.0, ease: 'power2.out' }, badgePopTime);
+          tl.to(noiseRef.current, { opacity: 0, duration: TIMING.VERDICT_NOISE_DECAY, ease: 'power2.out' }, badgePopTime);
         }
 
         // Border pulse
         if (containerRef.current) {
           tl.to(containerRef.current, {
-            borderColor: 'rgba(255, 0, 60, 0.8)',
-            boxShadow: '0 0 20px rgba(255, 0, 60, 0.4)',
+            borderColor: COLORS_RGBA.VIOLATION_80,
+            boxShadow: `0 0 20px ${COLORS_RGBA.VIOLATION_40}`,
             duration: 0.125,
             repeat: 15,
             yoyo: true,
@@ -117,7 +118,7 @@ export function VerdictPanel() {
         // Genuine effect
         if (containerRef.current) {
           tl.to(containerRef.current, {
-             boxShadow: '0 0 40px rgba(45, 212, 191, 0.4)',
+             boxShadow: `0 0 40px ${COLORS_RGBA.GENUINE_40}`,
              duration: 1.5,
              ease: 'power2.inOut'
           }, badgePopTime);
@@ -141,7 +142,7 @@ export function VerdictPanel() {
 
       tl.to(countRef.current, {
         val: verdict.confidence * 100,
-        duration: 1.2,
+        duration: TIMING.CONFIDENCE_COUNT_DURATION,
         ease: 'power3.out',
         onUpdate: () => {
           setDisplayConfidence(countRef.current.val.toFixed(1));
@@ -171,7 +172,7 @@ export function VerdictPanel() {
         if (!verdict.isGenuine) {
           Array.from(evidenceRef.current.children).forEach((child, i) => {
             tl.to(child.children, {
-              color: '#FF003C',
+              color: COLORS.VIOLATION,
               duration: 0.1,
               yoyo: true,
               repeat: 1,

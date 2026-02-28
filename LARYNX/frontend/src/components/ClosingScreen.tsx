@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 import { SoundEngine } from '@/audio/SoundEngine'
+import { COLORS } from '@/constants'
 
 interface ClosingScreenProps {
   onReset: () => void;
@@ -28,10 +29,10 @@ export function ClosingScreen({ onReset }: ClosingScreenProps) {
   };
 
   const charVariants = {
-    hidden: { opacity: 0, textShadow: "0 0 0px #00ffff" },
+    hidden: { opacity: 0, textShadow: `0 0 0px ${COLORS.CYAN}` },
     visible: { 
       opacity: 1, 
-      textShadow: ["0 0 20px #00ffff", "0 0 0px #00ffff"],
+      textShadow: [`0 0 20px ${COLORS.CYAN}`, `0 0 0px ${COLORS.CYAN}`],
       transition: { duration: 0.2 }
     }
   };
@@ -55,7 +56,7 @@ export function ClosingScreen({ onReset }: ClosingScreenProps) {
       <div className="absolute inset-0 pointer-events-none scanline-overlay opacity-20" />
       
       {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan/10 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Title Section */}
       <div className="relative z-10 flex flex-col items-center">
@@ -78,7 +79,7 @@ export function ClosingScreen({ onReset }: ClosingScreenProps) {
         </motion.h1>
 
         <motion.p 
-          className="font-sans text-lg md:text-xl tracking-[0.2em] text-cyan-400/80 uppercase mb-16 text-center px-4"
+          className="font-sans text-lg md:text-xl tracking-[0.2em] text-cyan/80 uppercase mb-16 text-center px-4"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.2, duration: 0.8 }}
@@ -92,25 +93,26 @@ export function ClosingScreen({ onReset }: ClosingScreenProps) {
         {sponsors.map((sponsor, i) => (
           <motion.div 
             key={sponsor.name}
-            className="flex flex-col items-center p-4 border border-cyan-900/30 bg-black/40 backdrop-blur-sm hud-panel"
+            className="flex flex-col items-center p-4 border border-cyan/30 bg-black/40 backdrop-blur-sm hud-panel"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.8 + i * 0.2, duration: 0.5 }}
           >
             <span className="text-white font-mono text-lg tracking-widest mb-1 text-glow-cyan">{sponsor.name}</span>
-            <span className="text-cyan-500/50 font-mono text-[10px] uppercase tracking-tighter text-center">{sponsor.track}</span>
+            <span className="text-cyan/50 font-mono text-[10px] uppercase tracking-tighter text-center">{sponsor.track}</span>
           </motion.div>
         ))}
       </div>
 
       {/* Team Info */}
       <motion.div 
-        className="mb-12 z-10"
+        className="mb-12 z-10 flex flex-col items-center gap-2"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 2.8, duration: 0.8 }}
       >
-        <span className="font-mono text-sm tracking-[0.5em] text-white/40 uppercase">HackIllinois 2026</span>
+        <span className="font-mono text-sm tracking-[0.5em] text-cyan/80 uppercase text-center">Built by Gladdon (tianyi)</span>
+        <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase text-center">HackIllinois 2026</span>
       </motion.div>
 
       {/* CTA Button */}
@@ -127,10 +129,10 @@ export function ClosingScreen({ onReset }: ClosingScreenProps) {
       </motion.button>
 
       {/* Decorative HUD corners */}
-      <div className="absolute top-8 left-8 w-12 h-12 border-t border-l border-cyan-500/30 pointer-events-none" />
-      <div className="absolute top-8 right-8 w-12 h-12 border-t border-r border-cyan-500/30 pointer-events-none" />
-      <div className="absolute bottom-8 left-8 w-12 h-12 border-b border-l border-cyan-500/30 pointer-events-none" />
-      <div className="absolute bottom-8 right-8 w-12 h-12 border-b border-r border-cyan-500/30 pointer-events-none" />
+      <div className="absolute top-8 left-8 w-12 h-12 border-t border-l border-cyan/30 pointer-events-none" />
+      <div className="absolute top-8 right-8 w-12 h-12 border-t border-r border-cyan/30 pointer-events-none" />
+      <div className="absolute bottom-8 left-8 w-12 h-12 border-b border-l border-cyan/30 pointer-events-none" />
+      <div className="absolute bottom-8 right-8 w-12 h-12 border-b border-r border-cyan/30 pointer-events-none" />
     </motion.div>
   );
 }

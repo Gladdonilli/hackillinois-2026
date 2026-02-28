@@ -2,6 +2,7 @@ import { useRef, useEffect, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Sparkles, Stars, useGLTF, Text, Billboard } from '@react-three/drei'
 import * as THREE from 'three'
+import { SCENE } from '@/constants'
 import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import gsap from 'gsap'
@@ -19,10 +20,9 @@ function MouthBeacon({ portalState }: { portalState: string }) {
 
     // Volatile shaking
     const shake = 0.015
-    groupRef.current.position.x = 1.2 + (Math.random() - 0.5) * shake + Math.sin(t * 1.3) * 0.03
-    groupRef.current.position.y = -1.5 + Math.sin(t * 0.8) * 0.05 + (Math.random() - 0.5) * shake
-    groupRef.current.position.z = 2.5 + (Math.random() - 0.5) * shake
-
+    groupRef.current.position.x = SCENE.MOUTH_BEACON_POSITION[0] + (Math.random() - 0.5) * shake + Math.sin(t * 1.3) * 0.03
+    groupRef.current.position.y = SCENE.MOUTH_BEACON_POSITION[1] + Math.sin(t * 0.8) * 0.05 + (Math.random() - 0.5) * shake
+    groupRef.current.position.z = SCENE.MOUTH_BEACON_POSITION[2] + (Math.random() - 0.5) * shake
     // Rotate icosahedron
     if (icoRef.current) {
       icoRef.current.rotation.x += 0.008
@@ -47,7 +47,7 @@ function MouthBeacon({ portalState }: { portalState: string }) {
   if (portalState === 'entering' || portalState === 'warping') return null
 
   return (
-    <group ref={groupRef} position={[1.2, -1.5, 2.5]}>
+    <group ref={groupRef} position={SCENE.MOUTH_BEACON_POSITION as [number, number, number]}>
       {/* Volatile icosahedron */}
       <mesh ref={icoRef}>
         <icosahedronGeometry args={[0.22, 0]} />
@@ -65,7 +65,7 @@ function MouthBeacon({ portalState }: { portalState: string }) {
       <pointLight ref={glowRef} color="#38BDF8" intensity={0.6} distance={3} />
 
       {/* Arrow pointing left toward mouth */}
-      <group ref={arrowRef} position={[-0.6, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+      <group ref={arrowRef} position={[-0.6, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
         <mesh>
           <coneGeometry args={[0.06, 0.18, 4]} />
           <meshStandardMaterial
@@ -251,10 +251,10 @@ function FaceModel({ portalState }: { portalState: string }) {
 
     // Parallax
     if (solidRef.current) {
-      const targetRotX = mousePos.current.y * 0.08
-      const targetRotY = mousePos.current.x * 0.08
-      solidRef.current.rotation.x += (targetRotX - solidRef.current.rotation.x) * 0.03
-      solidRef.current.rotation.y += (targetRotY - solidRef.current.rotation.y) * 0.03
+      const targetRotX = mousePos.current.y * SCENE.PARALLAX_RANGE
+      const targetRotY = mousePos.current.x * SCENE.PARALLAX_RANGE
+      solidRef.current.rotation.x += (targetRotX - solidRef.current.rotation.x) * SCENE.PARALLAX_LERP
+      solidRef.current.rotation.y += (targetRotY - solidRef.current.rotation.y) * SCENE.PARALLAX_LERP
     }
 
     // Morph targets
@@ -315,7 +315,7 @@ function FaceModel({ portalState }: { portalState: string }) {
   })
 
   return (
-    <group ref={solidRef} scale={2.5} position={[0, -0.3, 0]}>
+    <group ref={solidRef} scale={SCENE.FACE_MODEL_SCALE} position={SCENE.FACE_MODEL_POSITION as [number, number, number]}>
       <primitive object={clonedWireScene} />
       <primitive object={clonedSolidScene} />
     </group>

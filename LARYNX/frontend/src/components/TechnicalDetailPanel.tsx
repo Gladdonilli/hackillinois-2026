@@ -319,18 +319,18 @@ export const TechnicalDetailPanel: React.FC = () => {
         
       <motion.div variants={itemVariants} className="w-full bg-black/60 border border-cyan-900/40 rounded-sm p-6 relative z-10 flex justify-between items-center divide-x divide-white/10">
         <div className="flex flex-col items-center px-6 flex-1">
-          <div className="flex items-baseline gap-1">
           <div className="text-[10px] font-mono text-cyan/60 mb-2 tracking-widest uppercase">Analysis Rate</div>
+          <div className="flex items-baseline gap-1">
             <span className="text-3xl font-mono text-white font-light">
               <NumberFlow value={stats.fps} format={{ maximumFractionDigits: 0 }} />
             </span>
-          </div>
             <span className="text-sm font-mono text-cyan/50">fps</span>
+          </div>
         </div>
 
         <div className="flex flex-col items-center px-6 flex-1">
-          <div className="flex items-baseline gap-1">
           <div className="text-[10px] font-mono text-cyan/60 mb-2 tracking-widest uppercase">Sensor Inputs</div>
+          <div className="flex items-baseline gap-1">
             <span className="text-3xl font-mono text-white font-light">
               <NumberFlow value={stats.dof} format={{ maximumFractionDigits: 0 }} />
             </span>
@@ -339,19 +339,19 @@ export const TechnicalDetailPanel: React.FC = () => {
         </div>
 
         <div className="flex flex-col items-center px-6 flex-1">
-          <div className="flex items-baseline gap-1">
           <div className="text-[10px] font-mono text-cyan/60 mb-2 tracking-widest uppercase">Human Limit</div>
+          <div className="flex items-baseline gap-1">
             <span className="text-3xl font-mono text-white font-light">
               <NumberFlow value={stats.humanVel} format={{ maximumFractionDigits: 0 }} />
             </span>
-          </div>
             <span className="text-sm font-mono text-cyan/50">cm/s</span>
+          </div>
         </div>
 
         <div className="flex flex-col items-center px-6 flex-1">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="text-[10px] font-mono text-rose-500/80 tracking-widest uppercase mb-2 flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite]" />
-            <div className="text-[10px] font-mono text-rose-500/80 tracking-widest uppercase">Fake Peak</div>
+            Fake Peak
           </div>
           <div className="flex items-baseline gap-1 text-rose-500 drop-shadow-[0_0_10px_rgba(244,63,94,0.5)]">
             <span className="text-sm font-mono mr-1">&gt;</span>
@@ -363,8 +363,8 @@ export const TechnicalDetailPanel: React.FC = () => {
         </div>
 
         <div className="flex flex-col items-center px-6 flex-1 border-r-0">
-          <div className="flex items-baseline gap-1">
           <div className="text-[10px] font-mono text-cyan/60 mb-2 tracking-widest uppercase">Confidence</div>
+          <div className="flex items-baseline gap-1">
             <span className="text-3xl font-mono text-cyan-300 font-bold drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">
               <NumberFlow value={stats.conf} format={{ minimumFractionDigits: 1, maximumFractionDigits: 1 }} />
             </span>

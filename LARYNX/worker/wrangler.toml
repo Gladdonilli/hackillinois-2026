@@ -3,20 +3,23 @@ main = "src/index.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 
+account_id = "1d71ce44882801d49fad2c5b02629d82"
+
 [vars]
-MODAL_API_URL = "https://gladdonilli--larynx-analyze-dev.modal.run"
+MODAL_API_URL = "https://gladdonilli--larynx-analyze.modal.run"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "larynx-analysis"
-database_id = "placeholder-set-on-deploy"
+database_id = "4c23a222-e513-446f-b2a4-6d5303840396"
 
 [[r2_buckets]]
 binding = "AUDIO_BUCKET"
 bucket_name = "larynx-audio"
 
-[[unsafe.bindings]]
-name = "RATE_LIMITER"
-type = "ratelimit"
-namespace_id = "larynx-api-limit"
-simple = { limit = 20, period = 60 }
+# Rate limiter disabled for hackathon — requires CF enterprise namespace
+# [[unsafe.bindings]]
+# name = "RATE_LIMITER"
+# type = "ratelimit"
+# namespace_id = "larynx-api-limit"
+# simple = { limit = 20, period = 60 }

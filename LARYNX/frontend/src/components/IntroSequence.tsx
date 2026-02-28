@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { SoundEngine } from '@/audio/SoundEngine'
-
+import { TIMING } from '@/constants'
 interface IntroSequenceProps {
   onComplete: () => void;
 }
@@ -14,13 +14,13 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
       if (!SoundEngine.isInitialized()) {
         SoundEngine.init();
       }
-    } catch (e) {
-      console.warn("AudioContext init failed", e);
+    } catch {
+      // AudioContext init may fail in restricted environments — non-fatal
     }
 
     const timer = setTimeout(() => {
       setComplete(true);
-      setTimeout(onComplete, 1200); // Wait for fade out
+      setTimeout(onComplete, TIMING.INTRO_FADE_DELAY_MS); // Wait for fade out
     }, 5500);
     return () => clearTimeout(timer);
   }, [onComplete]);
