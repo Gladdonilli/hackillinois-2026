@@ -2,10 +2,7 @@
   "name": "hackillinois-2026",
   "private": true,
   "scripts": {
-    "build": "cd LARYNX/frontend && npm install && npx vite build",
-    "start": "npx serve LARYNX/frontend/dist -s -l 8000"
-  },
-  "dependencies": {
-    "serve": "^14.2.4"
+    "build": "cd LARYNX/frontend && npm install && ./node_modules/.bin/vite build",
+    "start": "cd LARYNX/frontend && npx serve dist -s -l 8000"
   }
 }
