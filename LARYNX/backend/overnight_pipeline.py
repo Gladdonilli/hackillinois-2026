@@ -510,6 +510,31 @@ def main():
     all_fake = existing_fake + fake_items
     print(f"  Total: {len(all_real)} real + {len(all_fake)} fake = {len(all_real) + len(all_fake)} samples")
 
+    # ---- Save generated WAVs locally for JJ snapshot + auto-push backup ----
+    from pathlib import Path as _LP
+    local_audio_dir = _LP(__file__).resolve().parent / "training_data" / "audio"
+    real_dir = local_audio_dir / "real"
+    fake_dir = local_audio_dir / "fake"
+    real_dir.mkdir(parents=True, exist_ok=True)
+    fake_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_real = saved_fake = 0
+    for fname, wav_bytes in all_real:
+        out = real_dir / fname
+        if not out.exists():
+            with open(out, "wb") as f:
+                f.write(wav_bytes)
+            saved_real += 1
+    for fname, wav_bytes in all_fake:
+        out = fake_dir / fname
+        if not out.exists():
+            with open(out, "wb") as f:
+                f.write(wav_bytes)
+            saved_fake += 1
+    if saved_real or saved_fake:
+        print(f"  \U0001f4be Saved locally: {saved_real} new real + {saved_fake} new fake WAVs")
+        print(f"     → {local_audio_dir} (JJ will snapshot, auto-push will back up)")
+
     # ---- Step 2: AAI inference on Modal (batched, multi-pass overnight mode) ----
     n_samples_once = len(all_real) + len(all_fake)
     print(

@@ -85,7 +85,7 @@ export default function App() {
       case 'idle':
         SoundEngine.stopTicking()
         SoundEngine.stopDrone()
-        SoundEngine.stopHorror()
+        SoundEngine.stopIECAlarm()
         SoundEngine.stopRiser()
         SoundEngine.stopBackgroundLayer()
         break
@@ -97,25 +97,25 @@ export default function App() {
     if (status !== 'analyzing' || !SoundEngine.isInitialized() || showIntro) return
 
     let prevVelocity = useLarynxStore.getState().tongueVelocity
-    let horrorActive = false
+    let alarmActive = false
     const unsub = useLarynxStore.subscribe((state) => {
       if (state.tongueVelocity !== prevVelocity) {
         prevVelocity = state.tongueVelocity
         SoundEngine.updateVelocity(state.tongueVelocity)
 
-        // Start horror texture at skull-clip threshold
-        if (state.tongueVelocity > 80 && !horrorActive) {
-          SoundEngine.startHorror()
-          horrorActive = true
-        } else if (state.tongueVelocity <= 80 && horrorActive) {
-          SoundEngine.stopHorror()
-          horrorActive = false
+        // Start IEC alarm at skull-clip threshold
+        if (state.tongueVelocity > 80 && !alarmActive) {
+          SoundEngine.startIECAlarm()
+          alarmActive = true
+        } else if (state.tongueVelocity <= 80 && alarmActive) {
+          SoundEngine.stopIECAlarm()
+          alarmActive = false
         }
       }
     })
     return () => {
       unsub()
-      if (horrorActive) SoundEngine.stopHorror()
+      if (alarmActive) SoundEngine.stopIECAlarm()
     }
   }, [status, showIntro])
 
@@ -258,7 +258,7 @@ export default function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <Suspense fallback={<div className="hud-panel p-8 text-cyan-400 font-mono animate-pulse">Loading...</div>}>
+            <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
               <CompareView />
             </Suspense>
             <motion.button
@@ -283,7 +283,7 @@ export default function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <Suspense fallback={<div className="hud-panel p-8 text-cyan-400 font-mono animate-pulse">Loading...</div>}>
+            <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
               <TechnicalDetailPanel />
             </Suspense>
             <motion.button
@@ -308,7 +308,7 @@ export default function App() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <Suspense fallback={<div className="hud-panel p-8 text-cyan-400 font-mono animate-pulse">Loading...</div>}>
+            <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
               <ClosingScreen onReset={() => useLarynxStore.getState().reset()} />
             </Suspense>
           </motion.div>
