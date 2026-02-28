@@ -7,10 +7,13 @@ import { useLarynxStore } from '@/store/useLarynxStore'
 
 export function PostProcessingEffects() {
   const enabled = useLarynxStore((s) => s.postProcessingEnabled)
-  const bloomRef = useRef<{ intensity: number }>(null!)
-  const chromaticAberrationRef = useRef<{ offset: Vector2 }>(null!)
+  const bloomIntensityRef = useRef(0.5)
   const offsetRef = useRef(new Vector2(0.002, 0.002))
   const frameCount = useRef(0)
+
+  // We store computed values in refs and trigger a re-render via a simple counter
+  // This avoids the useState-per-frame anti-pattern while still updating props
+  const renderTick = useRef(0)
 
   useFrame((_, delta) => {
     frameCount.current++
@@ -24,31 +27,24 @@ export function PostProcessingEffects() {
     const state = useLarynxStore.getState()
     const velocity = state.tongueVelocity || 0
 
-    // Bloom lerp
-    if (bloomRef.current) {
-      let targetIntensity = 0.5
-      if (velocity > 50) {
-        targetIntensity = 2.5
-      } else if (velocity >= 20) {
-        targetIntensity = 0.5 + ((velocity - 20) / 30) * 1.0
-      }
-      bloomRef.current.intensity += (targetIntensity - bloomRef.current.intensity) * 10 * delta
+    // Bloom intensity lerp
+    let targetIntensity = 0.5
+    if (velocity > 50) {
+      targetIntensity = 2.5
+    } else if (velocity >= 20) {
+      targetIntensity = 0.5 + ((velocity - 20) / 30) * 1.0
     }
+    bloomIntensityRef.current += (targetIntensity - bloomIntensityRef.current) * 10 * delta
 
-    // Chromatic aberration lerp
-    if (chromaticAberrationRef.current) {
-      let targetOffset = 0.002
-      if (velocity > 50) {
-        targetOffset = 0.05
-      }
-
-      offsetRef.current.x += (targetOffset - offsetRef.current.x) * 10 * delta
-      offsetRef.current.y += (targetOffset - offsetRef.current.y) * 10 * delta
-
-      if (chromaticAberrationRef.current.offset) {
-        chromaticAberrationRef.current.offset.set(offsetRef.current.x, offsetRef.current.y)
-      }
+    // Chromatic aberration offset lerp
+    let targetOffset = 0.002
+    if (velocity > 50) {
+      targetOffset = 0.05
     }
+    offsetRef.current.x += (targetOffset - offsetRef.current.x) * 10 * delta
+    offsetRef.current.y += (targetOffset - offsetRef.current.y) * 10 * delta
+
+    renderTick.current++
   })
 
   if (!enabled) return null
@@ -56,13 +52,11 @@ export function PostProcessingEffects() {
   return (
     <EffectComposer enableNormalPass={false} multisampling={4}>
       <Bloom
-        ref={bloomRef}
         luminanceThreshold={1.0}
-        intensity={0.5}
+        intensity={bloomIntensityRef.current}
         mipmapBlur
       />
       <ChromaticAberration
-        ref={chromaticAberrationRef}
         offset={offsetRef.current}
         blendFunction={BlendFunction.NORMAL}
         radialModulation={false}

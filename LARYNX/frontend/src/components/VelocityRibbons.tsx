@@ -9,7 +9,7 @@ type MaterialWithColor = THREE.Material & { color?: THREE.Color }
 
 export function VelocityRibbons() {
   const meshRef = useRef<THREE.Mesh>(null!)
-  const trailRef = useRef<THREE.Group>(null!)
+  const trailGroupRef = useRef<THREE.Group>(null!)
 
   // Pre-allocate values outside useFrame to avoid allocations
   const _normalColor = useRef(new THREE.Color('#00FFFF'))
@@ -45,8 +45,8 @@ export function VelocityRibbons() {
     currentColor.current.lerp(targetColor.current, 10 * delta)
 
     // Apply color directly to Trail child material (skips React DOM updates for 60fps)
-    if (trailRef.current) {
-      trailRef.current.traverse((child: THREE.Object3D) => {
+    if (trailGroupRef.current) {
+      trailGroupRef.current.traverse((child: THREE.Object3D) => {
         if (child instanceof THREE.Mesh) {
           const mat = child.material as MaterialWithColor
           if (mat && mat.color) {
@@ -58,18 +58,19 @@ export function VelocityRibbons() {
   })
 
   return (
-    <Trail
-      ref={trailRef}
-      width={0.3}
-      length={8}
-      decay={1}
-      color={currentColor.current}
-      attenuation={handleAttenuation}
-    >
-      <mesh ref={meshRef}>
-        <sphereGeometry args={[0.01, 8, 8]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-    </Trail>
+    <group ref={trailGroupRef}>
+      <Trail
+        width={0.3}
+        length={8}
+        decay={1}
+        color={currentColor.current}
+        attenuation={handleAttenuation}
+      >
+        <mesh ref={meshRef}>
+          <sphereGeometry args={[0.01, 8, 8]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      </Trail>
+    </group>
   )
 }
