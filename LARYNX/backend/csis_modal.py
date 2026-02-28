@@ -36,6 +36,11 @@ aai_image = (
     )
     .run_commands(
         "pip install git+https://github.com/articulatory/articulatory.git",
+        # articulatory's pqmf.py uses scipy.signal.kaiser which was removed in scipy 1.12+
+        # Patch the import in-place using find+sed (can't import the module to find its path)
+        "find /usr/local/lib/python3.11 -path '*/articulatory/layers/pqmf.py' -exec sed -i 's/from scipy.signal import kaiser/from scipy.signal.windows import kaiser/g' {} +",
+        # Verify the patch worked
+        "python -c 'import articulatory.layers.pqmf; print(\"pqmf import OK\")'",
     )
 )
 
