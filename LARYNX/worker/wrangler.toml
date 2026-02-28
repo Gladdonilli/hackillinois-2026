@@ -1,4 +1,4 @@
-name = "synapse-proxy"
+name = "larynx-proxy"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
@@ -8,6 +8,10 @@ ENVIRONMENT = "production"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "synapse-db"
+database_name = "larynx-db"
 database_id = "PLACEHOLDER_FILL_AFTER_CREATE"
 migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "AUDIO_BUCKET"
+bucket_name = "larynx-audio"

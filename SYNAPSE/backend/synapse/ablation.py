@@ -9,7 +9,7 @@ from transformer_lens import HookedTransformer
 
 from .model import ModelManager
 from .sae import SAEExtractor
-from .schemas import AblateData, AblationEntry
+from .schemas import AblateData, AblationEntry, ClampData, ClampEntry
 
 logger = logging.getLogger(__name__)
 
@@ -115,4 +115,97 @@ def ablate_features(
         original_response=original_response,
         steered_response=steered_response,
         semantic_distance=distance,
+    )
+
+
+
+
+def make_clamp_hook(
+    sae: Any,
+    clamps: list[ClampEntry],
+) -> Callable[..., torch.Tensor]:
+    """Create a hook that CLAMPS SAE feature activations to target values.
+
+    This is the Golden Gate Claude method:
+    1. Encode residual stream through SAE
+    2. Set specific feature activations to a high target value (e.g., 10x normal max)
+    3. Decode modified features back to residual stream
+
+    Unlike ablation (which zeroes features), clamping AMPLIFIES features,
+    causing dramatic behavioral changes — the model becomes "obsessed" with the concept.
+    """
+    def hook_fn(value: torch.Tensor, hook: Any) -> torch.Tensor:
+        batch, seq, d_model = value.shape
+        flat = value.reshape(-1, d_model)
+
+        # Encode through SAE
+        feature_acts = sae.encode(flat)  # (batch*seq, d_sae)
+
+        # Clamp features to target values
+        for entry in clamps:
+            parts = entry.feature_id.split("_F")
+            if len(parts) != 2:
+                continue
+            try:
+                feat_idx = int(parts[1])
+            except ValueError:
+                continue
+
+            # Set activation to exact clamp value (10x normal max for dramatic effect)
+            feature_acts[:, feat_idx] = entry.clamp_value
+
+        # Decode back to residual space
+        modified = sae.decode(feature_acts)
+        return modified.reshape(batch, seq, d_model)
+
+    return hook_fn
+
+
+def clamp_features(
+    model_manager: ModelManager,
+    sae_extractor: SAEExtractor,
+    job_id: str,
+    clamps: list[ClampEntry],
+    regenerate: bool = True,
+) -> ClampData:
+    """Clamp specified features to target values and regenerate response.
+
+    This produces Golden Gate Claude-style obsessive behavior.
+    """
+    assert model_manager.model is not None, "Model not loaded"
+    assert sae_extractor.sae is not None, "SAE not loaded"
+
+    cached = model_manager.get_residual_stream(job_id)
+    original_response = cached["response"]
+    prompt = cached["prompt"]
+
+    if not regenerate:
+        return ClampData(
+            original_response=original_response,
+            clamped_response=original_response,
+            semantic_distance=0.0,
+            clamped_features=0,
+        )
+
+    hook_name = "blocks.15.hook_resid_post"
+    hook_fn = make_clamp_hook(sae_extractor.sae, clamps)
+
+    clamped_response = model_manager.regenerate_with_hooks(
+        prompt=prompt,
+        hooks=[(hook_name, hook_fn)],
+    )
+
+    distance = _compute_semantic_distance(original_response, clamped_response)
+
+    logger.info(
+        "Clamping complete: %d features clamped, semantic_distance=%.4f",
+        len(clamps),
+        distance,
+    )
+
+    return ClampData(
+        original_response=original_response,
+        clamped_response=clamped_response,
+        semantic_distance=distance,
+        clamped_features=len(clamps),
     )

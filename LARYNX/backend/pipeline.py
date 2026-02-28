@@ -9,7 +9,7 @@ import numpy as np
 import parselmouth
 from scipy.ndimage import median_filter
 
-from .config import (
+from LARYNX.backend.config import (
     ABSOLUTE_MAX_VELOCITY,
     F1_CLOSED_HZ,
     F1_OPEN_HZ,
@@ -29,7 +29,7 @@ from .config import (
     VELOCITY_THRESHOLDS,
     WINDOW_LENGTH,
 )
-from .models import AnalysisProgress, EMAFrame, FormantData, SensorPosition, Verdict
+from LARYNX.backend.models import AnalysisProgress, EMAFrame, FormantData, SensorPosition, Verdict
 
 class AudioPreprocessor:
     def load(self, audio_bytes: bytes, filename: str) -> tuple[np.ndarray, int]:

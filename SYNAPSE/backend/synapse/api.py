@@ -7,13 +7,15 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from .ablation import ablate_features
+from .ablation import ablate_features, clamp_features
 from .model import ModelManager
 from .sae import SAEExtractor
 from .schemas import (
     AblateData,
     AblateRequest,
     ApiResponse,
+    ClampData,
+    ClampRequest,
     FeaturesData,
     FeaturesRequest,
     GenerateData,
@@ -88,6 +90,24 @@ def create_app(model_manager: ModelManager, sae_extractor: SAEExtractor) -> Fast
             return ApiResponse(success=False, error=f"Job {req.job_id} not found")
         except Exception as e:
             logger.exception("Ablation failed")
+            return ApiResponse(success=False, error=str(e))
+
+    @app.post("/api/clamp", response_model=ApiResponse[ClampData])
+    async def clamp_endpoint(req: ClampRequest) -> ApiResponse[ClampData]:
+        """Clamp features to target values (Golden Gate method)."""
+        try:
+            result = clamp_features(
+                model_manager=model_manager,
+                sae_extractor=sae_extractor,
+                job_id=req.job_id,
+                clamps=req.clamps,
+                regenerate=req.regenerate,
+            )
+            return ApiResponse(success=True, data=result)
+        except KeyError:
+            return ApiResponse(success=False, error=f"Job {req.job_id} not found")
+        except Exception as e:
+            logger.exception("Clamping failed")
             return ApiResponse(success=False, error=str(e))
 
     @app.post("/api/steer", response_model=ApiResponse[SteerData])

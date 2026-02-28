@@ -27,6 +27,7 @@ larynx_image = (
         "python-multipart==0.0.12",
         "pydantic==2.10.3",
     )
+    .add_local_python_source("LARYNX.backend")  # Mount local package for relative imports
 )
 
 app = modal.App("hackillinois-2026")
@@ -42,11 +43,11 @@ cors_headers = {
     cpu=2.0,
     memory=2048,
     timeout=300,
-    container_idle_timeout=120,
-    keep_warm=1,
-    allow_concurrent_inputs=10,
-)
-@modal.web_endpoint(method="POST", label="larynx-analyze")
+    scaledown_window=120,
+    min_containers=1,
+    )
+@modal.concurrent(max_inputs=10)
+@modal.fastapi_endpoint(method="POST", label="larynx-analyze")
 async def analyze(file: UploadFile = File(...)):
     """
     POST /api/analyze
@@ -54,8 +55,9 @@ async def analyze(file: UploadFile = File(...)):
     Accepts multipart/form-data with 'file' field containing audio.
     Returns SSE stream with progress events, EMA frames, and verdict.
     """
-    from .config import ALLOWED_FORMATS, MAX_FILE_SIZE_MB
-    from .pipeline import analyze_audio, AnalysisProgress, EMAFrame, Verdict
+    from LARYNX.backend.config import ALLOWED_FORMATS, MAX_FILE_SIZE_MB
+    from LARYNX.backend.pipeline import analyze_audio
+    from LARYNX.backend.models import AnalysisProgress, EMAFrame, Verdict
     
     if file is None:
         return JSONResponse(
@@ -142,9 +144,9 @@ async def analyze(file: UploadFile = File(...)):
     cpu=0.25,
     memory=256,
     timeout=30,
-    allow_concurrent_inputs=100,
-)
-@modal.web_endpoint(method="GET", label="larynx-health")
+    )
+@modal.concurrent(max_inputs=100)
+@modal.fastapi_endpoint(method="GET", label="larynx-health")
 async def health():
     """GET /health — Health check endpoint."""
     return JSONResponse(

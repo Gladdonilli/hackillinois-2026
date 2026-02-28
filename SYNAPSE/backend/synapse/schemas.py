@@ -89,3 +89,28 @@ class SteerData(BaseModel):
     original_response: str
     steered_response: str
     semantic_distance: float
+
+
+# --- Clamping (Golden Gate Method) ---
+
+
+class ClampEntry(BaseModel):
+    feature_id: str
+    clamp_value: float = Field(description="Target activation value. Use 10x normal max for dramatic effect.")
+
+
+
+
+class ClampRequest(BaseModel):
+    job_id: str
+    clamps: list[ClampEntry]
+    regenerate: bool = True
+
+
+
+
+class ClampData(BaseModel):
+    original_response: str
+    clamped_response: str
+    semantic_distance: float
+    clamped_features: int
