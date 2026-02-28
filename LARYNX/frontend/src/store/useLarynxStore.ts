@@ -26,6 +26,9 @@ interface LarynxState {
   startAnalysis: () => void
   setPostProcessingEnabled: (enabled: boolean) => void
   reset: () => void
+  setProgress: (progress: AnalysisProgress) => void
+  addFrame: (frame: { sensors: Record<string, { x: number; y: number; velocity?: number }>; tongueVelocity: number; timestamp: number }) => void
+  setVerdict: (verdict: Verdict) => void
 }
 
 const generateMockFrames = (): EMAFrame[] => {
@@ -93,6 +96,28 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   setStatus: (status) => set({ status }),
 
   setPostProcessingEnabled: (enabled) => set({ postProcessingEnabled: enabled }),
+
+  setProgress: (progress) => set({ progress }),
+
+  addFrame: (frame) => {
+    const state = get()
+    const newFrames = [...state.frames, {
+      sensors: frame.sensors as Record<SensorName, { x: number; y: number; velocity?: number }>,
+      tongueVelocity: frame.tongueVelocity,
+      timestamp: frame.timestamp,
+    }]
+    const currentFrame = newFrames.length - 1
+    const t1 = frame.sensors['T1'] || frame.sensors.T1
+    set({
+      frames: newFrames,
+      currentFrame,
+      tongueVelocity: frame.tongueVelocity,
+      tongueT1: t1 ? { x: t1.x, y: t1.y } : state.tongueT1,
+      formants: [...state.formants], // Keep existing formants
+    })
+  },
+
+  setVerdict: (verdict) => set({ verdict }),
 
   startAnalysis: () => {
     const frames = generateMockFrames()

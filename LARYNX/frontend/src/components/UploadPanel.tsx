@@ -4,6 +4,7 @@ import { Upload, FileAudio, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import useLarynxStore from "@/store/useLarynxStore"
+import { useAnalysisStream } from '@/hooks/useAnalysisStream'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_TYPES = ["audio/wav", "audio/mpeg", "audio/ogg", "audio/flac", "audio/x-m4a"]
@@ -16,6 +17,7 @@ export default function UploadPanel() {
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioFile = useLarynxStore((state) => state.audioFile)
+  const { startStream } = useAnalysisStream()
 
   const validateAndProcessFile = async (file: File) => {
     setError(null)
@@ -76,9 +78,7 @@ export default function UploadPanel() {
   }
 
   const handleAnalyze = () => {
-    const store = useLarynxStore.getState()
-    store.startAnalysis()
-    store.setStatus('analyzing')
+    startStream()
   }
 
   const formatDuration = (seconds: number) => {
