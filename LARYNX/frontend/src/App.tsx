@@ -43,6 +43,7 @@ export default function App() {
 
     switch (status) {
       case 'uploading':
+        SoundEngine.playUploadThunk()
         SoundEngine.playBeep()
         break
       case 'analyzing':
@@ -54,7 +55,12 @@ export default function App() {
         SoundEngine.stopDrone()
         const verdict = useLarynxStore.getState().verdict
         if (verdict) {
-          SoundEngine.playVerdict(verdict.isGenuine ? 'genuine' : 'deepfake')
+          if (verdict.isGenuine) {
+            SoundEngine.playVerdict('genuine')
+            SoundEngine.playResolution('genuine')
+          } else {
+            SoundEngine.triggerDeepfakeReveal()
+          }
         }
         break
       }
@@ -62,6 +68,8 @@ export default function App() {
       case 'idle':
         SoundEngine.stopTicking()
         SoundEngine.stopDrone()
+        SoundEngine.stopHorror()
+        SoundEngine.stopRiser()
         break
     }
   }, [status, showIntro])
@@ -71,13 +79,26 @@ export default function App() {
     if (status !== 'analyzing' || !SoundEngine.isInitialized() || showIntro) return
 
     let prevVelocity = useLarynxStore.getState().tongueVelocity
+    let horrorActive = false
     const unsub = useLarynxStore.subscribe((state) => {
       if (state.tongueVelocity !== prevVelocity) {
         prevVelocity = state.tongueVelocity
         SoundEngine.updateVelocity(state.tongueVelocity)
+
+        // Start horror texture at skull-clip threshold
+        if (state.tongueVelocity > 80 && !horrorActive) {
+          SoundEngine.startHorror()
+          horrorActive = true
+        } else if (state.tongueVelocity <= 80 && horrorActive) {
+          SoundEngine.stopHorror()
+          horrorActive = false
+        }
       }
     })
-    return unsub
+    return () => {
+      unsub()
+      if (horrorActive) SoundEngine.stopHorror()
+    }
   }, [status, showIntro])
 
   return (

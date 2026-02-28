@@ -51,9 +51,21 @@ HUBERT_CACHE = "/model-cache/hubert"
 # EMA coordinate indices (from predict_ema.py):
 # 0:LI_x, 1:LI_y, 2:UL_x, 3:UL_y, 4:LL_x, 5:LL_y,
 # 6:TT_x, 7:TT_y, 8:TB_x, 9:TB_y, 10:TD_x, 11:TD_y
-TT_X, TT_Y = 6, 7  # Tongue Tip
-TB_X, TB_Y = 8, 9  # Tongue Body
+LI_X, LI_Y = 0, 1   # Lower Incisor (jaw)
+UL_X, UL_Y = 2, 3   # Upper Lip
+LL_X, LL_Y = 4, 5   # Lower Lip
+TT_X, TT_Y = 6, 7   # Tongue Tip
+TB_X, TB_Y = 8, 9   # Tongue Body
 TD_X, TD_Y = 10, 11  # Tongue Dorsum
+
+ALL_ARTICULATORS = [
+    ("LI", LI_X, LI_Y),
+    ("UL", UL_X, UL_Y),
+    ("LL", LL_X, LL_Y),
+    ("TT", TT_X, TT_Y),
+    ("TB", TB_X, TB_Y),
+    ("TD", TD_X, TD_Y),
+]
 
 
 @app.function(
@@ -220,9 +232,21 @@ def predict_ema_velocity(wav_bytes: bytes, filename: str) -> dict:
         vel_cm_s = dist_mm / dt / 10.0  # mm/s -> cm/s
         return vel_cm_s
 
-    tt_vel = compute_velocity(ema, TT_X, TT_Y)
-    tb_vel = compute_velocity(ema, TB_X, TB_Y)
-    td_vel = compute_velocity(ema, TD_X, TD_Y)
+    def compute_jerk(vel: np.ndarray) -> np.ndarray:
+        """Jerk = d(acceleration)/dt = d²v/dt². Units: cm/s³."""
+        accel = np.diff(vel) / dt
+        jerk = np.diff(accel) / dt
+        return np.abs(jerk)
+
+    # Compute velocity AND jerk for ALL 6 articulators
+    art_stats = {}
+    for name, ix, iy in ALL_ARTICULATORS:
+        vel = compute_velocity(ema, ix, iy)
+        jerk = compute_jerk(vel)
+        art_stats[name] = {
+            "vel": vel,
+            "jerk": jerk,
+        }
 
     # ---- Encode raw EMA for downstream analysis ----
     buf = io.BytesIO()
@@ -235,23 +259,25 @@ def predict_ema_velocity(wav_bytes: bytes, filename: str) -> dict:
         "ema_shape": list(ema.shape),
         "duration_s": round(duration_s, 3),
         "ema_rate_hz": ema_rate,
-        # Tongue Tip velocities
-        "tt_peak_vel": round(float(np.max(tt_vel)), 4),
-        "tt_mean_vel": round(float(np.mean(tt_vel)), 4),
-        "tt_p95_vel": round(float(np.percentile(tt_vel, 95)), 4),
-        "tt_p99_vel": round(float(np.percentile(tt_vel, 99)), 4),
-        "tt_median_vel": round(float(np.median(tt_vel)), 4),
-        # Tongue Body velocities
-        "tb_peak_vel": round(float(np.max(tb_vel)), 4),
-        "tb_mean_vel": round(float(np.mean(tb_vel)), 4),
-        "tb_p95_vel": round(float(np.percentile(tb_vel, 95)), 4),
-        # Tongue Dorsum velocities
-        "td_peak_vel": round(float(np.max(td_vel)), 4),
-        "td_mean_vel": round(float(np.mean(td_vel)), 4),
-        "td_p95_vel": round(float(np.percentile(td_vel, 95)), 4),
-        # Raw EMA for visualization
-        "raw_ema_b64": ema_b64,
     }
+
+    # Add velocity + jerk stats for ALL articulators
+    for name, stats in art_stats.items():
+        prefix = name.lower()
+        vel = stats["vel"]
+        jerk = stats["jerk"]
+        result[f"{prefix}_peak_vel"] = round(float(np.max(vel)), 4)
+        result[f"{prefix}_mean_vel"] = round(float(np.mean(vel)), 4)
+        result[f"{prefix}_p95_vel"] = round(float(np.percentile(vel, 95)), 4)
+        result[f"{prefix}_p99_vel"] = round(float(np.percentile(vel, 99)), 4)
+        result[f"{prefix}_median_vel"] = round(float(np.median(vel)), 4)
+        result[f"{prefix}_peak_jerk"] = round(float(np.max(jerk)), 4)
+        result[f"{prefix}_mean_jerk"] = round(float(np.mean(jerk)), 4)
+        result[f"{prefix}_p95_jerk"] = round(float(np.percentile(jerk, 95)), 4)
+        result[f"{prefix}_p99_jerk"] = round(float(np.percentile(jerk, 99)), 4)
+
+    # Raw EMA for visualization
+    result["raw_ema_b64"] = ema_b64
 
     return result
 
@@ -323,18 +349,20 @@ def main():
         return
 
     # ---- Step 4: Print results table ----
-    print("\n" + "=" * 120)
-    print(f"{'File':<28} {'Label':<10} {'Frames':>7} {'Dur(s)':>7} "
-          f"{'TT_Peak':>8} {'TT_Mean':>8} {'TT_P95':>8} {'TT_P99':>8} "
-          f"{'TB_Peak':>8} {'TD_Peak':>8}")
-    print("-" * 120)
+    print("\n" + "=" * 160)
+    header = f"{'File':<30} {'Label':<10} {'Dur':>5}"
+    for art in ['TT', 'TB', 'TD', 'LI', 'UL', 'LL']:
+        header += f" | {art+'_Vpk':>7} {art+'_Vm':>7} {art+'_Jpk':>8} {art+'_Jp95':>8}"
+    print(header)
+    print("-" * 160)
 
     for r in results:
-        print(f"{r['filename']:<28} {r['label']:<10} {r['num_frames']:>7} {r['duration_s']:>7.2f} "
-              f"{r['tt_peak_vel']:>8.2f} {r['tt_mean_vel']:>8.2f} {r['tt_p95_vel']:>8.2f} {r['tt_p99_vel']:>8.2f} "
-              f"{r['tb_peak_vel']:>8.2f} {r['td_peak_vel']:>8.2f}")
+        row = f"{r['filename']:<30} {r['label']:<10} {r['duration_s']:>5.1f}"
+        for art in ['tt', 'tb', 'td', 'li', 'ul', 'll']:
+            row += f" | {r[f'{art}_peak_vel']:>7.2f} {r[f'{art}_mean_vel']:>7.2f} {r[f'{art}_peak_jerk']:>8.1f} {r[f'{art}_p95_jerk']:>8.1f}"
+        print(row)
 
-    print("-" * 120)
+    print("-" * 160)
 
     # ---- Step 5: Separation analysis ----
     import numpy as np
@@ -343,52 +371,56 @@ def main():
     fake_results = [r for r in results if r["label"] == "deepfake"]
 
     if real_results and fake_results:
-        print("\nSEPARATION ANALYSIS (AAI EMA Velocities):")
+        print("\nSEPARATION ANALYSIS (AAI EMA — All Articulators, Velocity + Jerk):")
+        print(f"  Real samples: {len(real_results)}, Deepfake samples: {len(fake_results)}")
+        print()
 
-        for metric, key in [
-            ("TT Peak", "tt_peak_vel"),
-            ("TT P95", "tt_p95_vel"),
-            ("TT P99", "tt_p99_vel"),
-            ("TT Mean", "tt_mean_vel"),
-            ("TT Median", "tt_median_vel"),
-            ("TB Peak", "tb_peak_vel"),
-            ("TD Peak", "td_peak_vel"),
-        ]:
+        # Build comprehensive metric list: velocity + jerk for all 6 articulators
+        metrics = []
+        for art in ['TT', 'TB', 'TD', 'LI', 'UL', 'LL']:
+            prefix = art.lower()
+            for stat, label in [('peak_vel', 'PeakVel'), ('mean_vel', 'MeanVel'), ('p95_vel', 'P95Vel'),
+                                ('p99_vel', 'P99Vel'), ('peak_jerk', 'PeakJerk'), ('mean_jerk', 'MeanJerk'),
+                                ('p95_jerk', 'P95Jerk'), ('p99_jerk', 'P99Jerk')]:
+                metrics.append((f"{art} {label}", f"{prefix}_{stat}"))
+
+        best_signals = []
+        for metric_name, key in metrics:
             real_avg = np.mean([r[key] for r in real_results])
             fake_avg = np.mean([r[key] for r in fake_results])
+            if real_avg == 0 and fake_avg == 0:
+                continue
             sep = abs(fake_avg - real_avg)
+            # Relative separation (% of mean)
+            mean_val = (real_avg + fake_avg) / 2
+            rel_sep = (sep / mean_val * 100) if mean_val > 0 else 0
             direction = "FAKE>REAL" if fake_avg > real_avg else "REAL>FAKE"
+            signal = "✅" if rel_sep > 20 else ("🟡" if rel_sep > 10 else "  ")
+            best_signals.append((rel_sep, metric_name, real_avg, fake_avg, sep, direction, signal))
 
-            # Threshold varies by metric
-            threshold = 3.0 if "peak" in key.lower() else 1.5
-            signal = "✅ SIGNAL" if sep > threshold else "❌ NO SIGNAL"
+        # Sort by relative separation descending
+        best_signals.sort(reverse=True)
 
-            print(f"  {metric:<12}: Real={real_avg:>8.3f}  Fake={fake_avg:>8.3f}  "
-                  f"Sep={sep:>7.3f} ({direction})  {signal}")
+        print(f"  {'Metric':<18} {'Real':>10} {'Fake':>10} {'AbsSep':>10} {'RelSep%':>8} {'Dir':<10} {'Signal'}")
+        print(f"  {'-'*80}")
+        for rel_sep, metric_name, real_avg, fake_avg, sep, direction, signal in best_signals[:20]:
+            print(f"  {metric_name:<18} {real_avg:>10.3f} {fake_avg:>10.3f} {sep:>10.3f} {rel_sep:>7.1f}% {direction:<10} {signal}")
 
-        # Overall verdict
-        peak_sep = abs(np.mean([r["tt_peak_vel"] for r in fake_results]) -
-                       np.mean([r["tt_peak_vel"] for r in real_results]))
-        p95_sep = abs(np.mean([r["tt_p95_vel"] for r in fake_results]) -
-                      np.mean([r["tt_p95_vel"] for r in real_results]))
-        mean_sep = abs(np.mean([r["tt_mean_vel"] for r in fake_results]) -
-                       np.mean([r["tt_mean_vel"] for r in real_results]))
-
-        signals = sum([peak_sep > 3.0, p95_sep > 2.0, mean_sep > 1.0])
+        # Overall verdict based on top signals
+        top_signals = [s for s in best_signals if s[0] > 20]  # >20% relative separation
+        mid_signals = [s for s in best_signals if 10 < s[0] <= 20]
 
         print()
-        if signals >= 2:
-            print("🟢 CSIS PHASE 2 PASS — AAI model shows EMA velocity separation!")
+        if len(top_signals) >= 3:
+            print("🟢 CSIS PHASE 2 PASS — Multiple strong separation signals found!")
             print("   The articulatory inversion approach CAN discriminate real from deepfake.")
             print("   LARYNX thesis validated. Proceed with production pipeline.")
-        elif signals == 1:
-            print("🟡 CSIS PHASE 2 MARGINAL — Weak signal detected.")
-            print("   Some separation exists but may not be robust.")
-            print("   Consider fine-tuning AAI model on more varied data.")
+        elif len(top_signals) >= 1 or len(mid_signals) >= 3:
+            print("🟡 CSIS PHASE 2 MARGINAL — Some separation signals detected.")
+            print("   May work with feature combination or model fine-tuning.")
         else:
-            print("🔴 CSIS PHASE 2 FAIL — No velocity separation detected.")
-            print("   The AAI model does NOT produce different velocities for real vs synthetic.")
-            print("   LARYNX thesis may need fundamental rethinking.")
+            print("🔴 CSIS PHASE 2 FAIL — No strong separation signals.")
+            print("   Consider: different deepfake sources, model fine-tuning, or fallback to Wav2Vec2 classifier.")
 
         # Also check if velocities are physiologically plausible
         all_tt_peaks = [r["tt_peak_vel"] for r in results]

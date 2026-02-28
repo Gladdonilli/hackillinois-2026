@@ -86,7 +86,7 @@ function FaceModel() {
         scanY: { value: 10.0 },
         scanWidth: { value: 0.5 }
       },
-      onBeforeCompile: (shader: THREE.Shader) => {
+      onBeforeCompile: (shader: { uniforms: Record<string, { value: unknown }>; vertexShader: string; fragmentShader: string }) => {
         shader.uniforms.scanWidth = customShader.uniforms.scanWidth
         
         shader.vertexShader = `
@@ -232,7 +232,7 @@ export function LandingScene() {
 
       <EffectComposer>
         <Bloom luminanceThreshold={1} mipmapBlur={true} intensity={1.2} />
-        <ChromaticAberration offset={chromaticOffset} bundle={undefined} className={""} blendFunction={BlendFunction.NORMAL} radialModulation={false} modulationOffset={0} />
+        <ChromaticAberration offset={chromaticOffset} blendFunction={BlendFunction.NORMAL} radialModulation={false} modulationOffset={0} />
       </EffectComposer>
     </Canvas>
   )

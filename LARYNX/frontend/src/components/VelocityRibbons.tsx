@@ -2,6 +2,7 @@ import { Trail, CatmullRomLine } from '@react-three/drei'
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import { Line2 } from 'three-stdlib'
 import { useLarynxStore } from '@/store/useLarynxStore'
 
 // Typing helper to avoid 'any' when setting color natively
@@ -13,7 +14,7 @@ type Line2Mesh = THREE.Mesh & {
 export function VelocityRibbons() {
   const meshRef = useRef<THREE.Mesh>(null!)
   const trailGroupRef = useRef<THREE.Group>(null!)
-  const lineRef = useRef<Line2Mesh>(null!)
+  const lineRef = useRef<Line2>(null!)
 
   // Pre-allocate values outside useFrame to avoid allocations
   const _normalColor = useRef(new THREE.Color('#00FFFF'))
@@ -50,10 +51,13 @@ export function VelocityRibbons() {
         curve.points[3].set(jaw.x / 50, jaw.y / 50, 0.3)
 
         const interpolated = curve.getPoints(50)
-        lineRef.current.geometry.setPositions(interpolated.flatMap(p => [p.x, p.y, p.z]))
+        const lineAsMesh = lineRef.current as unknown as Line2Mesh
+        if (lineAsMesh.geometry?.setPositions) {
+          lineAsMesh.geometry.setPositions(interpolated.flatMap(p => [p.x, p.y, p.z]))
+        }
       }
-    }
 
+    }
     // Determine target color based on velocity thresholds
     if (velocity < 22) {
       targetColor.current.copy(_normalColor.current)
@@ -91,13 +95,12 @@ export function VelocityRibbons() {
     }
 
     if (lineRef.current) {
-      const mat = lineRef.current.material
+      const mat = lineRef.current.material as unknown as { color: THREE.Color; transparent: boolean; opacity: number; linewidth: number; lineWidth: number }
       if (mat) {
-        mat.color.copy(currentColor.current)
+        if (mat.color) mat.color.copy(currentColor.current)
         mat.transparent = true
-        mat.opacity = THREE.MathUtils.lerp(mat.opacity || targetOpacity, targetOpacity, 10 * delta)
-        if (mat.linewidth !== undefined) mat.linewidth = THREE.MathUtils.lerp(mat.linewidth || targetLineWidth, targetLineWidth, 10 * delta)
-        if (mat.lineWidth !== undefined) mat.lineWidth = THREE.MathUtils.lerp(mat.lineWidth || targetLineWidth, targetLineWidth, 10 * delta)
+        mat.opacity = THREE.MathUtils.lerp(mat.opacity, targetOpacity, 10 * delta)
+        mat.lineWidth = THREE.MathUtils.lerp(mat.lineWidth, targetLineWidth, 10 * delta)
       }
     }
   })
