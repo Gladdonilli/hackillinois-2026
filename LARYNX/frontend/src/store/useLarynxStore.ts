@@ -49,6 +49,9 @@ interface LarynxState {
   // Portal animation state
   portalState: 'idle' | 'entering' | 'warping' | 'done'
   setPortalState: (state: 'idle' | 'entering' | 'warping' | 'done') => void
+  // Stream abort registry — hooks register their AbortController here
+  _streamAbort: AbortController | null
+  _setStreamAbort: (controller: AbortController | null) => void
 }
 
 const initialComparison: ComparisonState = {
@@ -71,6 +74,7 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   formants: [],
   comparison: { ...initialComparison },
   portalState: 'idle',
+  _streamAbort: null,
 
   setAudioFile: (file) => {
     const currentUrl = get().audioUrl
@@ -89,11 +93,11 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
 
   addFrame: (frame) => {
     const state = get()
-    const newFrames = [...state.frames, {
+    const newFrames = state.frames.concat({
       sensors: frame.sensors as Record<SensorName, EMASensor>,
       tongueVelocity: frame.tongueVelocity,
       timestamp: frame.timestamp,
-    }]
+    })
     const currentFrame = newFrames.length - 1
     const t1 = frame.sensors['T1'] || frame.sensors.T1
     set({
@@ -112,7 +116,12 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   },
 
   reset: () => {
-    const currentUrl = get().audioUrl
+    // C3 fix: abort any active SSE stream before resetting state
+    const state = get()
+    if (state._streamAbort) {
+      state._streamAbort.abort()
+    }
+    const currentUrl = state.audioUrl
     if (currentUrl) URL.revokeObjectURL(currentUrl)
     set({
       status: 'idle',
@@ -126,7 +135,8 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
       tongueT1: { x: 0, y: 0 },
       formants: [],
       comparison: { ...initialComparison, channelFrames: [[], []], channelVerdicts: [null, null] },
-      portalState: 'idle'
+      portalState: 'idle',
+      _streamAbort: null,
     })
   },
 
@@ -155,6 +165,7 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   },
 
   setPortalState: (state) => set({ portalState: state }),
+  _setStreamAbort: (controller) => set({ _streamAbort: controller } as Partial<LarynxState>),
 }))
 
 export { useLarynxStore }

@@ -18,11 +18,25 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
       // AudioContext init may fail in restricted environments — non-fatal
     }
 
+    const skipIntro = () => {
+      clearTimeout(timer);
+      setComplete(true);
+      setTimeout(onComplete, TIMING.INTRO_FADE_DELAY_MS);
+    };
+
     const timer = setTimeout(() => {
       setComplete(true);
-      setTimeout(onComplete, TIMING.INTRO_FADE_DELAY_MS); // Wait for fade out
+      setTimeout(onComplete, TIMING.INTRO_FADE_DELAY_MS);
     }, 5500);
-    return () => clearTimeout(timer);
+
+    // H10 fix: allow click/key to skip intro
+    window.addEventListener('click', skipIntro);
+    window.addEventListener('keydown', skipIntro);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('click', skipIntro);
+      window.removeEventListener('keydown', skipIntro);
+    };
   }, [onComplete]);
 
   const text = "LARYNX.";

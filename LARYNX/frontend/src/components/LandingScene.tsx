@@ -245,6 +245,7 @@ function FaceModel({ portalState }: { portalState: string }) {
   }, [clonedSolidScene, clonedWireScene, customShader])
 
   const portalTimeRef = useRef(0)
+  const lastTimeRef = useRef(0)
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -257,13 +258,15 @@ function FaceModel({ portalState }: { portalState: string }) {
       solidRef.current.rotation.y += (targetRotY - solidRef.current.rotation.y) * SCENE.PARALLAX_LERP
     }
 
-    // Morph targets
+    // Morph targets — use elapsedTime diff instead of getDelta() (already consumed by R3F)
     const portalEntering = portalState === 'entering' || portalState === 'warping'
     if (portalEntering) {
-      portalTimeRef.current += clock.getDelta()
+      const dt = t - lastTimeRef.current
+      portalTimeRef.current += dt
     } else {
       portalTimeRef.current = 0
     }
+    lastTimeRef.current = t
 
     const morphScenes = [clonedSolidScene, clonedWireScene]
     morphScenes.forEach((s) => {

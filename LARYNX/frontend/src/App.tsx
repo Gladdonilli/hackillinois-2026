@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
-import { TIMING, SPRING, COLORS_RGBA } from '@/constants'
+import { TIMING, SPRING } from '@/constants'
 import { motion, AnimatePresence } from 'motion/react'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import UploadPanel from '@/components/UploadPanel'

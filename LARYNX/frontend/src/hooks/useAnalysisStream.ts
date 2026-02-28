@@ -14,6 +14,8 @@ export function useAnalysisStream() {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
+    // Register with store so reset() can abort us (C3 fix)
+    useLarynxStore.getState()._setStreamAbort(controller)
 
     // Prepare upload
     const formData = new FormData()
@@ -46,8 +48,17 @@ export function useAnalysisStream() {
       let buffer = ''
       const allFrames: Parameters<typeof store.addFrame>[0][] = []
 
+      // Timeout: 60s inactivity guard for conference WiFi drops
+      const STREAM_TIMEOUT_MS = 60_000
+
       while (true) {
-        const { done, value } = await reader.read()
+        const readPromise = reader.read()
+        const timeoutPromise = new Promise<{ done: true; value: undefined }>((_, reject) => {
+          const id = setTimeout(() => reject(new Error('Stream timeout: no data for 60s')), STREAM_TIMEOUT_MS)
+          readPromise.then(() => clearTimeout(id), () => clearTimeout(id))
+        })
+
+        const { done, value } = await Promise.race([readPromise, timeoutPromise])
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })

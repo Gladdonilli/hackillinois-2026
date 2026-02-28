@@ -46,11 +46,13 @@ export function TongueModel() {
         targetHex = '#FDE047'; // yellow-300
     }
 
+    const targetColor = useRef(new THREE.Color('#38BDF8'))
     matRef.current.distort += (targetDistort - matRef.current.distort) * 10 * delta;
     matRef.current.speed += (targetSpeed - matRef.current.speed) * 10 * delta;
     matRef.current.emissiveIntensity += (targetEmissive - matRef.current.emissiveIntensity) * 10 * delta;
     
-    colorObj.current.lerp(new THREE.Color(targetHex), 10 * delta);
+    targetColor.current.set(targetHex);
+    colorObj.current.lerp(targetColor.current, 10 * delta);
     matRef.current.color = colorObj.current;
     matRef.current.emissive = colorObj.current;
 

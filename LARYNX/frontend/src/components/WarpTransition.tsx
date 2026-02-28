@@ -47,7 +47,7 @@ export function WarpTransition({ isActive, onComplete }: WarpTransitionProps) {
     return () => {
       tl.kill()
     }
-  }, [isActive, onComplete])
+  }, [isActive]) // onComplete intentionally excluded — stable ref not needed, prevents GSAP timeline restart
 
   return (
     <AnimatePresence>
