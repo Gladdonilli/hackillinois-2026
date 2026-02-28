@@ -179,7 +179,7 @@ def download_skypro1111():
     print("DOWNLOADING: skypro1111/elevenlabs_dataset")
     print("=" * 60)
 
-    from datasets import load_dataset
+    from datasets import load_dataset, Audio
 
     fake_dir = BASE_DIR / "skypro1111" / "fake"
 
@@ -192,6 +192,10 @@ def download_skypro1111():
     print("[INFO] Loading dataset from HuggingFace...")
     try:
         ds = load_dataset("skypro1111/elevenlabs_dataset", trust_remote_code=True)
+        # Disable auto audio decoding to avoid torchcodec dependency
+        for split_name in ds:
+            if "audio" in ds[split_name].column_names:
+                ds[split_name] = ds[split_name].cast_column("audio", Audio(decode=False))
     except Exception as e:
         print(f"[ERROR] Failed to load skypro1111 dataset: {e}")
         traceback.print_exc()
@@ -211,9 +215,13 @@ def download_skypro1111():
                                     audio_data = example[col]
                                     break
 
-                        if audio_data and isinstance(audio_data, dict):
+                        if audio_data and isinstance(audio_data, dict) and "bytes" in audio_data and audio_data["bytes"]:
+                            audio_array, sr = librosa.load(io.BytesIO(audio_data["bytes"]), sr=None, mono=True)
+                        elif audio_data and isinstance(audio_data, dict) and "array" in audio_data:
                             audio_array = np.array(audio_data["array"], dtype=np.float32)
                             sr = audio_data["sampling_rate"]
+                        else:
+                            continue
                             filename = f"skypro1111_el_{split_name}_{i:05d}.wav"
                             out_path = fake_dir / filename
                             if not out_path.exists():
@@ -255,7 +263,9 @@ def download_skypro1111():
                         print(f"[WARN] Sample keys: {list(example.keys())}")
                     continue
 
-                if isinstance(audio_data, dict):
+                if isinstance(audio_data, dict) and "bytes" in audio_data and audio_data["bytes"]:
+                    audio_array, sr = librosa.load(io.BytesIO(audio_data["bytes"]), sr=None, mono=True)
+                elif isinstance(audio_data, dict) and "array" in audio_data:
                     audio_array = np.array(audio_data["array"], dtype=np.float32)
                     sr = audio_data["sampling_rate"]
                 elif isinstance(audio_data, (bytes, bytearray)):
