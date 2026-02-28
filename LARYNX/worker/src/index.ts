@@ -574,7 +574,7 @@ app.get('/api/intelligence/stats', async (c) => {
           anomalyBands: INTEL_CONFIG.ANOMALY_BANDS,
         },
         supermemory: {
-          configured: !!(c.env.SUPERMEMORY_API_KEY && c.env.SUPERMEMORY_SPACE_ID),
+          configured: !!c.env.SUPERMEMORY_API_KEY,
         },
       },
     }

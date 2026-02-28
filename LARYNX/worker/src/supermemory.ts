@@ -15,6 +15,11 @@ export const MEMORY_CONFIG = {
   // Supermemory API
   API_BASE: 'https://api.supermemory.ai',
 
+  // Container tag for forensic memory isolation
+  // All LARYNX forensic records are partitioned under this tag
+  // within the existing Supermemory space (no separate space needed)
+  CONTAINER_TAG: 'larynx-forensic',
+
   // Memory settings
   SCOPE: 'project' as const,
   TYPE: 'learned-pattern' as const,
@@ -94,8 +99,8 @@ export async function writeForensicMemory(
   verdict: VerdictData,
   _clientIpHash?: string
 ): Promise<string | null> {
-  if (!env.SUPERMEMORY_API_KEY || !env.SUPERMEMORY_SPACE_ID) {
-    console.warn('[supermemory] API key or space ID not configured — skipping write');
+  if (!env.SUPERMEMORY_API_KEY) {
+    console.warn('[supermemory] API key not configured — skipping write');
     return null;
   }
 
@@ -110,9 +115,8 @@ export async function writeForensicMemory(
       headers: {
         'Authorization': `Bearer ${env.SUPERMEMORY_API_KEY}`,
         'Content-Type': 'application/json',
-        'x-space-id': env.SUPERMEMORY_SPACE_ID,
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, containerTag: MEMORY_CONFIG.CONTAINER_TAG }),
       signal: controller.signal,
     });
 
@@ -142,8 +146,8 @@ export async function searchForensicMemories(
   query: string,
   options?: { limit?: number }
 ): Promise<ForensicMemory[]> {
-  if (!env.SUPERMEMORY_API_KEY || !env.SUPERMEMORY_SPACE_ID) {
-    console.warn('[supermemory] API key or space ID not configured — skipping search');
+  if (!env.SUPERMEMORY_API_KEY) {
+    console.warn('[supermemory] API key not configured — skipping search');
     return [];
   }
 
@@ -160,9 +164,8 @@ export async function searchForensicMemories(
         headers: {
           'Authorization': `Bearer ${env.SUPERMEMORY_API_KEY}`,
           'Content-Type': 'application/json',
-          'x-space-id': env.SUPERMEMORY_SPACE_ID,
         },
-        body: JSON.stringify({ query, limit }),
+        body: JSON.stringify({ query, limit, containerTags: [MEMORY_CONFIG.CONTAINER_TAG] }),
         signal: controller.signal,
       }
     );

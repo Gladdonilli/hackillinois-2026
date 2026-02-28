@@ -150,7 +150,7 @@ export default function App() {
       {/* Background effects — always visible */}
       <div className="grid-bg" />
       <div className="vignette" />
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="sync">
         {appState === 'intro' && (
           <IntroSequence key="intro" onComplete={() => setShowIntro(false)} />
         )}
@@ -178,7 +178,7 @@ export default function App() {
         {(appState === 'analyzing' || (appState === 'uploading' && !isPortalTransition)) && (
           <motion.div
             key="analysis" 
-            className="absolute inset-0 z-10"
+            className="absolute inset-0 z-20"
             initial={{ opacity: 0, scale: 1.05 }} 
             animate={{ opacity: 1, scale: 1 }} 
             exit={{ opacity: 0 }}

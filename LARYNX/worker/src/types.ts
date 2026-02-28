@@ -11,7 +11,6 @@ export interface Env {
   VECTOR_SIGNATURES?: VectorizeIndex;
   // Supermemory forensic memory
   SUPERMEMORY_API_KEY?: string;
-  SUPERMEMORY_SPACE_ID?: string;
 }
 
 export interface ApiResponse<T> {
