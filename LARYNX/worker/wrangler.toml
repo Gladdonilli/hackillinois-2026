@@ -23,3 +23,12 @@ bucket_name = "larynx-audio"
 # type = "ratelimit"
 # namespace_id = "larynx-api-limit"
 # simple = { limit = 20, period = 60 }
+
+# ─── Intelligence Layer ───
+
+[ai]
+binding = "AI"
+
+[[vectorize]]
+binding = "VECTOR_SIGNATURES"
+index_name = "larynx-signatures"

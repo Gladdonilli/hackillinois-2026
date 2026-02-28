@@ -6,6 +6,12 @@ export interface Env {
   };
   MODAL_API_URL: string;
   MODAL_COMPARE_URL: string;
+  // Intelligence layer (Workers AI + Vectorize)
+  AI?: Ai;
+  VECTOR_SIGNATURES?: VectorizeIndex;
+  // Supermemory forensic memory
+  SUPERMEMORY_API_KEY?: string;
+  SUPERMEMORY_SPACE_ID?: string;
 }
 
 export interface ApiResponse<T> {
@@ -33,4 +39,37 @@ export interface Report {
   classifierScore?: number;
   classifierModel?: string;
   ensembleScore?: number;
+}
+
+// ─── Intelligence Layer Types ───
+
+export interface VerdictData {
+  isGenuine: boolean;
+  confidence: number;
+  peakVelocity: number;
+  threshold: number;
+  anomalousFrameCount: number;
+  totalFrameCount: number;
+  anomalyRatio: number;
+  classifierScore?: number;
+  classifierModel?: string;
+  ensembleScore?: number;
+  reportId?: string;
+  processingTimeMs?: number;
+}
+
+export interface SimilarityMatch {
+  reportId: string;
+  score: number;
+  verdict: string;
+  confidence: number;
+  peakVelocity: number;
+  timestamp: string;
+}
+
+export interface ForensicMemory {
+  id: string;
+  content: string;
+  score: number;
+  createdAt: string;
 }

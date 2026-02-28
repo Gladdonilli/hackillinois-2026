@@ -82,3 +82,60 @@ declare interface R2Objects {
   cursor?: string;
   delimitedPrefixes: string[];
 }
+
+// ─── Workers AI Types ───
+declare interface Ai {
+  run(
+    model: string,
+    inputs: Record<string, unknown>,
+    options?: { gateway?: { id: string; skipCache?: boolean; cacheTtl?: number } }
+  ): Promise<unknown>;
+}
+
+// ─── Vectorize Types ───
+declare interface VectorizeIndex {
+  upsert(vectors: VectorizeVector[]): Promise<VectorizeMutationResult>;
+  query(
+    vector: number[],
+    options?: {
+      topK?: number;
+      returnMetadata?: 'all' | 'indexed' | 'none';
+      returnValues?: boolean;
+      filter?: Record<string, unknown>;
+      namespace?: string;
+    }
+  ): Promise<VectorizeQueryResult>;
+  getByIds(ids: string[]): Promise<VectorizeVector[]>;
+  deleteByIds(ids: string[]): Promise<VectorizeMutationResult>;
+  describe(): Promise<VectorizeIndexInfo>;
+}
+
+declare interface VectorizeVector {
+  id: string;
+  values: number[];
+  metadata?: Record<string, string | number | boolean>;
+  namespace?: string;
+}
+
+declare interface VectorizeQueryResult {
+  count: number;
+  matches: VectorizeMatch[];
+}
+
+declare interface VectorizeMatch {
+  id: string;
+  score: number;
+  values?: number[];
+  metadata?: Record<string, string | number | boolean>;
+}
+
+declare interface VectorizeMutationResult {
+  count: number;
+  ids: string[];
+}
+
+declare interface VectorizeIndexInfo {
+  dimensions: number;
+  vectorCount: number;
+  processedUpTo: number;
+}
