@@ -55,8 +55,8 @@ export function CustomCursor() {
       if (outerRef.current) {
         outerRef.current.style.transform = `translate(${pos.current.x - 20}px, ${pos.current.y - 20}px) scale(${pos.current.scale}) rotate(${pos.current.rot}deg)`
         
-        outerRef.current.style.border = isInteractive.current ? '1.5px dashed rgba(0, 255, 255, 0.6)' : '1px solid rgba(0, 255, 255, 0.4)'
-        outerRef.current.style.backgroundColor = isNavBtn.current ? 'rgba(0, 255, 255, 0.1)' : 'transparent'
+        outerRef.current.style.border = isInteractive.current ? '1.5px dashed rgba(56, 189, 248, 0.6)' : '1px solid rgba(56, 189, 248, 0.4)'
+        outerRef.current.style.backgroundColor = isNavBtn.current ? 'rgba(56, 189, 248, 0.1)' : 'transparent'
       }
       if (innerRef.current) {
         innerRef.current.style.transform = `translate(${target.current.x - 3}px, ${target.current.y - 3}px) scale(${hovering.current ? 0.5 : 1})`
@@ -82,7 +82,7 @@ export function CustomCursor() {
         style={{
           width: 40,
           height: 40,
-          border: '1px solid rgba(0, 255, 255, 0.4)',
+          border: '1px solid rgba(56, 189, 248, 0.4)',
           borderRadius: '50%',
           transition: 'border-color 0.3s, background-color 0.3s, border-width 0.3s',
           mixBlendMode: 'difference',
@@ -96,8 +96,8 @@ export function CustomCursor() {
           width: 6,
           height: 6,
           borderRadius: '50%',
-          backgroundColor: '#00FFFF',
-          boxShadow: '0 0 6px rgba(0, 255, 255, 0.6)',
+          backgroundColor: '#38BDF8',
+          boxShadow: '0 0 6px rgba(56, 189, 248, 0.6)',
         }}
       />
     </>

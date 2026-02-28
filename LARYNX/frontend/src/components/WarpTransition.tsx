@@ -59,11 +59,11 @@ export function WarpTransition({ isActive, onComplete }: WarpTransitionProps) {
         >
           {/* Tunnel / Light speed streaks background */}
           <div ref={tunnelRef} className="absolute inset-0 opacity-0 scale-50" style={{
-            background: 'radial-gradient(circle at center, transparent 0%, rgba(0, 255, 255, 0.4) 40%, white 100%)'
+            background: 'radial-gradient(circle at center, transparent 0%, rgba(56, 189, 248, 0.4) 40%, white 100%)'
           }} />
           
           {/* Flash overlay */}
-          <div ref={overlayRef} className="absolute inset-0 bg-[#E0FFFF] opacity-0 mix-blend-screen" />
+          <div ref={overlayRef} className="absolute inset-0 bg-[#E4F0FF] opacity-0 mix-blend-screen" />
         </motion.div>
       )}
     </AnimatePresence>

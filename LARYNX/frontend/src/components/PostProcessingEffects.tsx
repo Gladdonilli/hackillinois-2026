@@ -34,17 +34,17 @@ export function PostProcessingEffects() {
     const state = useLarynxStore.getState()
     const velocity = state.tongueVelocity || 0
 
-    let targetIntensity = 0.5
-    if (velocity > 80) targetIntensity = 4.0
-    else if (velocity > 50) targetIntensity = 2.5
-    else if (velocity > 22) targetIntensity = 1.5
+    let targetIntensity = 0.3
+    if (velocity > 80) targetIntensity = 3.0
+    else if (velocity > 50) targetIntensity = 2.0
+    else if (velocity > 22) targetIntensity = 1.0
 
     bloomIntensityRef.current += (targetIntensity - bloomIntensityRef.current) * 10 * delta
 
     let targetOffset = 0.002
-    if (velocity > 80) targetOffset = 0.1
-    else if (velocity > 50) targetOffset = 0.05
-    else if (velocity > 22) targetOffset = 0.02
+    if (velocity > 80) targetOffset = 0.08
+    else if (velocity > 50) targetOffset = 0.03
+    else if (velocity > 22) targetOffset = 0.01
 
     offsetRef.current.x += (targetOffset - offsetRef.current.x) * 10 * delta
     offsetRef.current.y += (targetOffset - offsetRef.current.y) * 10 * delta

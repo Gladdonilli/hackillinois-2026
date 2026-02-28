@@ -40,10 +40,11 @@ let subImpact: Tone.MembraneSynth | null = null
 let noiseBurst: Tone.NoiseSynth | null = null
 let noiseBurstFilter: Tone.Filter | null = null
 
-// Horror
-let horrorSynth: Tone.FMSynth | null = null
-let horrorLfo: Tone.LFO | null = null
-let horrorTremolo: Tone.Tremolo | null = null
+// IEC 60601-1-8 compliant alarm (replaces horror FMSynth)
+let iecAlarmSynth: Tone.Synth | null = null
+let iecAlarmGain: Tone.Gain | null = null
+let iecAlarmLoop: Tone.Loop | null = null
+let iecAlarmActive = false
 
 // Scanner / ticking
 let scannerBeepSynth: Tone.FMSynth | null = null
@@ -66,12 +67,17 @@ let genuinePad: Tone.PolySynth | null = null
 let genuinePadFilter: Tone.Filter | null = null
 let genuinePadGain: Tone.Gain | null = null
 
-// Velocity reactive
-let velocityOsc: Tone.Oscillator | null = null
-let velocityFilter: Tone.Filter | null = null
-let velocityDistortion: Tone.Distortion | null = null
-let velocityCrusher: Tone.BitCrusher | null = null
-let velocityGain: Tone.Gain | null = null
+// Geiger counter velocity sonification
+let geigerSynth: Tone.NoiseSynth | null = null
+let geigerFilter: Tone.Filter | null = null
+let geigerGain: Tone.Gain | null = null
+let geigerInterval: ReturnType<typeof setTimeout> | null = null
+let geigerActive = false
+
+// Oximeter pitch mapping (formant deviation → semitone drops)
+let oximeterOsc: Tone.Oscillator | null = null
+let oximeterGain: Tone.Gain | null = null
+let oximeterBasePitch = 523  // C5
 
 // Portal entry SFX
 let portalMembrane: Tone.MembraneSynth | null = null
@@ -111,6 +117,8 @@ let preVacuumSoundtrackGain = 0
 
 const MIN_MASTER_GAIN = 0.0001
 const DEFAULT_TICK_BPM = 60
+const IEC_BASE_FREQ = 440  // A4 — IEC 60601-1-8 alarm base
+let tickJitterActive = false
 
 const contextIsRunning = (): boolean => Tone.getContext().state === 'running'
 
@@ -220,19 +228,28 @@ const ensureInitializedGraph = (): void => {
   noiseBurstFilter = new Tone.Filter(8000, 'highpass')
   noiseBurst.chain(noiseBurstFilter, masterCompressor)
 
-  // --- Horror FMSynth ---
-  horrorSynth = new Tone.FMSynth({
-    harmonicity: 3.14,
-    modulationIndex: 10,
-    oscillator: { type: 'sine' },
-    modulation: { type: 'square' },
-    envelope: { attack: 2, decay: 1, sustain: 1, release: 2 },
-    volume: -8,
+  // --- IEC 60601-1-8 compliant alarm (replaces horror FMSynth) ---
+  // 440Hz base + 4 harmonics within 300-4000Hz, pure sines FORBIDDEN per spec
+  iecAlarmSynth = new Tone.Synth({
+    oscillator: { type: 'custom', partials: [1, 0.8, 0.6, 0.4, 0.2] } as unknown as Tone.RecursivePartial<Tone.OmniOscillatorOptions>,
+    envelope: { attack: 0.01, decay: 0.075, sustain: 0, release: 0.015 },
+    volume: -10,
   })
-  horrorLfo = new Tone.LFO({ frequency: 0.1, min: 2.5, max: 4.5 })
-  horrorTremolo = new Tone.Tremolo(19, 1).start()
-  horrorLfo.connect(horrorSynth.harmonicity)
-  horrorSynth.chain(horrorTremolo, masterCompressor)
+  iecAlarmGain = new Tone.Gain(0)
+  iecAlarmSynth.connect(iecAlarmGain)
+  iecAlarmGain.connect(masterCompressor)
+
+  // IEC high-priority 10-pulse uneven rhythm: [P][P][P]--400ms--[P][P]---2.0s---[P][P][P]--400ms--[P][P]
+  let iecPulseIndex = 0
+  iecAlarmLoop = new Tone.Loop((time: number) => {
+    if (!iecAlarmSynth || !iecAlarmActive) return
+    // 10-pulse pattern with uneven spacing to prevent habituation
+    const pattern = [0, 0.15, 0.30, 0.70, 0.85, 2.85, 3.00, 3.15, 3.55, 3.70]  // seconds within 4s cycle
+    const pulseTime = pattern[iecPulseIndex % 10]
+    iecAlarmSynth.triggerAttackRelease(IEC_BASE_FREQ, '32n', time + pulseTime)
+    iecPulseIndex++
+    if (iecPulseIndex >= 10) iecPulseIndex = 0
+  }, '1m')  // full cycle every measure
 
   // --- Scanner beep ---
   scannerBeepSynth = new Tone.FMSynth({
@@ -297,25 +314,25 @@ const ensureInitializedGraph = (): void => {
   genuinePadFilter.connect(genuinePadGain)
   genuinePadGain.connect(masterCompressor)
 
-  // --- Velocity reactive ---
-  velocityOsc = new Tone.Oscillator({
-    type: 'sawtooth',
-    frequency: 200,
-    volume: -20,
+  // --- Geiger counter velocity sonification ---
+  // Sparse clicks 1-3Hz normal → continuous crackle at 15-20Hz merge threshold
+  geigerSynth = new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0, decay: 0.003, sustain: 0, release: 0.002 },
+    volume: -15,
   })
-  velocityFilter = new Tone.Filter({ type: 'lowpass', frequency: 400 })
-  velocityDistortion = new Tone.Distortion(0)
-  velocityCrusher = new Tone.BitCrusher(8)
-  velocityGain = new Tone.Gain(0)
+  geigerFilter = new Tone.Filter({ type: 'bandpass', frequency: 4000, Q: 2 })
+  geigerGain = new Tone.Gain(0)
+  geigerSynth.connect(geigerFilter)
+  geigerFilter.connect(geigerGain)
+  geigerGain.connect(masterCompressor)
 
-  velocityOsc.connect(velocityFilter)
-  velocityFilter.connect(velocityDistortion)
-  velocityDistortion.connect(velocityCrusher)
-  velocityCrusher.connect(velocityGain)
-  velocityGain.connect(masterCompressor)
-
-  velocityCrusher.wet.value = 0
-  velocityOsc.start()
+  // --- Oximeter pitch mapping (formant deviation → semitone drops) ---
+  oximeterOsc = new Tone.Oscillator({ type: 'triangle', frequency: oximeterBasePitch, volume: -25 })
+  oximeterGain = new Tone.Gain(0)
+  oximeterOsc.connect(oximeterGain)
+  oximeterGain.connect(masterCompressor)
+  oximeterOsc.start()
 
   // --- Portal entry SFX ---
   portalMembrane = new Tone.MembraneSynth({
@@ -444,7 +461,9 @@ export const SoundEngine = {
       uploadSine, uploadAM, uploadMembrane,
       riserNoise, riserFilter, riserVolume,
       subImpact, noiseBurst, noiseBurstFilter,
-      horrorSynth, horrorLfo, horrorTremolo,
+      iecAlarmSynth, iecAlarmGain,
+      geigerSynth, geigerFilter, geigerGain,
+      oximeterOsc, oximeterGain,
       tensionPad, tensionFilter, tensionGain,
       portalMembrane, portalSub, portalSubGain, portalFilter,
       warpNoise, warpFilter, warpChirp,
@@ -468,8 +487,12 @@ export const SoundEngine = {
     velocityCrusher = null; velocityGain = null
     uploadSine = null; uploadAM = null; uploadMembrane = null
     riserNoise = null; riserFilter = null; riserVolume = null
-    subImpact = null; noiseBurst = null; noiseBurstFilter = null
     horrorSynth = null; horrorLfo = null; horrorTremolo = null
+    iecAlarmSynth = null; iecAlarmGain = null
+    iecAlarmLoop?.stop(0); iecAlarmLoop?.dispose(); iecAlarmLoop = null
+    geigerSynth = null; geigerFilter = null; geigerGain = null
+    if (geigerInterval) { clearTimeout(geigerInterval); geigerInterval = null }
+    oximeterOsc = null; oximeterGain = null
     tensionPad = null; tensionFilter = null; tensionGain = null
     portalMembrane = null; portalSub = null; portalSubGain = null; portalFilter = null
     warpNoise = null; warpFilter = null; warpChirp = null
@@ -594,12 +617,18 @@ export const SoundEngine = {
       tensionFilter.frequency.setValueAtTime(200, now)
       tensionFilter.frequency.linearRampToValueAtTime(2000, now + 30)
     }
+    // Start Geiger clicks at low baseline rate
+    geigerActive = true
+    if (geigerGain) geigerGain.gain.setTargetAtTime(0.3, Tone.now(), 0.3)
+    // Start oximeter monitoring tone
+    if (oximeterGain) oximeterGain.gain.setTargetAtTime(0.5, Tone.now(), 0.5)
   },
 
   stopTicking: (): void => {
     if (!initialized || !processingTickLoop) return
     processingTickLoop.stop(0)
     tickingActive = false
+    tickJitterActive = false
     if (Tone.Transport.state === 'started') {
       Tone.Transport.stop()
     }
@@ -608,6 +637,12 @@ export const SoundEngine = {
       const now = Tone.now()
       tensionGain.gain.setTargetAtTime(0, now, 0.3)
     }
+    // Stop Geiger clicks
+    geigerActive = false
+    if (geigerInterval) { clearTimeout(geigerInterval); geigerInterval = null }
+    if (geigerGain) geigerGain.gain.setTargetAtTime(0, Tone.now(), 0.2)
+    // Stop oximeter
+    if (oximeterGain) oximeterGain.gain.setTargetAtTime(0, Tone.now(), 0.2)
   },
 
   setTickBPM: (bpm: number): void => {
@@ -678,18 +713,27 @@ export const SoundEngine = {
     }
   },
 
-  // ==================== HORROR ====================
+  // ==================== IEC 60601-1-8 ALARM ====================
 
-  startHorror: (): void => {
-    if (!requireAudioReady()) return
-    horrorLfo?.start()
-    horrorSynth?.triggerAttack('C2')
+  startIECAlarm: (): void => {
+    if (!requireAudioReady() || iecAlarmActive) return
+    iecAlarmActive = true
+    if (iecAlarmGain) {
+      iecAlarmGain.gain.setTargetAtTime(1, Tone.now(), 0.05)
+    }
+    iecAlarmLoop?.start(Tone.now())
+    Tone.Transport.start(Tone.now())
   },
 
-  stopHorror: (): void => {
-    if (!initialized) return
-    horrorSynth?.triggerRelease()
-    horrorLfo?.stop()
+  stopIECAlarm: (): void => {
+    if (!iecAlarmActive) return
+    iecAlarmActive = false
+    if (iecAlarmGain) {
+      iecAlarmGain.gain.setTargetAtTime(0, Tone.now(), 0.1)
+    }
+    setTimeout(() => {
+      iecAlarmLoop?.stop(0)
+    }, 500)
   },
 
   // ==================== VERDICT ====================
@@ -766,7 +810,7 @@ export const SoundEngine = {
         SoundEngine.playSubImpact()
         SoundEngine.playNoiseBurst()
         SoundEngine.playVerdict('deepfake')
-        SoundEngine.startHorror()
+        SoundEngine.startIECAlarm()
       }, 250)
     }, 5000)
   },
@@ -786,30 +830,45 @@ export const SoundEngine = {
     deepfakeStingSynth.triggerRelease(['C3', 'C#3'], now + 2)
   },
 
-  // ==================== VELOCITY REACTIVE ====================
-
+  /** Geiger counter: velocity maps to click rate (1-3Hz normal → 15-20Hz crackle) */
   updateVelocity: (velocity: number): void => {
     if (!requireAudioReady()) return
-    if (!velocityFilter || !velocityDistortion || !velocityCrusher || !velocityGain) return
-
-    const now = Tone.now()
     const safeVelocity = Math.max(0, velocity)
 
-    const cutoff = clamp(400 + safeVelocity * 50, 400, 12000)
-    velocityFilter.frequency.setTargetAtTime(cutoff, now, 0.05)
+    // --- Geiger click rate ---
+    // Normal speech ~8-15cm/s = 1-3 Hz clicks
+    // Deepfake >50cm/s = 15-20 Hz (continuous crackle)
+    const clickRate = clamp(safeVelocity * 0.3, 0.5, 25)
+    const clickIntervalMs = 1000 / clickRate
 
-    const distortionAmount = clamp(safeVelocity / 100, 0, 1)
-    velocityDistortion.distortion = distortionAmount
+    // Clear previous interval and set new one
+    if (geigerInterval) clearTimeout(geigerInterval)
+    if (geigerGain && safeVelocity > 0.1) {
+      geigerGain.gain.setTargetAtTime(1, Tone.now(), 0.05)
+      const scheduleClick = () => {
+        if (!geigerActive || !geigerSynth) return
+        geigerSynth.triggerAttackRelease('32n')
+        // Add ±20% jitter to prevent regularity
+        const jitter = clickIntervalMs * (0.8 + Math.random() * 0.4)
+        geigerInterval = setTimeout(scheduleClick, jitter)
+      }
+      geigerActive = true
+      scheduleClick()
+    } else {
+      geigerActive = false
+      if (geigerGain) geigerGain.gain.setTargetAtTime(0, Tone.now(), 0.1)
+    }
 
-    const crusherWet = safeVelocity > 80 ? 1 : 0
-    velocityCrusher.wet.setTargetAtTime(crusherWet, now, 0.03)
-
-    // Scale velocity gain: -20dB baseline → -8dB at max
-    const velGainDb = -20 + clamp(safeVelocity / 100, 0, 1) * 12
-    if (velocityOsc) velocityOsc.volume.setTargetAtTime(velGainDb, now, 0.05)
-
-    const activeGain = safeVelocity > 0.1 ? 1 : 0
-    velocityGain.gain.setTargetAtTime(activeGain, now, 0.06)
+    // --- Oximeter pitch: deviation maps to semitone drops ---
+    // Normal ~0-15cm/s = C5 (523Hz), each 10cm/s deviation = 1 semitone drop
+    if (oximeterOsc && oximeterGain) {
+      const semitonesDrop = Math.floor(safeVelocity / 10)
+      const freq = oximeterBasePitch * Math.pow(2, -semitonesDrop / 12)
+      oximeterOsc.frequency.setTargetAtTime(Math.max(freq, 100), Tone.now(), 0.1)
+      // Fade in oximeter when velocity > 5
+      const oxGain = safeVelocity > 5 ? 1 : 0
+      oximeterGain.gain.setTargetAtTime(oxGain, Tone.now(), 0.2)
+    }
   },
 
   // ==================== GENERATIVE SOUNDTRACK ====================

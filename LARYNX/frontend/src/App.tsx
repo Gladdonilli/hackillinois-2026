@@ -167,7 +167,7 @@ export default function App() {
             {/* LARYNX title overlay */}
             <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none">
               <h1 className="text-5xl font-mono tracking-[0.5em] text-white/90 text-glow-cyan glitch-text">LARYNX.</h1>
-              <p className="text-xs font-mono tracking-[0.3em] text-cyan-400/50 mt-2">DEEPFAKE VOICE DETECTION</p>
+              <p className="text-xs font-mono tracking-[0.3em] text-cyan/50 mt-2">DEEPFAKE VOICE DETECTION</p>
             </div>
             {/* Hide upload panel during portal transition to focus on mouth opening */}
             {!isPortalTransition && <UploadPanel />}
@@ -237,7 +237,7 @@ export default function App() {
 
             {/* Navigation to demo flow */}
             <motion.button
-              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan-500/40 bg-black/60 backdrop-blur-sm text-cyan-400 font-mono text-sm tracking-wider hover:bg-cyan-500/10 hover:border-cyan-400/60 transition-all"
+              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.5 }}
@@ -262,7 +262,7 @@ export default function App() {
               <CompareView />
             </Suspense>
             <motion.button
-              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan-500/40 bg-black/60 backdrop-blur-sm text-cyan-400 font-mono text-sm tracking-wider hover:bg-cyan-500/10 hover:border-cyan-400/60 transition-all"
+              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
@@ -287,7 +287,7 @@ export default function App() {
               <TechnicalDetailPanel />
             </Suspense>
             <motion.button
-              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan-500/40 bg-black/60 backdrop-blur-sm text-cyan-400 font-mono text-sm tracking-wider hover:bg-cyan-500/10 hover:border-cyan-400/60 transition-all"
+              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}

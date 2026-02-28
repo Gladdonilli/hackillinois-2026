@@ -149,7 +149,9 @@ ELEVENLABS_VOICES = [
     gpu="A100",
     timeout=600,
     retries=3,
-)
+    max_containers=10,           # Force 10 separate GPU containers
+    )
+@modal.concurrent(max_inputs=1)  # One batch per container = one batch per GPU
 def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
     """Process a batch of WAV files through AAI model. Each item is (filename, wav_bytes)."""
     import torch
@@ -311,8 +313,9 @@ def download_librispeech() -> list[tuple[str, bytes]]:
     ),
     timeout=600,
     secrets=[modal.Secret.from_name("elevenlabs-api-key")],
-    concurrency_limit=50,  # Max 50 parallel containers for TTS generation
-)
+    max_containers=50,           # Force 50 separate CPU containers
+    )
+@modal.concurrent(max_inputs=1)  # One chunk per container = max parallelism
 def generate_elevenlabs_chunk(chunk: list[tuple[int, str, str, str, str]]) -> list[tuple[str, bytes]]:
     """Generate a chunk of ElevenLabs deepfakes in one container.
 
@@ -426,7 +429,7 @@ def main():
     print(f"  Dispatching {len(el_items)} ElevenLabs calls across {len(el_chunks)} chunks (up to 50 containers)...")
 
     # Fire ElevenLabs .map() — streams results as chunks complete
-    el_results_iter = generate_elevenlabs_chunk.map(el_chunks, return_exceptions=True)
+    el_results_iter = generate_elevenlabs_chunk.map(el_chunks, return_exceptions=True, wrap_returned_exceptions=False)
 
     # Also load existing local samples while ElevenLabs runs remotely
     existing_real: list[tuple[str, bytes]] = []
@@ -494,7 +497,7 @@ def main():
 
         pass_results = []
         for batch_idx, batch_result in enumerate(
-            predict_ema_batch.map(batches, return_exceptions=True)
+            predict_ema_batch.map(batches, return_exceptions=True, wrap_returned_exceptions=False)
         ):
             if isinstance(batch_result, Exception):
                 err_str = str(batch_result)

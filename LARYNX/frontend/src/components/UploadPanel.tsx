@@ -45,7 +45,7 @@ function FileCard({
             </div>
             <div className="min-w-0 pointer-events-auto">
               <p className="truncate font-mono text-foreground text-sm">{file.name}</p>
-              <p className="text-xs text-[#666] font-mono mt-1">
+              <p className="text-xs text-dim font-mono mt-1">
                 {(file.size / 1024 / 1024).toFixed(2)} MB
                 {duration && ` • ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`}
               </p>
@@ -167,7 +167,7 @@ export default function UploadPanel() {
       <div
         className={cn(
           "absolute bottom-0 left-0 right-0 h-[60%] pointer-events-auto cursor-pointer transition-all duration-500",
-          isDragging && "bg-[rgba(0,255,255,0.03)]"
+          isDragging && "bg-cyan/[0.03]"
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -184,7 +184,7 @@ export default function UploadPanel() {
 
         {/* Subtle drag-active indicator — just a border glow, no box */}
         {isDragging && (
-          <div className="absolute inset-0 border border-[rgba(0,255,255,0.15)] rounded-lg pointer-events-none" />
+          <div className="absolute inset-0 border border-cyan/15 rounded-sm pointer-events-none" />
         )}
       </div>
 

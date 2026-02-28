@@ -72,8 +72,8 @@ function MouthBeacon({ portalState }: { portalState: string }) {
       <mesh ref={icoRef}>
         <icosahedronGeometry args={[0.22, 0]} />
         <meshStandardMaterial
-          color="#00FFFF"
-          emissive="#00FFFF"
+          color="#38BDF8"
+          emissive="#38BDF8"
           emissiveIntensity={0.6}
           transparent
           opacity={0.7}
@@ -82,15 +82,15 @@ function MouthBeacon({ portalState }: { portalState: string }) {
       </mesh>
 
       {/* Glow */}
-      <pointLight ref={glowRef} color="#00FFFF" intensity={0.6} distance={3} />
+      <pointLight ref={glowRef} color="#38BDF8" intensity={0.6} distance={3} />
 
       {/* Arrow pointing left toward mouth */}
       <group ref={arrowRef} position={[-0.6, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
         <mesh>
           <coneGeometry args={[0.06, 0.18, 4]} />
           <meshStandardMaterial
-            color="#00FFFF"
-            emissive="#00FFFF"
+            color="#38BDF8"
+            emissive="#38BDF8"
             emissiveIntensity={0.8}
             transparent
             opacity={0.9}
@@ -100,8 +100,8 @@ function MouthBeacon({ portalState }: { portalState: string }) {
         <mesh position={[0, 0.2, 0]}>
           <cylinderGeometry args={[0.015, 0.015, 0.25, 8]} />
           <meshStandardMaterial
-            color="#00FFFF"
-            emissive="#00FFFF"
+            color="#38BDF8"
+            emissive="#38BDF8"
             emissiveIntensity={0.6}
             transparent
             opacity={0.8}
@@ -113,11 +113,11 @@ function MouthBeacon({ portalState }: { portalState: string }) {
       <Billboard position={[0.5, 0.3, 0]} follow lockX={false} lockY={false} lockZ={false}>
         <Text
           fontSize={0.08}
-          color="#00FFFF"
+          color="#38BDF8"
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.003}
-          outlineColor="#003333"
+          outlineColor="#0c2a3a"
           font={undefined}
         >
           DROP FILE IN MOUTH
@@ -223,7 +223,7 @@ function FaceModel({ portalState }: { portalState: string }) {
            if (scanDist < scanWidth) {
              // Fade out instead of hard discard — translucent scan line
              gl_FragColor.rgb *= 0.3 + 0.7 * (scanDist / scanWidth);
-             gl_FragColor.rgb += vec3(0.0, 1.0, 1.0) * (1.0 - scanDist / scanWidth) * 0.3;
+           gl_FragColor.rgb += vec3(0.22, 0.74, 0.97) * (1.0 - scanDist / scanWidth) * 0.3;
            }
           `
         )
@@ -236,8 +236,8 @@ function FaceModel({ portalState }: { portalState: string }) {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
         const mat = new THREE.MeshStandardMaterial({
-          color: '#88ccff',
-          emissive: '#00FFFF',
+          color: '#a8d8ea',
+          emissive: '#38BDF8',
           emissiveIntensity: 0.3,
           transparent: true,
           opacity: 0.45,
@@ -253,8 +253,8 @@ function FaceModel({ portalState }: { portalState: string }) {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
         mesh.material = new THREE.MeshStandardMaterial({
-          color: '#00FFFF',
-          emissive: '#00FFFF',
+          color: '#38BDF8',
+          emissive: '#38BDF8',
           emissiveIntensity: 0.5,
           transparent: true,
           opacity: 0.25,
@@ -271,10 +271,10 @@ function FaceModel({ portalState }: { portalState: string }) {
 
     // Parallax
     if (solidRef.current) {
-      const targetRotX = mousePos.current.y * 0.1
-      const targetRotY = mousePos.current.x * 0.1
-      solidRef.current.rotation.x += (targetRotX - solidRef.current.rotation.x) * 0.05
-      solidRef.current.rotation.y += (targetRotY - solidRef.current.rotation.y) * 0.05
+      const targetRotX = mousePos.current.y * 0.08
+      const targetRotY = mousePos.current.x * 0.08
+      solidRef.current.rotation.x += (targetRotX - solidRef.current.rotation.x) * 0.03
+      solidRef.current.rotation.y += (targetRotY - solidRef.current.rotation.y) * 0.03
     }
 
     // Morph targets
@@ -357,11 +357,11 @@ export function LandingScene() {
       
       <fog attach="fog" args={['#000000', 10, 45]} />
       <ambientLight intensity={0.15} />
-      <pointLight position={[0, 5, 5]} intensity={0.8} color="#00FFFF" />
+      <pointLight position={[0, 5, 5]} intensity={0.8} color="#38BDF8" />
       <pointLight position={[-3, -2, 4]} intensity={0.4} color="#4488FF" />
       <spotLight position={[0, 3, 8]} angle={0.5} penumbra={0.8} intensity={0.6} color="#FFFFFF" />
 
-      <Sparkles count={150} scale={15} size={2.5} speed={0.3} opacity={0.6} color="#00FFFF" />
+      <Sparkles count={150} scale={15} size={2.5} speed={0.3} opacity={0.6} color="#38BDF8" />
       <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade speed={1} />
 
       <FaceModel portalState={portalState} />
