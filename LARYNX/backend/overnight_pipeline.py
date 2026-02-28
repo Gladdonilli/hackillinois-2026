@@ -57,7 +57,7 @@ MERGED_REAL_DIR = Path(__file__).resolve().parent / "training_data" / "datasets"
 MERGED_FAKE_DIR = Path(__file__).resolve().parent / "training_data" / "datasets" / "merged" / "fake"
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
-INFERENCE_PASSES = 10
+INFERENCE_PASSES = 30
 
 # Phonetically diverse sentences for TTS generation
 SENTENCES = [
@@ -148,9 +148,9 @@ ELEVENLABS_VOICES = [
     gpu="A100",
     timeout=600,
     retries=3,
-    max_containers=10,           # Force 10 separate GPU containers
+    max_containers=100,           # Maximize GPU parallelism (100 A100s)
     )
-@modal.concurrent(max_inputs=1)  # One batch per container = one batch per GPU
+@modal.concurrent(max_inputs=2)  # 2 batches per container = overlap I/O with compute
 def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
     """Process a batch of WAV files through AAI model. Each item is (filename, wav_bytes)."""
     import torch
@@ -483,8 +483,8 @@ def main():
         f"for {INFERENCE_PASSES} passes (~{n_samples_once * INFERENCE_PASSES} total inferences)..."
     )
 
-    # Batch into groups of 10 for maximum GPU parallelism (saturate 10 A100s)
-    BATCH_SIZE = 10
+    # Batch into groups of 20 for fewer scheduling round trips
+    BATCH_SIZE = 20
     all_items_labeled = [(f, b, "real") for f, b in all_real] + [(f, b, "deepfake") for f, b in all_fake]
     labels = {f: l for f, _, l in all_items_labeled}
 
