@@ -324,7 +324,7 @@ export const TechnicalDetailPanel: React.FC = () => {
           <div className="text-[10px] font-mono text-cyan-500/60 mb-2 tracking-widest uppercase">Analysis Rate</div>
           <div className="flex items-baseline gap-1">
             <span className="text-3xl font-mono text-white font-light">
-              <NumberFlow value={stats.fps} format={{ trailingZeroDisplay: 'stripIfInteger' }} />
+              <NumberFlow value={stats.fps} format={{ maximumFractionDigits: 0 }} />
             </span>
             <span className="text-sm font-mono text-cyan-500/50">fps</span>
           </div>
@@ -334,7 +334,7 @@ export const TechnicalDetailPanel: React.FC = () => {
           <div className="text-[10px] font-mono text-cyan-500/60 mb-2 tracking-widest uppercase">Sensor Inputs</div>
           <div className="flex items-baseline gap-1">
             <span className="text-3xl font-mono text-white font-light">
-              <NumberFlow value={stats.dof} format={{ trailingZeroDisplay: 'stripIfInteger' }} />
+              <NumberFlow value={stats.dof} format={{ maximumFractionDigits: 0 }} />
             </span>
             <span className="text-sm font-mono text-green-400/60">DOF</span>
           </div>
@@ -344,7 +344,7 @@ export const TechnicalDetailPanel: React.FC = () => {
           <div className="text-[10px] font-mono text-cyan-500/60 mb-2 tracking-widest uppercase">Human Limit</div>
           <div className="flex items-baseline gap-1">
             <span className="text-3xl font-mono text-white font-light">
-              <NumberFlow value={stats.humanVel} format={{ trailingZeroDisplay: 'stripIfInteger' }} />
+              <NumberFlow value={stats.humanVel} format={{ maximumFractionDigits: 0 }} />
             </span>
             <span className="text-sm font-mono text-cyan-500/50">cm/s</span>
           </div>
@@ -358,7 +358,7 @@ export const TechnicalDetailPanel: React.FC = () => {
           <div className="flex items-baseline gap-1 text-rose-500 drop-shadow-[0_0_10px_rgba(244,63,94,0.5)]">
             <span className="text-sm font-mono mr-1">&gt;</span>
             <span className="text-3xl font-mono font-bold">
-              <NumberFlow value={stats.fakeVel} format={{ trailingZeroDisplay: 'stripIfInteger' }} />
+              <NumberFlow value={stats.fakeVel} format={{ maximumFractionDigits: 0 }} />
             </span>
             <span className="text-sm font-mono">cm/s</span>
           </div>

@@ -13,6 +13,9 @@ const CAMERA_PRESETS: Record<
   uploading: { position: [2, 1, 4], target: [0, 0, 0] },
   analyzing: { position: [1.5, 0.5, 3], target: [0, -0.3, 0] },
   complete: { position: [0, 0.5, 4], target: [0, 0, 0] },
+  comparing: { position: [0, 0, 5], target: [0, 0, 0] },
+  technical: { position: [0, 0, 5], target: [0, 0, 0] },
+  closing: { position: [0, 0, 5], target: [0, 0, 0] },
   error: { position: [0, 0, 5], target: [0, 0, 0] },
 }
 
