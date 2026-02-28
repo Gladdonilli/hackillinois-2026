@@ -159,7 +159,7 @@ export default function UploadPanel() {
               <p className="text-sm text-[#666] mb-1">
                 Drop <span className="text-[var(--cyan)] font-medium">audio file</span> here
               </p>
-              <p className="text-xs text-[#444] mt-1 font-mono tracking-wider">
+              <p className="text-xs text-[#666] mt-1 font-mono tracking-wider">
                 .wav, .mp3, .ogg, .flac &middot; Max 10MB
               </p>
             </div>
@@ -237,7 +237,7 @@ export default function UploadPanel() {
         </AnimatePresence>
 
         {/* Info Footer */}
-        <div className="mt-8 flex justify-center items-center space-x-3 text-[10px] text-[#444] font-mono tracking-wider uppercase">
+        <div className="mt-8 flex justify-center items-center space-x-3 text-[10px] text-[#555] font-mono tracking-wider uppercase">
           <span>PROTOCOL v2.1</span>
           <span className="h-[2px] w-[2px] rounded-full bg-[#444]" />
           <span>ARTICULATORY PHYSICS</span>

@@ -36,8 +36,8 @@
     --genuine-glow: 0 255 136;
     --surface: #0A0A0A;
     --surface-elevated: #111111;
-    --grid-line: rgba(0, 255, 255, 0.03);
-    --scanline-opacity: 0.04;
+    --grid-line: rgba(0, 255, 255, 0.06);
+    --scanline-opacity: 0.12;
   }
 }
 
@@ -106,7 +106,7 @@
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: radial-gradient(ellipse 70% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.7) 100%);
+  background: radial-gradient(ellipse 60% 55% at 50% 50%, transparent 20%, rgba(0,0,0,0.85) 100%);
 }
 
 /* ============================================
@@ -159,7 +159,7 @@
 
 .border-glow {
   position: relative;
-  border: 1px solid rgba(0, 255, 255, 0.15);
+  border: 1px solid rgba(0, 255, 255, 0.35);
 }
 
 .border-glow::before {
