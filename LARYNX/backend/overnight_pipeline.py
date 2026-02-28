@@ -337,8 +337,11 @@ def generate_elevenlabs_deepfakes() -> list[tuple[str, bytes]]:
     for idx in range(N_FAKE_SAMPLES):
         voice_id, voice_name = ELEVENLABS_VOICES[idx % n_voices]
         sentence = SENTENCES[idx % n_sentences]
-        # Encode voice name in filename for speaker tracking
-        filename = f"elevenlabs_{voice_name}_{idx:04d}"
+        # Alternate between V2 and V3 models for synthesis diversity
+        model_id = "eleven_v3" if idx % 2 == 0 else "eleven_multilingual_v2"
+        model_tag = "v3" if idx % 2 == 0 else "v2"
+        # Encode voice name + model version in filename for speaker tracking
+        filename = f"elevenlabs_{voice_name}_{model_tag}_{idx:04d}"
 
         mp3_path = work_dir / f"{filename}.mp3"
         wav_path = work_dir / f"{filename}.wav"
@@ -354,7 +357,7 @@ def generate_elevenlabs_deepfakes() -> list[tuple[str, bytes]]:
                 },
                 json={
                     "text": sentence,
-                    "model_id": "eleven_multilingual_v2",
+                    "model_id": model_id,
                     "voice_settings": {
                         "stability": 0.5,
                         "similarity_boost": 0.75,
@@ -414,14 +417,14 @@ def main():
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     print("=" * 80)
-    print("LARYNX OVERNIGHT PIPELINE — WAVE 1")
+    print("LARYNX OVERNIGHT PIPELINE — WAVE 2 (ElevenLabs + GroupKFold)")
     print("=" * 80)
     start_time = time.time()
 
     # ---- Step 1: Generate data in parallel ----
-    print("\n📦 Step 1: Downloading LibriSpeech + generating deepfakes (parallel)...")
+    print("\n📦 Step 1: Downloading LibriSpeech + generating ElevenLabs deepfakes (parallel)...")
     libri_handle = download_librispeech.spawn()
-    fake_handle = generate_deepfakes.spawn()
+    fake_handle = generate_elevenlabs_deepfakes.spawn()
 
     # Also load existing samples
     existing_real = []
@@ -443,9 +446,9 @@ def main():
     libri_items = libri_handle.get()
     print(f"  ✅ LibriSpeech: {len(libri_items)} real utterances")
 
-    print("  Waiting for deepfake generation...")
+    print("  Waiting for ElevenLabs deepfake generation...")
     fake_items = fake_handle.get()
-    print(f"  ✅ Edge-TTS: {len(fake_items)} deepfake utterances")
+    print(f"  ✅ ElevenLabs: {len(fake_items)} deepfake utterances")
 
     # Combine all samples
     all_real = existing_real + libri_items
@@ -556,7 +559,7 @@ def main():
     print(f"  Real: {len(real_results)}, Fake: {len(fake_results)}")
 
     # Get all feature keys (exclude metadata)
-    meta_keys = {"filename", "label", "num_frames", "error"}
+    meta_keys = {"filename", "label", "num_frames", "error", "pass_idx", "speaker"}
     feature_keys = sorted([k for k in good_results[0].keys() if k not in meta_keys])
     print(f"  Features: {len(feature_keys)}")
 
@@ -564,11 +567,31 @@ def main():
     X = []
     y = []
     filenames = []
+    speakers = []  # For GroupKFold
     for r in good_results:
         row = [r.get(k, 0.0) for k in feature_keys]
         X.append(row)
         y.append(1 if r["label"] == "deepfake" else 0)
         filenames.append(r["filename"])
+        # Extract speaker from filename:
+        # Real: "libri_1234-56789-0001.wav" → speaker = "1234"
+        # Fake: "elevenlabs_Rachel_0042.wav" → speaker = "Rachel"
+        # Existing: "slt-arctic-0001-16k.wav" → speaker = "slt"
+        fn = r["filename"]
+        if fn.startswith("libri_"):
+            # LibriSpeech speaker ID is first number segment
+            speaker = fn.replace("libri_", "").split("-")[0]
+        elif fn.startswith("elevenlabs_"):
+            # ElevenLabs voice name + model version as separate speaker
+            # e.g. "elevenlabs_Rachel_v3_0042.wav" → speaker = "Rachel_v3"
+            parts = fn.replace("elevenlabs_", "").split("_")
+            if len(parts) >= 2:
+                speaker = f"{parts[0]}_{parts[1]}"  # VoiceName_v2 or VoiceName_v3
+            else:
+                speaker = parts[0] if parts else "unknown"
+            # Existing local files — use filename prefix as speaker
+            speaker = fn.split("-")[0]
+        speakers.append(speaker)
 
     X = np.array(X, dtype=np.float64)
     y = np.array(y)
@@ -578,22 +601,26 @@ def main():
 
     # Standardize
     from sklearn.preprocessing import StandardScaler
-    from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+    from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, HistGradientBoostingClassifier
     from sklearn.svm import SVC
     from sklearn.linear_model import LogisticRegression
-    from sklearn.model_selection import StratifiedKFold, cross_val_predict
+    from sklearn.model_selection import GroupKFold, cross_val_predict
     from sklearn.metrics import accuracy_score, classification_report
     import pickle
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Scale model selection with dataset size to keep overnight run stable.
+    # GroupKFold by speaker — prevents train/test leakage
+    groups = np.array(speakers)
+    n_unique_speakers = len(set(speakers))
+    n_splits = min(5, n_unique_speakers)  # Can't have more splits than speakers
+    print(f"  Unique speakers: {n_unique_speakers}, using {n_splits}-fold GroupKFold")
+    cv = GroupKFold(n_splits=n_splits)
+
+    # Scale model selection with dataset size
     n_samples = len(y)
     if n_samples > 5000:
-        from sklearn.ensemble import HistGradientBoostingClassifier
-
-        cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
         models = {
             "HistGradientBoosting": HistGradientBoostingClassifier(
                 max_depth=8,
@@ -615,7 +642,6 @@ def main():
             ),
         }
     else:
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
         models = {
             "GradientBoosting": GradientBoostingClassifier(
                 n_estimators=500,
@@ -638,7 +664,7 @@ def main():
     best_model = None
 
     for name, model in models.items():
-        y_pred = cross_val_predict(model, X_scaled, y, cv=cv, method="predict")
+        y_pred = cross_val_predict(model, X_scaled, y, cv=cv, groups=groups, method="predict")
         acc = accuracy_score(y, y_pred)
         print(f"  {name}: {acc*100:.1f}% ({sum(y_pred == y)}/{len(y)})")
 
@@ -720,7 +746,7 @@ def main():
     medium = sum(1 for s in best_signals if 10 < s[0] <= 20)
 
     print(f"\n{'=' * 80}")
-    print(f"WAVE 1 COMPLETE")
+    print(f"WAVE 2 COMPLETE")
     print(f"{'=' * 80}")
     print(f"  Samples: {len(real_results)} real + {len(fake_results)} fake = {len(good_results)} total")
     print(f"  Features: {len(feature_keys)}")
@@ -731,9 +757,11 @@ def main():
     print(f"  Model: {model_path}")
     print(f"  Results: {results_path}")
 
-    if best_acc >= 0.99:
-        print(f"\n🟢 TARGET ACHIEVED: {best_acc*100:.1f}% accuracy. Pipeline is production-ready.")
-    elif best_acc >= 0.95:
-        print(f"\n🟡 GOOD: {best_acc*100:.1f}% accuracy. Consider adding acoustic features or fine-tuning AAI.")
+    if best_acc >= 0.95:
+        print(f"\n🟢 STRONG: {best_acc*100:.1f}% GroupKFold accuracy — generalizes across speakers.")
+    elif best_acc >= 0.85:
+        print(f"\n🟡 GOOD: {best_acc*100:.1f}% GroupKFold accuracy. Model shows real generalization.")
+    elif best_acc >= 0.70:
+        print(f"\n🔵 MODERATE: {best_acc*100:.1f}% GroupKFold accuracy. Useful but needs more diverse data.")
     else:
-        print(f"\n🔴 NEEDS WORK: {best_acc*100:.1f}% accuracy. More data or model changes needed.")
+        print(f"\n🔴 NEEDS WORK: {best_acc*100:.1f}% GroupKFold accuracy. Model may not generalize.")
