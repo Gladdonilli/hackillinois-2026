@@ -12,10 +12,10 @@ const CAMERA_PRESETS: Record<
   idle: { position: [0, 0, 5], target: [0, 0, 0] },
   uploading: { position: [2, 1, 4], target: [0, 0, 0] },
   analyzing: { position: [1.5, 0.5, 3], target: [0, -0.3, 0] },
-  complete: { position: [0, 0.5, 4], target: [0, 0, 0] },
-  comparing: { position: [0, 0, 5], target: [0, 0, 0] },
-  technical: { position: [0, 0, 5], target: [0, 0, 0] },
-  closing: { position: [0, 0, 5], target: [0, 0, 0] },
+  complete: { position: [0, 0.5, 4], target: [0, -0.5, 0] },
+  comparing: { position: [2, 1, 5], target: [0, 0, 0] },
+  technical: { position: [0, 0, 3], target: [0, 0, 0] },
+  closing: { position: [0, 0.5, 6], target: [0, 0, 0] },
   error: { position: [0, 0, 5], target: [0, 0, 0] },
 }
 
@@ -44,37 +44,32 @@ export function CameraController() {
   useEffect(() => {
     const unsub = useLarynxStore.subscribe((state) => {
       const status = state.status
-      if (status === statusRef.current) return
+      const oldStatus = statusRef.current
+      if (status === oldStatus) return
       statusRef.current = status
 
-      if (status === "idle" || status === "uploading" || status === "error") {
-        isCameraOverride.current = false
-        currentTarget.current.set(...CAMERA_PRESETS[status].target)
-        gsap.to(camera.position, {
-          x: CAMERA_PRESETS[status].position[0],
-          y: CAMERA_PRESETS[status].position[1],
-          z: CAMERA_PRESETS[status].position[2],
-          duration: 1.5,
-          ease: "power2.inOut",
-        })
-      } else if (status === "analyzing") {
-        skullClipTriggered.current = false
-        isCameraOverride.current = false
-        orbitAngle.current = Math.atan2(1.5, 3)
-        zoomLevel.current = Math.hypot(1.5, 3)
-        currentTarget.current.set(0, -0.3, 0)
-        camera.position.set(1.5, 0.5, 3)
-      } else if (status === "complete") {
+      // Kill any active tweens on camera to prevent jumpiness on rapid transitions
+      gsap.killTweensOf(camera)
+      gsap.killTweensOf(camera.position)
+
+      const tl = gsap.timeline({
+        onUpdate: () => camera.updateProjectionMatrix(),
+      })
+
+      if (oldStatus === "analyzing" && status === "complete") {
         isCameraOverride.current = true
-        currentTarget.current.set(0, 0, 0)
+        currentTarget.current.set(...CAMERA_PRESETS.complete.target)
         
         const verdict = state.verdict
         if (verdict?.isGenuine) {
-          gsap.to(camera.position, {
-            x: 0, y: 0.5, z: 4,
+          tl.to(camera, { fov: 50, duration: 1.2, ease: "power2.out" }, 0)
+          tl.to(camera.position, {
+            x: CAMERA_PRESETS.complete.position[0],
+            y: CAMERA_PRESETS.complete.position[1],
+            z: CAMERA_PRESETS.complete.position[2],
             duration: 1.2,
             ease: "power2.out",
-          })
+          }, 0)
         } else {
           const initialX = camera.position.x
           const initialY = camera.position.y
@@ -86,13 +81,94 @@ export function CameraController() {
 
           setTimeout(() => {
             window.clearInterval(shakeIntervalId)
-            gsap.to(camera.position, {
-              x: 1, y: 1, z: 3.5,
-              duration: 1.5,
-              ease: "power2.inOut",
+            const shakeTl = gsap.timeline({
+              onUpdate: () => camera.updateProjectionMatrix(),
             })
+            shakeTl.to(camera, { fov: 50, duration: 1.2, ease: "power2.out" }, 0)
+            shakeTl.to(camera.position, {
+              x: CAMERA_PRESETS.complete.position[0],
+              y: CAMERA_PRESETS.complete.position[1],
+              z: CAMERA_PRESETS.complete.position[2],
+              duration: 1.2,
+              ease: "power2.out",
+            }, 0)
           }, 300)
         }
+      } else if (oldStatus === "complete" && status === "comparing") {
+        isCameraOverride.current = true
+        currentTarget.current.set(...CAMERA_PRESETS.comparing.target)
+        tl.to(camera, { fov: 45, duration: 1.5, ease: "power2.inOut" }, 0)
+        tl.to(camera.position, {
+          x: CAMERA_PRESETS.comparing.position[0],
+          y: CAMERA_PRESETS.comparing.position[1],
+          z: CAMERA_PRESETS.comparing.position[2],
+          duration: 1.5,
+          ease: "power2.inOut",
+        }, 0)
+      } else if (oldStatus === "comparing" && status === "technical") {
+        isCameraOverride.current = true
+        currentTarget.current.set(...CAMERA_PRESETS.technical.target)
+        tl.to(camera, { fov: 40, duration: 1, ease: "power2.inOut" }, 0)
+        tl.to(camera.position, {
+          x: CAMERA_PRESETS.technical.position[0],
+          y: CAMERA_PRESETS.technical.position[1],
+          z: CAMERA_PRESETS.technical.position[2],
+          duration: 1,
+          ease: "power2.inOut",
+        }, 0)
+      } else if (oldStatus === "technical" && status === "closing") {
+        isCameraOverride.current = true
+        currentTarget.current.set(...CAMERA_PRESETS.closing.target)
+        tl.to(camera, { fov: 50, duration: 2, ease: "power2.inOut" }, 0)
+        tl.to(camera.position, {
+          x: CAMERA_PRESETS.closing.position[0],
+          y: CAMERA_PRESETS.closing.position[1],
+          z: CAMERA_PRESETS.closing.position[2],
+          duration: 2,
+          ease: "power2.inOut",
+        }, 0)
+      } else if (oldStatus === "closing" && status === "idle") {
+        isCameraOverride.current = false
+        currentTarget.current.set(...CAMERA_PRESETS.idle.target)
+        tl.to(camera, { fov: 45, duration: 0.5, ease: "power2.inOut" }, 0)
+        tl.to(camera.position, {
+          x: CAMERA_PRESETS.idle.position[0],
+          y: CAMERA_PRESETS.idle.position[1],
+          z: CAMERA_PRESETS.idle.position[2],
+          duration: 0.5,
+          ease: "power2.inOut",
+        }, 0)
+      } else if (status === "idle" || status === "uploading" || status === "error") {
+        isCameraOverride.current = false
+        currentTarget.current.set(...CAMERA_PRESETS[status].target)
+        tl.to(camera, { fov: 45, duration: 1.5, ease: "power2.inOut" }, 0)
+        tl.to(camera.position, {
+          x: CAMERA_PRESETS[status].position[0],
+          y: CAMERA_PRESETS[status].position[1],
+          z: CAMERA_PRESETS[status].position[2],
+          duration: 1.5,
+          ease: "power2.inOut",
+        }, 0)
+      } else if (status === "analyzing") {
+        skullClipTriggered.current = false
+        isCameraOverride.current = false
+        orbitAngle.current = Math.atan2(1.5, 3)
+        zoomLevel.current = Math.hypot(1.5, 3)
+        currentTarget.current.set(...CAMERA_PRESETS.analyzing.target)
+        camera.position.set(...CAMERA_PRESETS.analyzing.position)
+        camera.fov = 45
+        camera.updateProjectionMatrix()
+      } else {
+        isCameraOverride.current = true
+        currentTarget.current.set(...CAMERA_PRESETS[status].target)
+        tl.to(camera, { fov: 45, duration: 1.5, ease: "power2.inOut" }, 0)
+        tl.to(camera.position, {
+          x: CAMERA_PRESETS[status].position[0],
+          y: CAMERA_PRESETS[status].position[1],
+          z: CAMERA_PRESETS[status].position[2],
+          duration: 1.5,
+          ease: "power2.inOut",
+        }, 0)
       }
     })
     return unsub

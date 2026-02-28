@@ -9,7 +9,7 @@ import * as THREE from 'three';
 const MiniModel = ({ isFake = false }: { isFake?: boolean }) => {
   const { scene } = useGLTF('/models/facecap.glb');
   const clone = useMemo(() => scene.clone(), [scene]);
-  const headMeshRef = useRef<THREE.Mesh>(null);
+  const headMeshRef = useRef<THREE.Mesh | null>(null);
   const time = useRef(0);
 
   useEffect(() => {
