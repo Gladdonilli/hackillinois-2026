@@ -145,11 +145,12 @@ def predict_ema_velocity(wav_bytes: bytes, filename: str) -> dict:
 
     device = torch.device("cuda:0")
     hubert_model = getattr(hub, "hubert_large_ll60k")()
-    hubert_model = hubert_model.to(device)
-    hubert_model.eval()
+    hubert_device = device
+    hubert_model = hubert_model.to(hubert_device)
 
-    # ---- Load AAI inversion model ----
+    # ---- Load AAI inversion model (match predict_ema.py exactly) ----
     from articulatory.utils import load_model
+    from articulatory.bin.decode import ar_loop
 
     config_path = os.path.join(CHECKPOINT_DIR, "config.yml")
     ckpt_path = os.path.join(CHECKPOINT_DIR, "best_mel_ckpt.pkl")
@@ -158,10 +159,11 @@ def predict_ema_velocity(wav_bytes: bytes, filename: str) -> dict:
         return {"error": f"Checkpoint not found at {ckpt_path}. Run download_checkpoint first."}
 
     with open(config_path) as f:
-        config = yaml.safe_load(f)
+        inversion_config = yaml.load(f, Loader=yaml.Loader)
 
-    model, _ = load_model(ckpt_path)
-    model = model.eval().to(device)
+    inversion_model = load_model(ckpt_path, inversion_config)
+    inversion_model.remove_weight_norm()
+    inversion_model = inversion_model.eval().to(device)
 
     # ---- HuBERT parameters for hprc_h2 ----
     interp_factor = 2
@@ -183,25 +185,24 @@ def predict_ema_velocity(wav_bytes: bytes, filename: str) -> dict:
 
     duration_s = len(wav_data) / sr
 
-    # ---- Extract HuBERT features ----
-    wav_tensor = torch.FloatTensor(wav_data).unsqueeze(0).to(device)
-
+    # ---- Extract HuBERT features (matching predict_ema.py lines 84-94 exactly) ----
     with torch.no_grad():
-        hubert_out = hubert_model(
-            [wav_tensor.squeeze(0)]
+        wavs = [torch.from_numpy(wav_data).float().to(hubert_device)]
+        states = hubert_model(wavs)["hidden_states"]
+        feature = states[-1].squeeze(0)  # (seq_len, 1024)
+        target_length = len(feature) * interp_factor
+        feature = torch.nn.functional.interpolate(
+            feature.unsqueeze(0).transpose(1, 2),
+            size=target_length, mode="linear", align_corners=False
         )
-        # s3prl output: dict with 'hidden_states' list
-        feat = hubert_out["hidden_states"][-1]  # (1, T, 1024)
+        feature = feature.transpose(1, 2).squeeze(0)  # (seq_len*2, 1024)
+        feat = feature.to(device)
 
-        # Interpolate 2x for 200Hz EMA rate
-        feat = feat.transpose(1, 2)  # (1, 1024, T)
-        feat = torch.nn.functional.interpolate(
-            feat, scale_factor=interp_factor, mode="linear", align_corners=False
-        )
-        feat = feat.transpose(1, 2)  # (1, T*2, 1024)
-
-        # ---- Run inversion model ----
-        pred = model.inference(feat, normalize_before=False)  # (1, T, 12)
+        # ---- Run inversion model (check use_ar like original) ----
+        if "use_ar" in inversion_config["generator_params"] and inversion_config["generator_params"]["use_ar"]:
+            pred = ar_loop(inversion_model, feat, inversion_config, normalize_before=False)
+        else:
+            pred = inversion_model.inference(feat, normalize_before=False)
         ema = pred.squeeze(0).cpu().numpy()  # (T, 12)
 
     # ---- Compute velocities ----
