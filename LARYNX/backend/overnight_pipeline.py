@@ -54,8 +54,8 @@ image = (
 # Constants
 # ---------------------------------------------------------------------------
 LIBRISPEECH_URL = "https://openslr.trmal.net/resources/12/dev-clean.tar.gz"
-N_REAL_SAMPLES = 300
-N_FAKE_SAMPLES = 300
+N_REAL_SAMPLES = 1200
+N_FAKE_SAMPLES = 1200
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
 INFERENCE_PASSES = 10
@@ -272,15 +272,17 @@ def download_librispeech() -> list[tuple[str, bytes]]:
     from pathlib import Path
 
     cache_dir = Path("/model-cache/librispeech")
-    cache_file = cache_dir / "dev_clean_2700.pkl"
+    cache_file = cache_dir / f"dev_clean_{N_REAL_SAMPLES}.pkl"
 
-    # Check volume cache first
+    # Check volume cache first — must match requested sample count
     if cache_file.exists():
         print("Loading LibriSpeech from volume cache...")
         with open(cache_file, "rb") as f:
             items = pickle.load(f)
-        print(f"  Loaded {len(items)} cached WAV files (skipped 337MB download)")
-        return items
+        if len(items) >= N_REAL_SAMPLES:
+            print(f"  Loaded {len(items)} cached WAV files (skipped 337MB download)")
+            return items[:N_REAL_SAMPLES]
+        print(f"  Cache has {len(items)} but need {N_REAL_SAMPLES}, re-downloading...")
 
     # Fresh download
     work_dir = Path("/tmp/librispeech")
@@ -459,14 +461,26 @@ def main():
         fake_items = cached_fakes[:N_FAKE_SAMPLES]
         el_results_iter = None
     else:
-        # Build ElevenLabs work items using Flash v2.5 (cheapest model)
+        # Build ElevenLabs work items: split across 3 models for diversity
         import random as _rng
         el_rng = _rng.Random(42)
         el_items: list[tuple[int, str, str, str, str]] = []
-        for i in range(N_FAKE_SAMPLES):
-            voice_id, voice_name = el_rng.choice(ELEVENLABS_VOICES)
-            sentence = el_rng.choice(SENTENCES)
-            el_items.append((i, voice_id, voice_name, "eleven_flash_v2_5", sentence))
+        # Exclude already-cached filenames
+        cached_names = {fname for fname, _ in cached_fakes}
+        n_per_model = (N_FAKE_SAMPLES - len(cached_fakes)) // 3
+        remainder = (N_FAKE_SAMPLES - len(cached_fakes)) % 3
+        models = [
+            ("eleven_flash_v2_5", n_per_model + remainder),  # Flash gets remainder
+            ("eleven_multilingual_v2", n_per_model),
+            ("eleven_v3", n_per_model),
+        ]
+        idx = 0
+        for model_id, count in models:
+            for _ in range(count):
+                voice_id, voice_name = el_rng.choice(ELEVENLABS_VOICES)
+                sentence = el_rng.choice(SENTENCES)
+                el_items.append((idx, voice_id, voice_name, model_id, sentence))
+                idx += 1
 
         CHUNK_SIZE = 50
         el_chunks = [el_items[i:i + CHUNK_SIZE] for i in range(0, len(el_items), CHUNK_SIZE)]
