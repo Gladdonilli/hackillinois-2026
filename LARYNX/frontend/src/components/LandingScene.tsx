@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Sparkles, Stars, useGLTF } from '@react-three/drei'
+import { Sparkles, Stars, useGLTF, Text, Billboard } from '@react-three/drei'
 import { EffectComposer, Bloom, ChromaticAberration } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
@@ -27,40 +27,102 @@ function GlitchEffectHandler() {
   return null
 }
 
-function SoundWaveRings() {
-  const ringsCount = 4
-  const ringsRef = useRef<THREE.Mesh[]>([])
+function MouthBeacon({ portalState }: { portalState: string }) {
+  const groupRef = useRef<THREE.Group>(null)
+  const icoRef = useRef<THREE.Mesh>(null)
+  const arrowRef = useRef<THREE.Group>(null)
+  const glowRef = useRef<THREE.PointLight>(null)
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    ringsRef.current.forEach((ring, i) => {
-      if (!ring) return
-      const phase = (t + i * 0.5) % 2.0
-      const progress = phase / 2.0
+    if (!groupRef.current) return
 
-      const scale = 1 + progress * 2
-      ring.scale.set(scale, scale, scale)
+    // Volatile shaking
+    const shake = 0.015
+    groupRef.current.position.x = 1.2 + (Math.random() - 0.5) * shake + Math.sin(t * 1.3) * 0.03
+    groupRef.current.position.y = -1.5 + Math.sin(t * 0.8) * 0.05 + (Math.random() - 0.5) * shake
+    groupRef.current.position.z = 2.5 + (Math.random() - 0.5) * shake
 
-      const material = ring.material as THREE.MeshStandardMaterial
-      material.opacity = (1 - progress) * 0.5
-    })
+    // Rotate icosahedron
+    if (icoRef.current) {
+      icoRef.current.rotation.x += 0.008
+      icoRef.current.rotation.y += 0.012
+      icoRef.current.rotation.z += 0.005
+      // Volatile scale pulsing
+      const pulse = 1 + Math.sin(t * 4) * 0.08 + Math.sin(t * 7.3) * 0.04
+      icoRef.current.scale.setScalar(pulse)
+    }
+
+    // Arrow bob
+    if (arrowRef.current) {
+      arrowRef.current.position.x = -0.6 + Math.sin(t * 2) * 0.08
+    }
+
+    // Glow pulse
+    if (glowRef.current) {
+      glowRef.current.intensity = 0.6 + Math.sin(t * 3) * 0.3
+    }
   })
 
+  if (portalState === 'entering' || portalState === 'warping') return null
+
   return (
-    <group position={[0, -0.3, 0.5]}>
-      {Array.from({ length: ringsCount }).map((_, i) => (
-        <mesh key={i} ref={(el) => { if (el) ringsRef.current[i] = el }}>
-          <torusGeometry args={[0.5, 0.02, 16, 64]} />
-          <meshStandardMaterial 
-            color="#00FFFF" 
-            emissive="#00FFFF" 
-            emissiveIntensity={0.8} 
-            transparent 
-            opacity={0} 
-            depthWrite={false}
+    <group ref={groupRef} position={[1.2, -1.5, 2.5]}>
+      {/* Volatile icosahedron */}
+      <mesh ref={icoRef}>
+        <icosahedronGeometry args={[0.22, 0]} />
+        <meshStandardMaterial
+          color="#00FFFF"
+          emissive="#00FFFF"
+          emissiveIntensity={0.6}
+          transparent
+          opacity={0.7}
+          wireframe
+        />
+      </mesh>
+
+      {/* Glow */}
+      <pointLight ref={glowRef} color="#00FFFF" intensity={0.6} distance={3} />
+
+      {/* Arrow pointing left toward mouth */}
+      <group ref={arrowRef} position={[-0.6, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <mesh>
+          <coneGeometry args={[0.06, 0.18, 4]} />
+          <meshStandardMaterial
+            color="#00FFFF"
+            emissive="#00FFFF"
+            emissiveIntensity={0.8}
+            transparent
+            opacity={0.9}
           />
         </mesh>
-      ))}
+        {/* Arrow shaft */}
+        <mesh position={[0, 0.2, 0]}>
+          <cylinderGeometry args={[0.015, 0.015, 0.25, 8]} />
+          <meshStandardMaterial
+            color="#00FFFF"
+            emissive="#00FFFF"
+            emissiveIntensity={0.6}
+            transparent
+            opacity={0.8}
+          />
+        </mesh>
+      </group>
+
+      {/* Label pointing to mouth */}
+      <Billboard position={[0.5, 0.3, 0]} follow lockX={false} lockY={false} lockZ={false}>
+        <Text
+          fontSize={0.08}
+          color="#00FFFF"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.003}
+          outlineColor="#003333"
+          font={undefined}
+        >
+          DROP FILE IN MOUTH
+        </Text>
+      </Billboard>
     </group>
   )
 }
@@ -84,14 +146,14 @@ function PortalCameraController({ portalState, setPortalState }: { portalState: 
       
       tlRef.current.to(c.position, {
         x: 0,
-        y: 0.3,
-        z: 0.1, // Zoom past the teeth into the throat
-        duration: 1.5,
-        ease: 'power2.in',
+        y: -0.2,
+        z: 1.8, // Don't go too close — prevents WebGL context loss
+        duration: 2.0,
+        ease: 'power3.inOut',
       }, 0).to(c, {
-        fov: 110, // Extreme warp field of view
-        duration: 1.5,
-        ease: 'power3.in',
+        fov: 90, // Moderate warp FOV — less extreme
+        duration: 2.0,
+        ease: 'power2.inOut',
         onUpdate: () => c.updateProjectionMatrix()
       }, 0)
     }
@@ -134,9 +196,10 @@ function FaceModel({ portalState }: { portalState: string }) {
     return {
       uniforms: {
         scanY: { value: 10.0 },
-        scanWidth: { value: 0.5 }
+        scanWidth: { value: 0.08 }  // Thin scan line, not a thick band
       },
       onBeforeCompile: (shader: { uniforms: Record<string, { value: unknown }>; vertexShader: string; fragmentShader: string }) => {
+        shader.uniforms.scanY = customShader.uniforms.scanY
         shader.uniforms.scanWidth = customShader.uniforms.scanWidth
         
         shader.vertexShader = `
@@ -156,8 +219,11 @@ function FaceModel({ portalState }: { portalState: string }) {
         `.replace(
           `#include <dithering_fragment>`,
           `#include <dithering_fragment>
-           if (vWorldPos.y < scanY && vWorldPos.y > scanY - scanWidth) {
-             discard;
+           float scanDist = abs(vWorldPos.y - scanY);
+           if (scanDist < scanWidth) {
+             // Fade out instead of hard discard — translucent scan line
+             gl_FragColor.rgb *= 0.3 + 0.7 * (scanDist / scanWidth);
+             gl_FragColor.rgb += vec3(0.0, 1.0, 1.0) * (1.0 - scanDist / scanWidth) * 0.3;
            }
           `
         )
@@ -250,10 +316,10 @@ function FaceModel({ portalState }: { portalState: string }) {
     })
 
     // X-ray sweep
-    const sweepTime = t % 4
+    const sweepTime = t % 8  // Slower sweep cycle
     let currentScanY = 10
-    if (sweepTime < 1) {
-      currentScanY = 3.0 - sweepTime * 6.0
+    if (sweepTime < 0.5) {
+      currentScanY = 3.0 - sweepTime * 12.0  // Faster pass, less visible time
     }
     customShader.uniforms.scanY.value = currentScanY
 
@@ -269,10 +335,9 @@ function FaceModel({ portalState }: { portalState: string }) {
   })
 
   return (
-    <group ref={solidRef} scale={2.5} position={[0, 0.5, 0]}>
+    <group ref={solidRef} scale={2.5} position={[0, -0.3, 0]}>
       <primitive object={clonedWireScene} />
       <primitive object={clonedSolidScene} />
-      { portalState !== 'entering' && portalState !== 'warping' && <SoundWaveRings /> }
     </group>
   )
 }
@@ -290,7 +355,7 @@ export function LandingScene() {
     >
       <PortalCameraController portalState={portalState} setPortalState={setPortalState} />
       
-      <fog attach="fog" args={['#000000', 8, 40]} />
+      <fog attach="fog" args={['#000000', 10, 45]} />
       <ambientLight intensity={0.15} />
       <pointLight position={[0, 5, 5]} intensity={0.8} color="#00FFFF" />
       <pointLight position={[-3, -2, 4]} intensity={0.4} color="#4488FF" />
@@ -300,6 +365,7 @@ export function LandingScene() {
       <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade speed={1} />
 
       <FaceModel portalState={portalState} />
+      <MouthBeacon portalState={portalState} />
       <GlitchEffectHandler />
 
       <EffectComposer>

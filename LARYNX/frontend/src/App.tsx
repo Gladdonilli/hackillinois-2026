@@ -148,6 +148,11 @@ export default function App() {
             transition={{ duration: 0.6 }}
           >
             <LandingScene />
+            {/* LARYNX title overlay */}
+            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none">
+              <h1 className="text-5xl font-mono tracking-[0.5em] text-white/90 text-glow-cyan glitch-text">LARYNX.</h1>
+              <p className="text-xs font-mono tracking-[0.3em] text-cyan-400/50 mt-2">DEEPFAKE VOICE DETECTION</p>
+            </div>
             {/* Hide upload panel during portal transition to focus on mouth opening */}
             {!isPortalTransition && <UploadPanel />}
           </motion.div>

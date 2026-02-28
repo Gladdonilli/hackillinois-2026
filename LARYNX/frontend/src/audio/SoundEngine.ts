@@ -399,13 +399,16 @@ export const SoundEngine = {
 
   playResolution: (type: 'genuine' | 'deepfake'): void => {
     if (!requireAudioReady()) return
+    const now = Tone.now()
     if (type === 'genuine') {
-      ambientOsc?.frequency.rampTo(150, 2)
-      ambientOsc2?.frequency.rampTo(225, 2)
+      // Use linearRampTo to avoid Tone.js v15 exponentialRamp RangeError
+      // when current value equals target (degenerate [0,0] range)
+      ambientOsc?.frequency.linearRampTo(150, 2, now)
+      ambientOsc2?.frequency.linearRampTo(225, 2, now)
       if (ambientOsc2) ambientOsc2.type = 'sine'
     } else {
-      ambientOsc?.frequency.rampTo(150, 2)
-      ambientOsc2?.frequency.rampTo(160, 2)
+      ambientOsc?.frequency.linearRampTo(150, 2, now)
+      ambientOsc2?.frequency.linearRampTo(160, 2, now)
       if (ambientOsc2) ambientOsc2.type = 'sawtooth'
     }
   },
