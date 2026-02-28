@@ -29,7 +29,7 @@ model_cache = modal.Volume.from_name("model-cache", create_if_missing=True)
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("libsndfile1", "ffmpeg", "wget", "sox")
+    .apt_install("libsndfile1", "ffmpeg", "wget", "sox", "git")
     .pip_install(
         "torch==2.5.1",
         "torchaudio==2.5.1",

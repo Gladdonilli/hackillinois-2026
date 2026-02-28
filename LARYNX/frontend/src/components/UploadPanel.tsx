@@ -166,7 +166,7 @@ export default function UploadPanel() {
             "relative flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg transition-all duration-300 hud-panel group",
             isDragging
               ? "border-[var(--cyan)] bg-[rgba(0,255,255,0.03)]"
-              : "border-glow bg-[#0A0A0A]/80 backdrop-blur-sm group-hover:shadow-[0_0_30px_rgba(0,255,255,0.15)] group-hover:border-solid border-dashed"
+              : "border-glow-slow bg-[#0A0A0A]/80 backdrop-blur-sm group-hover:shadow-[0_0_30px_rgba(0,255,255,0.15)] group-hover:border-solid border-dashed"
           )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -227,7 +227,7 @@ export default function UploadPanel() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="mt-6 flex flex-col gap-4"
+              className="mt-6 flex flex-col gap-4 animate-subtle-breathe"
             >
               <div className="hud-panel hud-sweep p-4 flex items-center justify-between border-[var(--cyan)]/20 hover:-translate-y-0.5 transition-transform duration-300">
                 <div className="flex items-center space-x-4 overflow-hidden">
@@ -266,6 +266,7 @@ export default function UploadPanel() {
                   onMouseEnter={() => playHover()}
                   disabled={status === "analyzing"}
                   className={cn(
+                    "btn-glow",
                     status === "idle" && "animate-pulse-glow"
                   )}
                 >
@@ -281,16 +282,17 @@ export default function UploadPanel() {
               </motion.div>
             </motion.div>
           )}
+
         </AnimatePresence>
 
         {/* Info Footer */}
-        <motion.div className="mt-8 flex justify-center items-center space-x-3 text-[10px] text-[#555] font-mono tracking-wider uppercase" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.2 } } }}>
-          <motion.span variants={{ hidden: { opacity: 0, y: 5 }, visible: { opacity: 1, y: 0 } }}>PROTOCOL v2.1</motion.span>
+        <div className="mt-8 flex justify-center items-center space-x-3 text-[10px] text-[#555] font-mono tracking-wider uppercase panel-stagger">
+          <span>PROTOCOL v2.1</span>
           <span className="h-[2px] w-[2px] rounded-full bg-[#444]" />
-          <motion.span variants={{ hidden: { opacity: 0, y: 5 }, visible: { opacity: 1, y: 0 } }}>ARTICULATORY PHYSICS</motion.span>
+          <span>ARTICULATORY PHYSICS</span>
           <span className="h-[2px] w-[2px] rounded-full bg-[#444]" />
-          <motion.span variants={{ hidden: { opacity: 0, y: 5 }, visible: { opacity: 1, y: 0 } }}>EMA 6-SENSOR</motion.span>
-        </motion.div>
+          <span>EMA 6-SENSOR</span>
+        </div>
       </motion.div>
     </div>
   )

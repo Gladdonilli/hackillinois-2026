@@ -156,12 +156,16 @@ export function CameraController() {
         zoomLevel.current = Math.hypot(1.5, 3)
         currentTarget.current.set(...CAMERA_PRESETS.analyzing.target)
         camera.position.set(...CAMERA_PRESETS.analyzing.position)
-        camera.fov = 45
-        camera.updateProjectionMatrix()
+        if ('fov' in camera) {
+          camera.fov = 45
+          camera.updateProjectionMatrix()
+        }
       } else {
         isCameraOverride.current = true
         currentTarget.current.set(...CAMERA_PRESETS[status].target)
-        tl.to(camera, { fov: 45, duration: 1.5, ease: "power2.inOut" }, 0)
+        if ('fov' in camera) {
+          tl.to(camera, { fov: 45, duration: 1.5, ease: "power2.inOut", onUpdate: () => camera.updateProjectionMatrix() }, 0)
+        }
         tl.to(camera.position, {
           x: CAMERA_PRESETS[status].position[0],
           y: CAMERA_PRESETS[status].position[1],

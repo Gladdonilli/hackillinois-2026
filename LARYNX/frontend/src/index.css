@@ -404,6 +404,138 @@
    INTERACTIVE ELEMENT EFFECTS  
    ============================================ */
 
+/* btn-glow */
+@keyframes fast-breathe-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(var(--cyan-glow), 0.2), 0 0 20px rgba(var(--cyan-glow), 0.1); }
+  50% { box-shadow: 0 0 15px rgba(var(--cyan-glow), 0.5), 0 0 35px rgba(var(--cyan-glow), 0.3); }
+}
+
+.btn-glow {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.btn-glow:hover {
+  animation: fast-breathe-glow 0.6s ease-in-out infinite;
+  border-color: rgba(0, 255, 255, 0.6);
+}
+
+/* data-interactive */
+[data-interactive] {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+[data-interactive]:hover {
+  transform: scale(1.02);
+  border-color: rgba(0, 255, 255, 0.3);
+  box-shadow: 0 0 10px rgba(var(--cyan-glow), 0.15);
+}
+[data-interactive]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* nav-btn */
+.nav-btn {
+  position: relative;
+  overflow: hidden;
+  transition: letter-spacing 0.3s ease, border-color 0.3s ease;
+  letter-spacing: 0.1em;
+  border: 1px solid transparent;
+}
+
+.nav-btn::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    var(--border-angle, 0deg),
+    transparent 40%,
+    rgba(0, 255, 255, 0.4) 50%,
+    transparent 60%
+  );
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  animation: border-rotate 4s linear infinite;
+}
+
+.nav-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  left: -100%;
+  background: rgba(0, 255, 255, 0.1);
+  transition: left 0.3s ease;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.nav-btn:hover {
+  letter-spacing: 0.2em;
+  border-color: rgba(0, 255, 255, 0.35);
+}
+
+.nav-btn:hover::before {
+  opacity: 1;
+}
+
+.nav-btn:hover::after {
+  left: 0;
+}
+
+/* border-glow-slow */
+.border-glow-slow {
+  position: relative;
+  border: 1px solid rgba(0, 255, 255, 0.35);
+}
+.border-glow-slow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    var(--border-angle, 0deg),
+    transparent 40%,
+    rgba(0, 255, 255, 0.4) 50%,
+    transparent 60%
+  );
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: border-rotate 8s linear infinite;
+}
+
+/* panel-stagger */
+@keyframes panel-enter {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.panel-stagger > * {
+  opacity: 0;
+  animation: panel-enter 0.5s ease-out forwards;
+}
+
+.panel-stagger > *:nth-child(1) { animation-delay: 100ms; }
+.panel-stagger > *:nth-child(2) { animation-delay: 200ms; }
+.panel-stagger > *:nth-child(3) { animation-delay: 300ms; }
+.panel-stagger > *:nth-child(4) { animation-delay: 400ms; }
+.panel-stagger > *:nth-child(5) { animation-delay: 500ms; }
+.panel-stagger > *:nth-child(n+6) { animation-delay: 600ms; }
+
+/* subtle breathing scale for file card */
+@keyframes subtle-breathe-scale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.005); }
+}
+
+.animate-subtle-breathe {
+  animation: subtle-breathe-scale 3s ease-in-out infinite;
+}
+
 /* All interactive elements get data-interactive for cursor detection */
 button, a, [role="button"], input, label, [data-interactive] {
   cursor: none !important;
