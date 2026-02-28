@@ -48,7 +48,7 @@ function MeasurementGrid() {
   return (
     <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.5, 0]}>
       <ringGeometry args={[0.5, 3, 64, 1]} />
-      <meshBasicMaterial wireframe color="#00FFFF" transparent opacity={0.08} />
+      <meshBasicMaterial wireframe color="#38BDF8" transparent opacity={0.08} />
     </mesh>
   );
 }
@@ -82,7 +82,7 @@ function DataParticles() {
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
       <planeGeometry args={[0.01, 0.02]} />
-      <meshBasicMaterial color="#00FFFF" transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
+      <meshBasicMaterial color="#38BDF8" transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
     </instancedMesh>
   );
 }
@@ -91,7 +91,7 @@ function LightCone() {
   return (
     <mesh position={[3, 5, 2]} rotation={[Math.PI / 4, 0, -Math.PI / 6]}>
       <coneGeometry args={[2, 8, 32, 1, true]} />
-      <meshBasicMaterial transparent opacity={0.03} color="#00FFFF" side={THREE.DoubleSide} blending={THREE.AdditiveBlending} depthWrite={false} />
+      <meshBasicMaterial transparent opacity={0.03} color="#38BDF8" side={THREE.DoubleSide} blending={THREE.AdditiveBlending} depthWrite={false} />
     </mesh>
   );
 }
@@ -111,14 +111,14 @@ export function AnalysisView() {
             
             {/* Lighting */}
             <ambientLight intensity={0.08} />
-            <spotLight position={[3, 5, 2]} color="#00FFFF" intensity={3} angle={0.4} penumbra={0.5} castShadow />
+            <spotLight position={[3, 5, 2]} color="#38BDF8" intensity={3} angle={0.4} penumbra={0.5} castShadow />
             <LightCone />
             <pointLight position={[-3, 1, 2]} intensity={0.5} color="#1a1a4a" />
-            <pointLight position={[2, 0, -3]} intensity={0.8} color="#FF3366" />
+            <pointLight position={[2, 0, -3]} intensity={0.8} color="#FF003C" />
             
             {/* Environment Upgrades */}
-            <Sparkles count={200} scale={8} size={1.5} speed={0.2} opacity={0.4} color="#00FFFF" />
-            <ContactShadows position={[0, -2.5, 0]} opacity={0.2} scale={10} blur={2} far={4} color="#00FFFF" />
+            <Sparkles count={200} scale={8} size={1.5} speed={0.2} opacity={0.4} color="#38BDF8" />
+            <ContactShadows position={[0, -2.5, 0]} opacity={0.2} scale={10} blur={2} far={4} color="#38BDF8" />
             
             {/* Scene */}
             <Float speed={0.8} rotationIntensity={0.02} floatIntensity={0.05}>

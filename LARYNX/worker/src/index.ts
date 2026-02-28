@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { Env, ApiResponse, Report } from './types';
+import type { Env, ApiResponse, Report, VerdictData, SimilarityMatch, ForensicMemory } from './types';
+import { embedAndStore, generateEmbedding, querySimilar, getIndexStats, INTEL_CONFIG } from './intelligence';
+import { storeForensicRecord, searchForensicMemories, MEMORY_CONFIG } from './supermemory';
 
 const ALLOWED_ORIGINS = [
   'https://larynx.pages.dev',
@@ -225,17 +227,45 @@ app.post('/api/analyze', async (c) => {
                 // Forward modified verdict with reportId
                 const modifiedMsg = `event: verdict\ndata: ${JSON.stringify(verdict)}\n\n`;
                 controller.enqueue(encoder.encode(modifiedMsg));
+
+                // Fire-and-forget: embed in Vectorize + store forensic memory
+                // Uses waitUntil so it runs after response is sent — never blocks SSE
+                const verdictData: VerdictData = {
+                  isGenuine: verdict.isGenuine,
+                  confidence: verdict.confidence,
+                  peakVelocity: verdict.peakVelocity,
+                  threshold: verdict.threshold,
+                  anomalousFrameCount: verdict.anomalousFrameCount || 0,
+                  totalFrameCount: verdict.totalFrameCount || 0,
+                  anomalyRatio: verdict.anomalyRatio || 0,
+                  classifierScore: verdict.classifierScore,
+                  classifierModel: verdict.classifierModel,
+                  ensembleScore: verdict.ensembleScore,
+                  reportId,
+                  processingTimeMs,
+                };
+
+                c.executionCtx.waitUntil(
+                  Promise.allSettled([
+                    embedAndStore(c.env, reportId, verdictData),
+                    storeForensicRecord(c.env, reportId, verdictData, ipHash),
+                  ]).then((results) => {
+                    console.log(`[post-verdict] reportId=${reportId} intel=${results[0].status} memory=${results[1].status}`);
+                  })
+                );
+
                 continue;
               } catch {
-                // If D1 fails, still forward the original verdict
+                // If D1/intelligence fails, still forward the original verdict
+                controller.enqueue(encoder.encode(msg + '\n\n'));
+                continue;
               }
+            } else {
+              // Forward all other events as-is
+              controller.enqueue(encoder.encode(msg + '\n\n'));
             }
-
-            // Forward all other events as-is
-            controller.enqueue(encoder.encode(msg + '\n\n'));
           }
         }
-
         // Flush remaining buffer
         if (buffer.trim()) {
           controller.enqueue(encoder.encode(buffer + '\n\n'));
@@ -431,6 +461,124 @@ app.get('/api/history', async (c) => {
     .all();
 
   return c.json<ApiResponse<typeof results>>({ success: true, data: results });
+});
+
+// ─── POST /api/intelligence/similar ───
+// Find similar voice signatures via Vectorize + Supermemory fusion
+app.post('/api/intelligence/similar', async (c) => {
+  const body = await c.req.json<{ reportId?: string; text?: string; topK?: number; minScore?: number }>().catch(() => null);
+
+  if (!body || (!body.reportId && !body.text)) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: { code: 'BAD_REQUEST', message: 'Provide reportId or text query' } },
+      400
+    );
+  }
+
+  // Get embedding — either from existing report or from text query
+  let embedding: number[] | null = null;
+
+  if (body.reportId && c.env.VECTOR_SIGNATURES) {
+    // Retrieve existing vector by report ID
+    try {
+      const existing = await c.env.VECTOR_SIGNATURES.getByIds([body.reportId]);
+      if (existing.length > 0 && existing[0].values) {
+        embedding = existing[0].values;
+      }
+    } catch (err) {
+      console.error('[similar] Failed to retrieve vector:', err);
+    }
+  }
+
+  if (!embedding && body.text && c.env.AI) {
+    // Generate embedding from text query
+    try {
+      const result = await c.env.AI.run(
+        INTEL_CONFIG.EMBEDDING_MODEL,
+        { text: [body.text] },
+        { gateway: { id: INTEL_CONFIG.GATEWAY_ID } }
+      ) as { data: number[][] };
+      if (result?.data?.[0]?.length === 768) {
+        embedding = result.data[0];
+      }
+    } catch (err) {
+      console.error('[similar] Failed to generate embedding:', err);
+    }
+  }
+
+  if (!embedding) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: { code: 'EMBEDDING_FAILED', message: 'Could not generate or retrieve embedding' } },
+      500
+    );
+  }
+
+  // Parallel: Vectorize similarity + Supermemory forensic search
+  const [vectorResults, memoryResults] = await Promise.allSettled([
+    c.env.VECTOR_SIGNATURES
+      ? querySimilar(c.env.VECTOR_SIGNATURES, embedding, {
+          topK: body.topK ?? INTEL_CONFIG.SIMILARITY_TOP_K,
+          minScore: body.minScore ?? INTEL_CONFIG.SIMILARITY_MIN_SCORE,
+          excludeId: body.reportId,
+        })
+      : Promise.resolve([] as SimilarityMatch[]),
+    searchForensicMemories(
+      c.env,
+      body.text || `Voice analysis report ${body.reportId}`,
+      { limit: MEMORY_CONFIG.SEARCH_LIMIT }
+    ),
+  ]);
+
+  const similar: SimilarityMatch[] = vectorResults.status === 'fulfilled' ? vectorResults.value : [];
+  const memories: ForensicMemory[] = memoryResults.status === 'fulfilled' ? memoryResults.value : [];
+
+  return c.json<ApiResponse<{ similar: SimilarityMatch[]; memories: ForensicMemory[] }>>(
+    {
+      success: true,
+      data: { similar, memories },
+    }
+  );
+});
+
+// ─── GET /api/intelligence/stats ───
+// Returns Vectorize index info + config for debugging/demo
+app.get('/api/intelligence/stats', async (c) => {
+  const vectorizeStats = c.env.VECTOR_SIGNATURES
+    ? await getIndexStats(c.env.VECTOR_SIGNATURES)
+    : null;
+
+  return c.json<ApiResponse<{
+    vectorize: { dimensions: number; vectorCount: number } | null;
+    config: {
+      embeddingModel: string;
+      gatewayId: string;
+      similarityTopK: number;
+      similarityMinScore: number;
+      severityBands: typeof INTEL_CONFIG.SEVERITY_BANDS;
+      confidenceBands: typeof INTEL_CONFIG.CONFIDENCE_BANDS;
+      anomalyBands: typeof INTEL_CONFIG.ANOMALY_BANDS;
+    };
+    supermemory: { configured: boolean };
+  }>>(
+    {
+      success: true,
+      data: {
+        vectorize: vectorizeStats,
+        config: {
+          embeddingModel: INTEL_CONFIG.EMBEDDING_MODEL,
+          gatewayId: INTEL_CONFIG.GATEWAY_ID,
+          similarityTopK: INTEL_CONFIG.SIMILARITY_TOP_K,
+          similarityMinScore: INTEL_CONFIG.SIMILARITY_MIN_SCORE,
+          severityBands: INTEL_CONFIG.SEVERITY_BANDS,
+          confidenceBands: INTEL_CONFIG.CONFIDENCE_BANDS,
+          anomalyBands: INTEL_CONFIG.ANOMALY_BANDS,
+        },
+        supermemory: {
+          configured: !!(c.env.SUPERMEMORY_API_KEY && c.env.SUPERMEMORY_SPACE_ID),
+        },
+      },
+    }
+  );
 });
 
 export default app;

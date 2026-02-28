@@ -59,6 +59,25 @@ export const VELOCITY_THRESHOLDS = {
   SKULL_CLIP: 80,
 } as const
 
+// Per-sensor velocity thresholds for EMAMarkers/VelocityHUD coloring (cm/s)
+// These are DISTINCT from the pipeline tier thresholds above
+export const SENSOR_THRESHOLDS: Record<string, number> = {
+  UL: 15,
+  LL: 15,
+  JAW: 20,
+  T1: 25,
+  T2: 25,
+  T3: 25,
+  tongue: 25,
+  TONGUE: 25,
+  jaw: 20,
+  JAW_CAT: 20,
+  lip: 15,
+  LIP: 15,
+  ul: 15,
+  ll: 15,
+}
+
 // ============================================================================
 // CAMERA
 // ============================================================================

@@ -223,7 +223,7 @@ export default function App() {
               animate={{ scale: 1, y: "-50%" }}
               transition={{ delay: 0.2, type: "spring", stiffness: SPRING.VERDICT_STIFFNESS, damping: SPRING.VERDICT_DAMPING }}
             >
-              <div className={`shadow-[0_0_100px_${COLORS_RGBA.CYAN_15}] rounded-sm`}>
+              <div className="shadow-[0_0_100px_rgba(56,189,248,0.15)] rounded-sm">
                 <VerdictPanel />
               </div>
             </motion.div>

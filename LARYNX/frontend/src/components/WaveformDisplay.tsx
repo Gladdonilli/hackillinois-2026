@@ -158,9 +158,9 @@ export function WaveformDisplay() {
              grad.addColorStop(0, 'rgba(255, 50, 50, 0.2)');
              grad.addColorStop(1, 'rgba(255, 50, 50, 0.8)');
           } else {
-          }
              grad.addColorStop(0, 'rgba(56, 189, 248, 0.1)');
              grad.addColorStop(1, 'rgba(56, 189, 248, 0.6)');
+          }
           
           ctx.fillStyle = grad;
           ctx.fillRect(x, y, barWidth, amplitude);

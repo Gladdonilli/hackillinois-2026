@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Billboard, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useLarynxStore } from '@/store/useLarynxStore';
-import { VELOCITY_THRESHOLDS } from '@/types/larynx';
+import { SENSOR_THRESHOLDS } from '@/constants';
 
 const SENSOR_NAMES = ['UL', 'LL', 'JAW', 'T1', 'T2', 'T3'] as const;
 type SensorNameType = typeof SENSOR_NAMES[number];
@@ -37,7 +37,7 @@ export function EMAMarkers() {
 
       // Velocity-based color mapping
       const velocity = sensor.velocity || 0;
-      const threshold = VELOCITY_THRESHOLDS[name];
+      const threshold = SENSOR_THRESHOLDS[name];
       
       if (velocity > threshold) {
         color.copy(WARN_COLOR);
@@ -93,7 +93,7 @@ function MarkerLabel({ name }: { name: SensorNameType }) {
 
     // Directly update text and color for 60fps
     const velocity = sensor.velocity || 0;
-    const threshold = VELOCITY_THRESHOLDS[name];
+    const threshold = SENSOR_THRESHOLDS[name];
     
     textRef.current.text = `${name} ${velocity.toFixed(1)}`;
     textRef.current.color = velocity > threshold ? WARN_COLOR : NORMAL_COLOR;

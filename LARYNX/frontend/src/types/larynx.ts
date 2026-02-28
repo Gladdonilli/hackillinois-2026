@@ -70,19 +70,6 @@ export interface SSEProgressEvent {
   message: string
 }
 
-export const VELOCITY_THRESHOLDS: Record<string, number> = {
-  UL: 15,
-  LL: 15,
-  JAW: 20,
-  T1: 25,
-  T2: 25,
-  T3: 25,
-  tongue: 25,
-  TONGUE: 25,
-  jaw: 20,
-  JAW_CAT: 20,
-  lip: 15,
-  LIP: 15,
-  ul: 15,
-  ll: 15,
-}
+// Per-sensor thresholds moved to constants.ts as SENSOR_THRESHOLDS
+// Re-exported here for backward compatibility
+export { SENSOR_THRESHOLDS as VELOCITY_THRESHOLDS } from '@/constants'
