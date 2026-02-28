@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useLarynxStore } from '@/store/useLarynxStore';
+import type { FormantData } from '@/types/larynx';
 
 export function WaveformDisplay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -112,13 +113,13 @@ export function WaveformDisplay() {
       if (Array.isArray(formantsData) && formantsData.length > 0) {
         const xStep = width / formantsData.length;
         
-        const drawFormantLine = (key: string, color: string, maxFreq: number) => {
+        const drawFormantLine = (key: keyof FormantData, color: string, maxFreq: number) => {
           ctx.strokeStyle = color;
           ctx.lineWidth = 1.5;
           ctx.beginPath();
           let started = false;
           for (let i = 0; i < formantsData.length; i++) {
-            const formantFrame = formantsData[i] as any;
+            const formantFrame = formantsData[i];
             const freq = formantFrame[key];
             if (typeof freq === 'number') {
               const x = i * xStep;

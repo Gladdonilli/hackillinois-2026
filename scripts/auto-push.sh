@@ -20,6 +20,17 @@ while true; do
         echo "[auto-push] $(date +%H:%M:%S) No changes, skipping"
         continue
     fi
+
+    # Skip if the working copy already has a manual description
+    # (don't overwrite intentional commit messages with 'auto: checkpoint')
+    CURRENT_DESC=$(jj log -r '@' --no-graph -T 'description' 2>/dev/null | head -1)
+    if [ -n "$CURRENT_DESC" ] && [[ "$CURRENT_DESC" != auto:* ]]; then
+        echo "[auto-push] $(date +%H:%M:%S) Manual commit detected ('$CURRENT_DESC'), pushing as-is"
+    else
+        # Describe current working copy with timestamp
+        TIMESTAMP=$(date +"%Y-%m-%d %H:%M")
+        jj describe -m "auto: checkpoint $TIMESTAMP" 2>/dev/null
+    fi
     
     # Describe current working copy with timestamp
     TIMESTAMP=$(date +"%Y-%m-%d %H:%M")

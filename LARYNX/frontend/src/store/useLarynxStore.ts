@@ -3,6 +3,7 @@ import {
   AnalysisStatus,
   AnalysisProgress,
   EMAFrame,
+  EMASensor,
   FormantData,
   Verdict,
   SensorName
@@ -23,7 +24,7 @@ interface LarynxState {
 
   setAudioFile: (file: File | null) => void
   setStatus: (status: AnalysisStatus) => void
-  startAnalysis: () => void // Legacy mock fallback — prefer useAnalysisStream
+  startAnalysis: () => void // No-op — real analysis uses useAnalysisStream hook
   setPostProcessingEnabled: (enabled: boolean) => void
   reset: () => void
   setProgress: (progress: AnalysisProgress) => void
@@ -63,7 +64,7 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   addFrame: (frame) => {
     const state = get()
     const newFrames = [...state.frames, {
-      sensors: frame.sensors as Record<SensorName, { x: number; y: number; velocity?: number }>,
+      sensors: frame.sensors as Record<SensorName, EMASensor>,
       tongueVelocity: frame.tongueVelocity,
       timestamp: frame.timestamp,
     }]
@@ -81,80 +82,10 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   setVerdict: (verdict) => set({ verdict }),
 
   startAnalysis: () => {
-    // Mock fallback: generate inline data when no backend is available
-    const mockFrames: EMAFrame[] = Array.from({ length: 120 }, (_, i) => {
-      const t = i / 120
-      const makeSensor = () => ({
-        x: (Math.random() - 0.5) * 0.8,
-        y: (Math.random() - 0.5) * 0.8,
-        velocity: 5 + Math.random() * 25,
-      })
-      const sensors: Record<SensorName, { x: number; y: number; velocity?: number }> = {
-        UL: makeSensor(),
-        LL: makeSensor(),
-        JAW: makeSensor(),
-        T1: makeSensor(),
-        T2: makeSensor(),
-        T3: makeSensor(),
-      }
-      const tongueVelocity = (
-        (sensors.T1.velocity ?? 0) +
-        (sensors.T2.velocity ?? 0) +
-        (sensors.T3.velocity ?? 0)
-      ) / 3
-      return { sensors, tongueVelocity, timestamp: t }
-    })
-
-    const mockFormants: FormantData[] = Array.from({ length: 120 }, () => ({
-      f1: 300 + Math.random() * 500,
-      f2: 800 + Math.random() * 1700,
-      f3: 1800 + Math.random() * 1700,
-    }))
-
-    set({
-      status: 'analyzing',
-      frames: mockFrames,
-      formants: mockFormants,
-      currentFrame: 0,
-      progress: { message: 'Analyzing acoustic characteristics...', percent: 0 }
-    })
-
-    let frameIndex = 0
-    const intervalId = setInterval(() => {
-      frameIndex++
-
-      if (frameIndex >= 120) {
-        clearInterval(intervalId)
-
-        const maxVelocity = Math.max(...mockFrames.map((frame) => frame.tongueVelocity))
-
-        set({
-          status: 'complete',
-          currentFrame: 119,
-          progress: { message: 'Analysis complete', percent: 100 },
-          verdict: {
-            isGenuine: Math.random() > 0.3,
-            confidence: 0.7 + Math.random() * 0.25,
-            peakVelocity: maxVelocity,
-            threshold: 25
-          }
-        })
-      } else {
-        const currentFrameData = mockFrames[frameIndex]
-        set({
-          currentFrame: frameIndex,
-          tongueVelocity: currentFrameData.tongueVelocity,
-          tongueT1: {
-            x: currentFrameData.sensors.T1.x,
-            y: currentFrameData.sensors.T1.y
-          },
-          progress: {
-            message: 'Inverting formants to articulatory kinematics...',
-            percent: Math.floor((frameIndex / 120) * 100)
-          }
-        })
-      }
-    }, 33)
+    // No-op stub — real analysis flow uses useAnalysisStream hook
+    // which streams EMA frames from the Modal backend via SSE.
+    // This method exists only as interface compliance.
+    console.warn('startAnalysis() is a no-op. Use useAnalysisStream hook for real analysis.')
   },
 
   reset: () => {
