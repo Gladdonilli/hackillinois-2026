@@ -10,6 +10,7 @@ export interface EMAFrame {
   sensors: Record<SensorName, EMASensor>
   tongueVelocity: number
   timestamp: number
+  isAnomalous?: boolean
 }
 
 export interface FormantData {

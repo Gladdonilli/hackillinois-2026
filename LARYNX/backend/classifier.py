@@ -18,6 +18,7 @@ from typing import Any, Optional
 
 import numpy as np
 
+from LARYNX.backend.config import VELOCITY_SCALE
 from LARYNX.backend.models import EMAFrame
 
 logger = logging.getLogger(__name__)
@@ -143,7 +144,7 @@ def _compute_kinematics(ema: np.ndarray, ix: int, iy: int) -> dict[str, np.ndarr
     # Velocity (cm/s)
     dx = np.diff(x)
     dy = np.diff(y)
-    vel = np.sqrt(dx**2 + dy**2) / PIPELINE_DT / 10.0  # mm/s → cm/s
+    vel = np.sqrt(dx**2 + dy**2) * VELOCITY_SCALE / PIPELINE_DT / 10.0  # mm/s → cm/s
 
     # Acceleration (cm/s²)
     accel = np.abs(np.diff(vel) / PIPELINE_DT)

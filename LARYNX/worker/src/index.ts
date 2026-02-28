@@ -7,6 +7,7 @@ import { storeForensicRecord, searchForensicMemories, MEMORY_CONFIG } from './su
 const ALLOWED_ORIGINS = [
   'https://larynx.pages.dev',
   'https://voxlarynx.tech',
+  'https://www.voxlarynx.tech',
   'http://localhost:5173',
 ];
 

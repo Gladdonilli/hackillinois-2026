@@ -81,6 +81,16 @@ export default function App() {
         }
         break
       }
+      case 'comparing':
+      case 'technical':
+      case 'closing':
+        SoundEngine.stopTicking()
+        SoundEngine.stopDrone()
+        SoundEngine.stopIECAlarm()
+        SoundEngine.stopRiser()
+        SoundEngine.restoreFromVacuum()
+        SoundEngine.stopSoundtrack()
+        break
       case 'error':
       case 'idle':
         SoundEngine.stopTicking()
@@ -88,6 +98,8 @@ export default function App() {
         SoundEngine.stopIECAlarm()
         SoundEngine.stopRiser()
         SoundEngine.stopBackgroundLayer()
+        SoundEngine.restoreFromVacuum()
+        SoundEngine.stopSoundtrack()
         break
     }
   }, [status, showIntro])
@@ -129,11 +141,11 @@ export default function App() {
       <WarpTransition 
         isActive={portalState === 'warping'} 
         onComplete={() => {
-          // Safe update at end of animation
-          setTimeout(() => {
-            useLarynxStore.getState().setPortalState('done')
-            useLarynxStore.getState().setStatus('uploading')
-          }, 10)
+          const state = useLarynxStore.getState()
+          if (state.portalState === 'warping') {
+            state.setPortalState('done')
+            state.setStatus('uploading')
+          }
         }}
       />
 

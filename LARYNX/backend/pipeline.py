@@ -49,7 +49,7 @@ class AudioPreprocessor:
             expanded_mask = np.pad(expanded_mask, (0, len(samples) - len(expanded_mask)), mode='edge')
             
         samples[~expanded_mask] = 0.0
-        return samples, sr
+        return samples, int(sr)
 
 
 class FormantExtractor:
@@ -218,14 +218,17 @@ def analyze_audio(audio_bytes: bytes, filename: str) -> Generator[AnalysisProgre
 
     yield AnalysisProgress(step="verdict", progress=0.90, message="Computing verdict...")
 
+    anomalous = sum(1 for f in ema_frames if f.is_anomalous)
+    total = len(ema_frames)
+    peak_v = max((f.tongue_velocity for f in ema_frames), default=0.0)
+    if total < 10 or peak_v <= 0.0:
+        raise ValueError("Audio is too short, silent, or unvoiced for reliable analysis")
+
     # Yield all frames
     for frame in ema_frames:
         yield frame
 
     # Compute formant-based verdict
-    anomalous = sum(1 for f in ema_frames if f.is_anomalous)
-    total = len(ema_frames)
-    peak_v = max((f.tongue_velocity for f in ema_frames), default=0.0)
     ratio = anomalous / total if total > 0 else 0.0
 
     # Genuine if < 5% of frames are anomalous

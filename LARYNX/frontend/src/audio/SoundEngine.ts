@@ -5,6 +5,10 @@ type VerdictResult = 'genuine' | 'deepfake'
 let initialized = false
 let ambientOscsStarted = false
 let bgLayersStarted = false
+let tensionPadStarted = false
+let oximeterStarted = false
+let portalSubStarted = false
+let verdictSubStarted = false
 
 // Master bus chain: Compressor → Reverb → EQ3 → HPF → Limiter → Volume → Destination
 let masterCompressor: Tone.Compressor | null = null
@@ -239,15 +243,12 @@ const ensureInitializedGraph = (): void => {
   iecAlarmGain.connect(masterCompressor)
 
   // IEC high-priority 10-pulse uneven rhythm: [P][P][P]--400ms--[P][P]---2.0s---[P][P][P]--400ms--[P][P]
-  let iecPulseIndex = 0
   iecAlarmLoop = new Tone.Loop((time: number) => {
     if (!iecAlarmSynth || !iecAlarmActive) return
-    // 10-pulse pattern with uneven spacing to prevent habituation
     const pattern = [0, 0.15, 0.30, 0.70, 0.85, 2.85, 3.00, 3.15, 3.55, 3.70]  // seconds within 4s cycle
-    const pulseTime = pattern[iecPulseIndex % 10]
-    iecAlarmSynth.triggerAttackRelease(IEC_BASE_FREQ, '32n', time + pulseTime)
-    iecPulseIndex++
-    if (iecPulseIndex >= 10) iecPulseIndex = 0
+    for (const pulseTime of pattern) {
+      iecAlarmSynth.triggerAttackRelease(IEC_BASE_FREQ, '32n', time + pulseTime)
+    }
   }, '4m')  // full 10-pulse cycle every 4 measures (4s at 60 BPM)
 
   // --- Scanner beep ---
@@ -283,7 +284,6 @@ const ensureInitializedGraph = (): void => {
   tensionPad.connect(tensionFilter)
   tensionFilter.connect(tensionGain)
   tensionGain.connect(masterCompressor)
-  tensionPad.start()
 
   // --- Verdict stings ---
   genuineStingSynth = new Tone.PolySynth(Tone.Synth, {
@@ -331,7 +331,6 @@ const ensureInitializedGraph = (): void => {
   oximeterGain = new Tone.Gain(0)
   oximeterOsc.connect(oximeterGain)
   oximeterGain.connect(masterCompressor)
-  oximeterOsc.start()
 
   // --- Portal entry SFX ---
   portalMembrane = new Tone.MembraneSynth({
@@ -348,7 +347,6 @@ const ensureInitializedGraph = (): void => {
   portalSub.connect(portalFilter)
   portalFilter.connect(portalSubGain)
   portalSubGain.connect(masterCompressor)
-  portalSub.start()
 
   // --- Warp transition SFX ---
   warpFilter = new Tone.Filter({ type: 'lowpass', frequency: 200 })
@@ -389,7 +387,6 @@ const ensureInitializedGraph = (): void => {
   verdictSubGain = new Tone.Gain(0)
   verdictSub.connect(verdictSubGain)
   verdictSubGain.connect(masterCompressor)
-  verdictSub.start()
 
   // --- Generative soundtrack (dark minor arpeggios) ---
   soundtrackSynth = new Tone.PolySynth(Tone.Synth, {
@@ -572,6 +569,10 @@ export const SoundEngine = {
   playPortalEntry: (): void => {
     if (!requireAudioReady()) return
     const now = Tone.now()
+    if (!portalSubStarted) {
+      portalSub?.start()
+      portalSubStarted = true
+    }
     // Deep resonant hit
     portalMembrane?.triggerAttackRelease('E1', '2n', now)
     // Sub-bass swell over 2s matching camera animation
@@ -617,7 +618,10 @@ export const SoundEngine = {
       Tone.Transport.bpm.setTargetAtTime(120, now, 2)
       Tone.Transport.start()
     }
-    // Start tension pad underneath
+    if (!tensionPadStarted) {
+      tensionPad?.start()
+      tensionPadStarted = true
+    }
     if (tensionGain) {
       const now = Tone.now()
       tensionGain.gain.setTargetAtTime(1, now, 0.5)
@@ -640,9 +644,6 @@ export const SoundEngine = {
     processingTickLoop.stop(0)
     tickingActive = false
     tickJitterActive = false
-    if (Tone.Transport.state === 'started') {
-      Tone.Transport.stop()
-    }
     // Fade out tension pad
     if (tensionGain) {
       const now = Tone.now()
@@ -770,6 +771,10 @@ export const SoundEngine = {
       return
     }
     const now = Tone.now()
+    if (!verdictSubStarted) {
+      verdictSub?.start()
+      verdictSubStarted = true
+    }
     // Fade everything to silence over 0.5s
     masterBus.volume.setValueAtTime(0, now)
     masterBus.volume.linearRampToValueAtTime(-60, now + 0.5)
@@ -859,6 +864,10 @@ export const SoundEngine = {
   updateVelocity: (velocity: number): void => {
     if (!requireAudioReady()) return
     const safeVelocity = Math.max(0, velocity)
+    if (!oximeterStarted) {
+      oximeterOsc?.start()
+      oximeterStarted = true
+    }
 
     // --- Geiger click rate ---
     // Normal speech ~8-15cm/s = 1-3 Hz clicks

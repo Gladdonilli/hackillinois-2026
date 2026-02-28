@@ -24,6 +24,7 @@ export function useComparisonStream() {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
+    useLarynxStore.getState()._setStreamAbort(controller)
 
     const store = useLarynxStore.getState()
     store.setStatus('comparing')
@@ -58,9 +59,16 @@ export function useComparisonStream() {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      const STREAM_TIMEOUT_MS = 60_000
 
       while (true) {
-        const { done, value } = await reader.read()
+        const readPromise = reader.read()
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          const id = setTimeout(() => reject(new Error('Stream timeout: no data for 60s')), STREAM_TIMEOUT_MS)
+          readPromise.then(() => clearTimeout(id), () => clearTimeout(id))
+        })
+
+        const { done, value } = await Promise.race([readPromise, timeoutPromise])
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
@@ -155,6 +163,8 @@ export function useComparisonStream() {
         message: err instanceof Error ? err.message : 'Comparison failed',
         percent: 0,
       })
+    } finally {
+      useLarynxStore.getState()._setStreamAbort(null)
     }
   }, [])
 

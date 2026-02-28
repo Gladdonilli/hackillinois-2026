@@ -336,9 +336,14 @@ export function LandingScene() {
       dpr={[1, 1.5]}
       style={{ position: 'fixed', inset: 0, zIndex: 0 }}
       onCreated={({ gl }) => {
-        const canvas = gl.domElement;
-        canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('[LARYNX] WebGL context lost (LandingScene)'); });
-        canvas.addEventListener('webglcontextrestored', () => { console.warn('[LARYNX] WebGL context restored (LandingScene)'); });
+        const canvas = gl.domElement
+        canvas.addEventListener('webglcontextlost', (e: Event) => {
+          e.preventDefault()
+          console.warn('[LARYNX] WebGL context lost (LandingScene)')
+        })
+        canvas.addEventListener('webglcontextrestored', () => {
+          console.warn('[LARYNX] WebGL context restored (LandingScene)')
+        })
       }}
     >
       <PortalCameraController portalState={portalState} setPortalState={setPortalState} />

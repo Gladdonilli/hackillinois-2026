@@ -33,7 +33,7 @@ larynx_image = (
 
 app = modal.App("hackillinois-2026")
 
-ALLOWLIST = ["https://larynx.pages.dev", "https://voxlarynx.tech", "http://localhost:5173"]
+ALLOWLIST = ["https://larynx.pages.dev", "https://voxlarynx.tech", "https://www.voxlarynx.tech", "http://localhost:5173"]
 
 cors_headers = {
     "Access-Control-Allow-Origin": "*",
@@ -172,6 +172,8 @@ async def analyze(request: Request, file: UploadFile = File(...)):
                 # Yield control without unnecessary delay
                 await asyncio.sleep(0)
 
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             data = json.dumps({"message": str(e)})
             yield f"event: error\ndata: {data}\n\n"
@@ -249,10 +251,11 @@ async def compare(request: Request, file_a: UploadFile = File(...), file_b: Uplo
     async def event_generator() -> AsyncGenerator[str, None]:
         """Stream analysis results as SSE events."""
         last_event_time = time.time()
-        verdicts = [None, None]
+        verdicts: list[dict[str, object] | None] = [None, None]
         
         try:
             for channel, audio_b, fname in [(0, audio_bytes_a, filename_a), (1, audio_bytes_b, filename_b)]:
+                frame_count = 0
                 for result in analyze_audio(audio_b, fname):
                     now = time.time()
                     if now - last_event_time > 15:
@@ -269,18 +272,20 @@ async def compare(request: Request, file_a: UploadFile = File(...), file_b: Uplo
                         yield f"event: progress\ndata: {data}\n\n"
                         last_event_time = time.time()
                     elif isinstance(result, EMAFrame):
-                        data = json.dumps({
-                            "channel": channel,
-                            "sensors": {
-                                name: {"x": s.x, "y": s.y, "velocity": s.velocity}
-                                for name, s in result.sensors.items()
-                            },
-                            "tongueVelocity": result.tongue_velocity,
-                            "timestamp": result.timestamp,
-                            "isAnomalous": result.is_anomalous,
-                        })
-                        yield f"event: frame\ndata: {data}\n\n"
-                        last_event_time = time.time()
+                        frame_count += 1
+                        if frame_count % 5 == 0 or result.is_anomalous:
+                            data = json.dumps({
+                                "channel": channel,
+                                "sensors": {
+                                    name: {"x": s.x, "y": s.y, "velocity": s.velocity}
+                                    for name, s in result.sensors.items()
+                                },
+                                "tongueVelocity": result.tongue_velocity,
+                                "timestamp": result.timestamp,
+                                "isAnomalous": result.is_anomalous,
+                            })
+                            yield f"event: frame\ndata: {data}\n\n"
+                            last_event_time = time.time()
                     elif isinstance(result, Verdict):
                         verdict_data = {
                             "channel": channel,
@@ -304,8 +309,7 @@ async def compare(request: Request, file_a: UploadFile = File(...), file_b: Uplo
                         verdicts[channel] = verdict_data
                         last_event_time = time.time()
 
-                    # Small delay to prevent overwhelming the client
-                    await asyncio.sleep(0.001)
+                    await asyncio.sleep(0)
 
             if verdicts[0] and verdicts[1]:
                 summary = "File A is genuine, File B is deepfake"
@@ -322,6 +326,8 @@ async def compare(request: Request, file_a: UploadFile = File(...), file_b: Uplo
                 })
                 yield f"event: comparison\ndata: {data}\n\n"
 
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             data = json.dumps({"message": str(e)})
             yield f"event: error\ndata: {data}\n\n"

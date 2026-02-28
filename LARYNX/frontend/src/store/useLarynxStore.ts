@@ -53,7 +53,7 @@ interface LarynxState {
   setPostProcessingEnabled: (enabled: boolean) => void
   reset: () => void
   setProgress: (progress: AnalysisProgress) => void
-  addFrame: (frame: { sensors: Record<string, { x: number; y: number; velocity?: number }>; tongueVelocity: number; timestamp: number }) => void
+  addFrame: (frame: { sensors: Record<string, { x: number; y: number; velocity?: number }>; tongueVelocity: number; timestamp: number; isAnomalous?: boolean }) => void
   setVerdict: (verdict: Verdict) => void
 
   // Comparison actions
@@ -127,7 +127,7 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
       currentFrame,
       tongueVelocity: frame.tongueVelocity,
       tongueT1: t1 ? { x: t1.x, y: t1.y } : state.tongueT1,
-      formants: [...state.formants], // Keep existing formants
+      formants: state.formants,
     })
   },
 
@@ -192,7 +192,7 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   fetchHistory: async () => {
     set({ historyLoading: true })
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://api.voxlarynx.tech'
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://larynx-api.tianyi35.workers.dev'
       const res = await fetch(`${apiUrl}/api/history?limit=20`)
       if (!res.ok) throw new Error('Failed to fetch history')
       const json = await res.json()

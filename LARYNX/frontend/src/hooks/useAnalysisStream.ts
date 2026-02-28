@@ -13,10 +13,10 @@ export function useAnalysisStream() {
 
     // Cancel any existing stream
     abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    // Register with store so reset() can abort us (C3 fix)
-    useLarynxStore.getState()._setStreamAbort(controller)
+      const controller = new AbortController()
+      abortRef.current = controller
+      // Register with store so reset() can abort us (C3 fix)
+      useLarynxStore.getState()._setStreamAbort(controller)
 
     // Prepare upload
     const formData = new FormData()
@@ -47,7 +47,6 @@ export function useAnalysisStream() {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
-      const allFrames: Parameters<typeof store.addFrame>[0][] = []
 
       // Timeout: 60s inactivity guard for conference WiFi drops
       const STREAM_TIMEOUT_MS = 60_000
@@ -96,16 +95,11 @@ export function useAnalysisStream() {
                 break
 
               case 'frame':
-                allFrames.push({
-                  sensors: parsed.sensors,
-                  tongueVelocity: parsed.tongueVelocity,
-                  timestamp: parsed.timestamp,
-                })
-                // Update store with accumulated frames and current frame data
                 store.addFrame({
                   sensors: parsed.sensors,
                   tongueVelocity: parsed.tongueVelocity,
                   timestamp: parsed.timestamp,
+                  isAnomalous: parsed.isAnomalous,
                 })
                 break
 
@@ -142,6 +136,8 @@ export function useAnalysisStream() {
         message: err instanceof Error ? err.message : 'Analysis failed',
         percent: 0,
       })
+    } finally {
+      useLarynxStore.getState()._setStreamAbort(null)
     }
   }, [])
 
