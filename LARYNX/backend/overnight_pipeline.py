@@ -403,13 +403,34 @@ def main():
     start_time = time.time()
 
     # ---- Step 1: Generate data in parallel ----
-    print("\n📦 Step 1: Downloading LibriSpeech + generating ElevenLabs deepfakes (parallel)...")
+    print("\n\U0001f4e6 Step 1: Downloading LibriSpeech + generating ElevenLabs deepfakes (parallel)...")
     libri_handle = download_librispeech.spawn()
-    fake_handle = generate_elevenlabs_deepfakes.spawn()
 
-    # Also load existing samples
-    existing_real = []
-    existing_fake = []
+    # Build ElevenLabs work items: 2700 fakes split 50/50 across v2 and v3
+    import random as _rng
+    el_rng = _rng.Random(42)
+    el_items: list[tuple[int, str, str, str, str]] = []
+    n_per_model = N_FAKE_SAMPLES // 2
+    for model_id, count in [
+        ("eleven_multilingual_v2", n_per_model),
+        ("eleven_v3", N_FAKE_SAMPLES - n_per_model),
+    ]:
+        for i in range(count):
+            voice_id, voice_name = el_rng.choice(ELEVENLABS_VOICES)
+            sentence = el_rng.choice(SENTENCES)
+            el_items.append((i, voice_id, voice_name, model_id, sentence))
+
+    # Split into chunks of 50, dispatch across up to 50 containers via .map()
+    CHUNK_SIZE = 50
+    el_chunks = [el_items[i:i + CHUNK_SIZE] for i in range(0, len(el_items), CHUNK_SIZE)]
+    print(f"  Dispatching {len(el_items)} ElevenLabs calls across {len(el_chunks)} chunks (up to 50 containers)...")
+
+    # Fire ElevenLabs .map() — streams results as chunks complete
+    el_results_iter = generate_elevenlabs_chunk.map(el_chunks, return_exceptions=True)
+
+    # Also load existing local samples while ElevenLabs runs remotely
+    existing_real: list[tuple[str, bytes]] = []
+    existing_fake: list[tuple[str, bytes]] = []
     real_dir = PROJECT_DIR / "shared" / "assets" / "audio" / "real"
     fake_dir = PROJECT_DIR / "shared" / "assets" / "audio" / "deepfake"
 
@@ -425,11 +446,20 @@ def main():
     # Collect remote results
     print("  Waiting for LibriSpeech download...")
     libri_items = libri_handle.get()
-    print(f"  ✅ LibriSpeech: {len(libri_items)} real utterances")
+    print(f"  \u2705 LibriSpeech: {len(libri_items)} real utterances")
 
-    print("  Waiting for ElevenLabs deepfake generation...")
-    fake_items = fake_handle.get()
-    print(f"  ✅ ElevenLabs: {len(fake_items)} deepfake utterances")
+    print("  Collecting ElevenLabs deepfakes from parallel containers...")
+    fake_items: list[tuple[str, bytes]] = []
+    el_errors = 0
+    for chunk_idx, chunk_result in enumerate(el_results_iter):
+        if isinstance(chunk_result, Exception):
+            print(f"    \u26a0\ufe0f Chunk {chunk_idx + 1}/{len(el_chunks)} failed: {chunk_result}")
+            el_errors += 1
+            continue
+        fake_items.extend(chunk_result)
+        if (chunk_idx + 1) % 10 == 0 or chunk_idx + 1 == len(el_chunks):
+            print(f"    \u2705 Collected {chunk_idx + 1}/{len(el_chunks)} chunks ({len(fake_items)} fakes so far)")
+    print(f"  \u2705 ElevenLabs: {len(fake_items)} deepfakes ({el_errors} chunk failures)")
 
     # Combine all samples
     all_real = existing_real + libri_items
@@ -443,8 +473,8 @@ def main():
         f"for {INFERENCE_PASSES} passes (~{n_samples_once * INFERENCE_PASSES} total inferences)..."
     )
 
-    # Batch into groups of 30 for parallel GPU processing
-    BATCH_SIZE = 30
+    # Batch into groups of 10 for maximum GPU parallelism (saturate 10 A100s)
+    BATCH_SIZE = 10
     all_items_labeled = [(f, b, "real") for f, b in all_real] + [(f, b, "deepfake") for f, b in all_fake]
     labels = {f: l for f, _, l in all_items_labeled}
 
@@ -460,35 +490,25 @@ def main():
             batch = [(f, b) for f, b, _ in batch_items]
             batches.append(batch)
 
-        print(f"  🔁 Pass {pass_idx + 1}/{INFERENCE_PASSES}: dispatching {len(batches)} batches")
-        handles = [predict_ema_batch.spawn(batch) for batch in batches]
+        print(f"  \U0001f501 Pass {pass_idx + 1}/{INFERENCE_PASSES}: dispatching {len(batches)} batches across 10 GPUs")
 
         pass_results = []
-        for i, handle in enumerate(handles):
-            # Retry logic: if a batch fails with transient error, retry up to 3 times
-            for attempt in range(3):
-                try:
-                    batch_results = handle.get()
-                    break
-                except Exception as e:
-                    err_str = str(e)
-                    if attempt < 2 and ("503" in err_str or "502" in err_str or "temporarily" in err_str.lower() or "timeout" in err_str.lower()):
-                        wait_secs = 30 * (attempt + 1)
-                        print(f"    ⚠️ Batch {i+1} attempt {attempt+1} failed ({err_str[:80]}), retrying in {wait_secs}s...")
-                        time.sleep(wait_secs)
-                        # Re-spawn the failed batch
-                        handle = predict_ema_batch.spawn(batches[i])
-                    else:
-                        print(f"    ❌ Batch {i+1} failed permanently: {err_str[:120]}")
-                        batch_results = [{"filename": f, "error": err_str[:200]} for f, _ in batches[i]]
-                        break
+        for batch_idx, batch_result in enumerate(
+            predict_ema_batch.map(batches, return_exceptions=True)
+        ):
+            if isinstance(batch_result, Exception):
+                err_str = str(batch_result)
+                print(f"    \u274c Batch {batch_idx + 1} failed: {err_str[:120]}")
+                batch_results = [{"filename": f, "error": err_str[:200]} for f, _ in batches[batch_idx]]
+            else:
+                batch_results = batch_result
             for r in batch_results:
                 if "filename" in r:
                     r["pass_idx"] = pass_idx + 1
             pass_results.extend(batch_results)
-            if (i + 1) % 5 == 0 or i + 1 == len(batches):
+            if (batch_idx + 1) % 20 == 0 or batch_idx + 1 == len(batches):
                 print(
-                    f"    ✅ Pass {pass_idx + 1}: batch {i + 1}/{len(batches)} "
+                    f"    \u2705 Pass {pass_idx + 1}: batch {batch_idx + 1}/{len(batches)} "
                     f"complete ({len(batch_results)} results)"
                 )
 
@@ -570,6 +590,7 @@ def main():
                 speaker = f"{parts[0]}_{parts[1]}"  # VoiceName_v2 or VoiceName_v3
             else:
                 speaker = parts[0] if parts else "unknown"
+        else:
             # Existing local files — use filename prefix as speaker
             speaker = fn.split("-")[0]
         speakers.append(speaker)

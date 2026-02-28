@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Project:** HackIllinois 2026 — LARYNX (Deepfake Voice Detection via Articulatory Physics)
-**Updated:** 2026-02-28
+**Updated:** 2026-02-28 (Sound Phase 2)
 
 ## OVERVIEW
 
@@ -12,7 +12,9 @@
 ```
 hackillinois/
 ├── LARYNX/              # Voice deepfake detection (formant→tongue velocity→3D skull clip)
-├── SYNAPSE/             # [ARCHIVED] LLM neural surgery — decision gate: LARYNX won
+│   ├── backend/         # Modal pipeline, classifier, SSE endpoint
+│   └── frontend/        # R3F + Zustand + GSAP + Tone.js cinematic UI
+├── SYNAPSE/             # [ARCHIVED] — decision gate chose LARYNX, do not modify
 ├── shared/              # Infrastructure configs, runbooks, API contracts
 │   ├── contracts/       # ApiResponse<T> envelope, SSE schemas, TypeScript interfaces
 │   ├── decision-gate/   # T-12h-GATE.md — completed, LARYNX selected
@@ -30,10 +32,10 @@ hackillinois/
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Understand a track's architecture | `{TRACK}/ARCHITECTURE.md` | Source of truth: data flow, APIs, component tree |
-| Check dependency versions | `{TRACK}/STACK.md` | Pinned versions — do NOT upgrade without checking compat |
-| See what's not built yet | `{TRACK}/TODO-FRONTEND.md` | Implementation gap lists |
-| Understand demo choreography | `{TRACK}/DEMO-SCRIPT.md` | Timestamped 3-min narratives |
+| Understand LARYNX architecture | `LARYNX/ARCHITECTURE.md` | Source of truth: data flow, APIs, component tree |
+| Check dependency versions | `LARYNX/STACK.md` | Pinned versions — do NOT upgrade without checking compat |
+| See what's not built yet | `LARYNX/TODO-FRONTEND.md` | Implementation gap lists |
+| Understand demo choreography | `LARYNX/DEMO-SCRIPT.md` | Timestamped 3-min narrative |
 | API contract format | `shared/contracts/api-common.md` | ALL responses use `{success, data, error}` envelope |
 | Modal backend layout | `shared/infra/modal/modal-app-layout.md` | Single `modal.App`, LARYNX processor class |
 | Frontend perf rules | `shared/infra/frontend/perf-rules.md` | 8 rules — NEVER useState for animation |
@@ -53,11 +55,12 @@ hackillinois/
 ## ANTI-PATTERNS (THIS PROJECT)
 
 - **NEVER** expose API keys client-side (Vite bundles `VITE_`-prefixed vars into JS). Route through CF Worker
-- **NEVER** use `vLLM` — fused CUDA kernels block Python `register_forward_hook()` needed for AAI model hooks
 - **NEVER** use live microphone in demo — 80dB hall noise kills formant extraction. Pre-recorded audio only
 - **NEVER** `gsap.to()` for real-time data streams — use `gsap.quickTo()` (4x faster)
 - **NEVER** instantiate Tone.js inside React components — module-scoped singletons only (HMR duplication)
+- **NEVER** use Tone.js `rampTo()` for frequency changes — internally uses `exponentialRampTo` which throws `RangeError` when current===target. Use `linearRampTo()` instead
 - **NEVER** upgrade parselmouth without regression-testing formant extraction on known-good WAV samples
+- **NEVER** use `useGLTF.preload()` with KTX2-compressed models — incompatible with custom loader config. facecap.glb requires KTX2Loader + basis transcoder WASM in `public/basis/`
 
 ## COMMANDS
 
@@ -70,6 +73,13 @@ jj log                    # View history
 jj describe -m "msg"      # Commit message
 jj new                    # New change
 jj git push               # Push to GitHub
+```
+
+## JJ CONFIG
+
+```toml
+# Raised for large training data files (aai_results.json ~25MB)
+snapshot.max-new-file-size = 27000000  # 27MB (default 1MB)
 ```
 
 ## NOTES
