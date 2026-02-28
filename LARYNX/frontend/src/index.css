@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* LARYNX Clinical Dark Mode — no light mode toggle */
+    --background: 0 0% 0%; /* #000000 */
+    --foreground: 0 0% 93%; /* #EDEDED */
+
+    --card: 0 0% 4%; /* #0A0A0A */
+    --card-foreground: 0 0% 93%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 93%;
+
+    --primary: 180 100% 50%; /* #00FFFF Clinical Cyan */
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 0 0% 12%; /* #1F1F1F */
+    --secondary-foreground: 0 0% 93%;
+
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 40%; /* #666666 */
+
+    --accent: 180 100% 50%; /* #00FFFF */
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 345 100% 60%; /* #FF3366 */
+    --destructive-foreground: 0 0% 93%;
+
+    --border: 0 0% 12%; /* #1F1F1F */
+    --input: 0 0% 12%;
+    --ring: 180 100% 50%;
+    --radius: 0.3rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    min-width: 1280px;
+    overflow-x: hidden;
+    font-family: "Geist", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  code, pre, .font-mono {
+    font-family: "Geist Mono", "JetBrains Mono", monospace;
+  }
+}
+
+/* Canvas fills viewport in analysis mode */
+.canvas-container {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+/* HUD overlays float above canvas */
+.hud-overlay {
+  position: fixed;
+  z-index: 10;
+  pointer-events: none;
+}
+.hud-overlay > * {
+  pointer-events: auto;
+}
