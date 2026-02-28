@@ -113,6 +113,7 @@ async def analyze(request: Request, file: UploadFile = File(...)):
     async def event_generator() -> AsyncGenerator[str, None]:
         """Stream analysis results as SSE events."""
         last_event_time = time.time()
+        frame_count = 0
         try:
             for result in analyze_audio(audio_bytes, filename):
                 # Heartbeat keepalive (15s)
@@ -130,17 +131,21 @@ async def analyze(request: Request, file: UploadFile = File(...)):
                     yield f"event: progress\ndata: {data}\n\n"
                     last_event_time = time.time()
                 elif isinstance(result, EMAFrame):
-                    data = json.dumps({
-                        "sensors": {
-                            name: {"x": s.x, "y": s.y, "velocity": s.velocity}
-                            for name, s in result.sensors.items()
-                        },
-                        "tongueVelocity": result.tongue_velocity,
-                        "timestamp": result.timestamp,
-                        "isAnomalous": result.is_anomalous,
-                    })
-                    yield f"event: frame\ndata: {data}\n\n"
-                    last_event_time = time.time()
+                    frame_count += 1
+                    # Send every 5th frame to frontend (reduces SSE overhead by 80%)
+                    # Classifier still processes ALL frames server-side
+                    if frame_count % 5 == 0 or result.is_anomalous:
+                        data = json.dumps({
+                            "sensors": {
+                                name: {"x": s.x, "y": s.y, "velocity": s.velocity}
+                                for name, s in result.sensors.items()
+                            },
+                            "tongueVelocity": result.tongue_velocity,
+                            "timestamp": result.timestamp,
+                            "isAnomalous": result.is_anomalous,
+                        })
+                        yield f"event: frame\ndata: {data}\n\n"
+                        last_event_time = time.time()
                 elif isinstance(result, Verdict):
                     processing_time = int((time.time() - start_time) * 1000)
                     verdict_data = {
@@ -164,8 +169,8 @@ async def analyze(request: Request, file: UploadFile = File(...)):
                     yield f"event: verdict\ndata: {data}\n\n"
                     last_event_time = time.time()
 
-                # Small delay to prevent overwhelming the client
-                await asyncio.sleep(0.001)
+                # Yield control without unnecessary delay
+                await asyncio.sleep(0)
 
         except Exception as e:
             data = json.dumps({"message": str(e)})

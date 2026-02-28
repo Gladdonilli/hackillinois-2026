@@ -192,6 +192,7 @@ ELEVENLABS_VOICES = [
     timeout=600,
     retries=3,
     max_containers=10,            # 10 GPU cap on Modal account
+    keep_warm=1,                  # 1 container always hot — models in VRAM, zero cold start
     )
 @modal.concurrent(max_inputs=10) # 10 concurrent batches per container — model loaded once, CPU handles preprocessing
 def predict_ema_batch(wav_paths: list[str]) -> list[dict]:
