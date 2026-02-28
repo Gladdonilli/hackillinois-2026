@@ -9,8 +9,8 @@ Every dependency is pinned. Every choice is justified. No "pick your favorite" n
 | Package | Version | Why |
 |---------|---------|-----|
 | `torch` | `2.5.1+cu124` | PyTorch with CUDA 12.4 for A100. Modal's base image ships this. Don't fight it. |
-| `transformer-lens` | `2.7.0` | Neel Nanda's mechanistic interpretability library. Wraps HuggingFace models as `HookedTransformer` with activation hooks at every residual stream, attention head, and MLP layer. This is why we can cache activations and inject steering vectors. **This is why we can't use vLLM.** TransformerLens needs Python-level hooks into the forward pass. vLLM's fused CUDA kernels skip Python entirely for performance, which blocks our hooks. |
-| `sae-lens` | `3.19.0` | SAE training and inference library from Joseph Bloom's group. Loads pre-trained sparse autoencoders. We use it purely for inference: `sae.encode(activation)` decomposes residual stream vectors into sparse interpretable features. |
+| `transformer-lens` | `2.8.1` | Neel Nanda's mechanistic interpretability library. Wraps HuggingFace models as `HookedTransformer` with activation hooks at every residual stream, attention head, and MLP layer. This is why we can cache activations and inject steering vectors. **This is why we can't use vLLM.** TransformerLens needs Python-level hooks into the forward pass. vLLM's fused CUDA kernels skip Python entirely for performance, which blocks our hooks. **Pinned to 2.8.1** (not latest 2.17.0) for known compatibility with sae-lens 4.1.1. |
+| `sae-lens` | `4.1.1` | SAE training and inference library from Joseph Bloom's group. Loads pre-trained sparse autoencoders. We use it purely for inference: `sae.encode(activation)` decomposes residual stream vectors into sparse interpretable features. **Upgraded from 3.19.0:** 4.0 was a major rewrite — `SAE.from_pretrained()` replaced dict loading, config objects overhauled. |
 | `einops` | `0.8.0` | Tensor reshaping. Makes activation manipulation readable. `rearrange(x, 'b s d -> (b s) d')` beats nested `.reshape()` calls every time. |
 | `umap-learn` | `0.5.7` | Dimensionality reduction for 3D feature layout. Takes the feature co-activation matrix and outputs 3D coordinates. Runs once per generation, cached thereafter. |
 | `numpy` | `1.26.4` | Array operations. Pinned because numpy 2.0 breaks half the ML ecosystem. |
@@ -36,7 +36,7 @@ Every dependency is pinned. Every choice is justified. No "pick your favorite" n
 
 | Package | Version | Why |
 |---------|---------|-----|
-| `modal` | `0.73.45` | Serverless GPU platform. A100-80GB with `keep_warm=1` for zero cold starts during demo. Model weights cached in Modal Volume so container startup doesn't re-download 16GB. |
+| `modal` | `1.3.4` | Serverless GPU platform. A100-80GB with `keep_warm=1` for zero cold starts during demo. Model weights cached in Modal Volume so container startup doesn't re-download 16GB. **Upgraded from 0.73.x:** 1.x replaced `modal.Stub` with `modal.App`. |
 | `huggingface-hub` | `0.27.0` | Downloads model weights on first run. Cached to Modal Volume. |
 
 ### Modal Configuration

@@ -36,13 +36,13 @@ image = modal.Image.debian_slim(python_version="3.11").pip_install(
 **Modal SDK** (installed locally for deployment):
 
 ```bash
-pip install modal==0.73.45
+pip install modal==1.3.4
 modal token set --token-id <YOUR_TOKEN_ID> --token-secret <YOUR_TOKEN_SECRET>
 ```
 
 | Package | Version | What It Does |
 |---------|---------|-------------|
-| `modal` | 0.73.45 | Serverless GPU platform. Deploys Python functions to A100 GPUs with `keep_warm=1` (one container always hot, prevents cold start). `modal deploy` pushes code, `modal serve` for local dev with hot reload. |
+| `modal` | 1.3.4 | Serverless GPU platform. Deploys Python functions to A100 GPUs with `keep_warm=1` (one container always hot, prevents cold start). `modal deploy` pushes code, `modal serve` for local dev with hot reload. **Note:** 1.x replaced `modal.Stub` with `modal.App`. |
 
 ---
 
@@ -103,24 +103,40 @@ No packages to install. These are cloud services configured via dashboards and C
 | **Cloudflare D1** | Analysis history database | SQLite at the edge. One table: `analyses` (job_id, verdict, confidence, peak_velocity, timestamp). `npx wrangler d1 create larynx-db`. |
 | **Cloudflare R2** | Audio file storage | S3-compatible object store. Uploaded audio files stored by job_id. Free egress. `npx wrangler r2 bucket create larynx-audio`. |
 | **Modal** | GPU compute | A100 (80GB VRAM, overkill for formants but it's what they sponsor). `keep_warm=1` keeps one container hot. Files processed in 2-4 seconds for a 10-second clip. |
-| **OpenAI API** | Deepfake generation | `tts-1` model, `alloy` voice. Used live during demo to generate the deepfake sample from text. ~$0.015 per request. |
+| **OpenAI API** | Deepfake generation | `tts-1` model, `alloy` voice. Called **server-side from CF Worker**, never from frontend. Used live during demo to generate the deepfake sample from text. ~$0.015 per request. Key stored via `wrangler secret put OPENAI_API_KEY`. |
 
-**OpenAI TTS call (for live demo deepfake generation):**
+**OpenAI TTS call (runs inside CF Worker, NOT in the browser):**
 
-```python
-from openai import OpenAI
+```typescript
+// workers/api.ts — POST /api/generate-deepfake
+// OpenAI key is a wrangler secret, never exposed to client
+async function handleGenerateDeepfake(request: Request, env: Env): Promise<Response> {
+  const { text, voice } = await request.json<{ text: string; voice?: string }>();
 
-client = OpenAI()
+  const response = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${env.OPENAI_API_KEY}`,  // wrangler secret
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'tts-1',
+      voice: voice || 'alloy',
+      input: text,
+      response_format: 'wav',
+      speed: 1.0,
+    }),
+  });
 
-response = client.audio.speech.create(
-    model="tts-1",
-    voice="alloy",
-    input="The quick brown fox jumps over the lazy dog.",
-    response_format="wav",
-    speed=1.0,
-)
-
-response.stream_to_file("deepfake_sample.wav")
+  // Stream the WAV back to the client
+  return new Response(response.body, {
+    headers: {
+      'Content-Type': 'audio/wav',
+      'X-Request-ID': crypto.randomUUID(),
+      ...corsHeaders,
+    },
+  });
+}
 ```
 
 ---
@@ -183,11 +199,17 @@ function HeadModel() {
 ```bash
 # .env.local (frontend, Vite prefix required)
 VITE_API_URL=https://larynx.your-worker.workers.dev
-VITE_OPENAI_API_KEY=sk-...    # only for demo deepfake generation button
+
+# IMPORTANT: NO OpenAI key in frontend.
+# TTS deepfake generation goes through CF Worker → Modal.
+# The Worker holds the key server-side via wrangler secret.
 
 # wrangler.toml (Cloudflare Worker)
 # [vars]
 # MODAL_TOKEN = "your-modal-deploy-token"
+
+# Wrangler secrets (set via CLI, never in code)
+# npx wrangler secret put OPENAI_API_KEY
 
 # Modal secrets (set via CLI)
 # modal secret create larynx-secrets OPENAI_API_KEY=sk-...

@@ -107,16 +107,16 @@ Upload audio file, returns job ID for SSE streaming.
 // Request: multipart/form-data
 // - file: audio file (wav/mp3/ogg, max 10MB)
 
-// Response
-interface AnalyzeResponse {
-  success: true;
-  data: {
-    jobId: string;        // UUID
-    duration: number;     // audio duration in seconds
-    sampleRate: number;   // always 16000
-    frameCount: number;   // total frames at 100fps
-  };
-}
+// Response: ApiResponse<AnalyzeData> (shared envelope)
+interface AnalyzeData {
+  jobId: string;        // UUID
+  duration: number;     // audio duration in seconds
+  sampleRate: number;   // always 16000
+  frameCount: number;   // total frames at 100fps
+    }
+
+  // Example:
+// { success: true, data: { jobId: "...", duration: 5.2, ... }, error: null }
 ```
 
 ### `GET /api/stream/{jobId}`
@@ -124,14 +124,27 @@ interface AnalyzeResponse {
 Server-Sent Events stream with analysis progress.
 
 ```typescript
-// SSE Event Types
+// SSE Event Types — ALL wrapped in ApiResponse envelope per shared contract
+// Each SSE `data:` field is a full ApiResponse<T>
 type SSEEvent =
-  | { type: "mel_ready";          data: { progress: number } }
-  | { type: "formants_extracted"; data: { progress: number; f1Range: [number, number]; f2Range: [number, number] } }
-  | { type: "velocity_computed";  data: { progress: number; maxVelocity: number; anomalyCount: number } }
-  | { type: "anomaly_detected";   data: { frameIndex: number; articulator: string; velocity: number; threshold: number } }
-  | { type: "verdict_ready";      data: Verdict }
-  | { type: "complete";           data: { processingTimeMs: number } }
+  | { type: "mel_ready";          data: ApiResponse<{ progress: number }> }
+  | { type: "formants_extracted"; data: ApiResponse<{ progress: number; f1Range: [number, number]; f2Range: [number, number] }> }
+  | { type: "velocity_computed";  data: ApiResponse<{ progress: number; maxVelocity: number; anomalyCount: number }> }
+  | { type: "anomaly_detected";   data: ApiResponse<{ frameIndex: number; articulator: string; velocity: number; threshold: number }> }
+  | { type: "verdict_ready";      data: ApiResponse<Verdict> }
+  | { type: "complete";           data: ApiResponse<{ processingTimeMs: number }> }
+
+// Re-exported from shared/types/api.ts
+interface ApiResponse<T> {
+  success: boolean;
+  data: T | null;
+  error: ApiError | null;
+}
+
+interface ApiError {
+  code: ErrorCode;
+  message: string;
+}
 
 interface Verdict {
   label: "GENUINE" | "DEEPFAKE";
@@ -184,7 +197,9 @@ interface EMAResponse {
 Upload (100ms network) 
   → librosa.load + resample to 16kHz (200ms)
   → SSE: mel_ready
+  → **PREPROCESSING** (noise gate + pitch filter) (50ms)
   → parselmouth formant extraction, 100fps (300ms for 5s audio)
+  → **50ms moving average smoothing on F1/F2/F3** (10ms)
   → SSE: formants_extracted
   → Articulatory mapping (50ms)
   → Velocity computation, frame-by-frame Δ (50ms)
@@ -195,7 +210,57 @@ Upload (100ms network)
   → SSE: verdict_ready
   → SSE: complete
   
-Total: ~700ms for 5s audio. Target: <2.5s including network.
+Total: ~750ms for 5s audio. Target: <2.5s including network.
+```
+
+
+## MANDATORY Preprocessing (from review audit)
+
+**These steps are NON-NEGOTIABLE.** Without them, formant extraction produces
+garbage on noisy audio. Demo MUST use pre-recorded clean audio, NEVER live mic
+in an 80dB hackathon hall.
+
+```python
+import numpy as np
+from scipy.signal import medfilt
+
+def preprocess_audio(audio: np.ndarray, sr: int = 16000) -> np.ndarray:
+    """Mandatory preprocessing before formant extraction.
+    
+    1. Noise gate: silence frames below -40dB RMS (prevents formant tracker
+       from hallucinating on background noise)
+    2. Pitch filter: reject frames where pitch < 80Hz (unvoiced/noise)
+    3. Both applied per-frame, not globally
+    """
+    frame_len = sr // 100  # 10ms frames at 100fps
+    frames = np.array_split(audio, len(audio) // frame_len)
+    
+    processed = []
+    for frame in frames:
+        rms = np.sqrt(np.mean(frame ** 2))
+        rms_db = 20 * np.log10(rms + 1e-10)
+        if rms_db < -40:  # noise gate threshold
+            processed.append(np.zeros_like(frame))
+        else:
+            processed.append(frame)
+    
+    return np.concatenate(processed)
+
+
+def smooth_formants(
+    f1: np.ndarray, f2: np.ndarray, f3: np.ndarray,
+    window: int = 5  # 50ms at 100fps
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """50ms moving average smoothing on formant tracks.
+    
+    Removes single-frame spikes that cause false velocity anomalies.
+    Uses median filter (robust to outliers) not mean filter.
+    """
+    return (
+        medfilt(f1, kernel_size=window),
+        medfilt(f2, kernel_size=window),
+        medfilt(f3, kernel_size=window),
+    )
 ```
 
 ## Formant → Morph Target Mapping
@@ -299,47 +364,131 @@ interface LarynxStore {
 
 ```typescript
 // workers/api.ts
+interface Env {
+  MODAL_URL: string;
+  AUDIO_BUCKET: R2Bucket;
+  OPENAI_API_KEY: string;  // wrangler secret, never in code
+  ANALYSES_DB: D1Database;
+  ALLOWED_ORIGINS: string; // comma-separated: https://larynx.pages.dev,http://localhost:5173
+}
+
+const corsHeaders = (origin: string, env: Env): HeadersInit => {
+  const allowed = env.ALLOWED_ORIGINS.split(',').map(s => s.trim());
+  const isAllowed = allowed.includes(origin) || origin === 'http://localhost:5173';
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : '',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+  };
+};
+
+function errorResponse(code: number, message: string, requestId: string, origin: string, env: Env): Response {
+  return new Response(JSON.stringify({
+    success: false,
+    data: null,
+    error: { code: code === 429 ? 'RATE_LIMITED' : code === 413 ? 'UPLOAD_TOO_LARGE' : 'PROCESSING_FAILED', message },
+  }), {
+    status: code,
+    headers: { 'Content-Type': 'application/json', 'X-Request-ID': requestId, ...corsHeaders(origin, env) },
+  });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const origin = request.headers.get('Origin') || '';
     const requestId = crypto.randomUUID();
-    
-    if (url.pathname === "/api/analyze" && request.method === "POST") {
-      // Upload audio to R2
-      const formData = await request.formData();
-      const file = formData.get("file") as File;
-      const key = `audio/${requestId}.wav`;
-      await env.AUDIO_BUCKET.put(key, file.stream());
-      
-      // Forward to Modal
-      const modalResp = await fetch(`${env.MODAL_URL}/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audioKey: key, requestId }),
-      });
-      
-      return new Response(modalResp.body, {
-        headers: {
-          "Content-Type": "application/json",
-          "X-Request-ID": requestId,
-        },
-      });
+
+    // CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders(origin, env) });
     }
-    
-    if (url.pathname.startsWith("/api/stream/")) {
-      // Proxy SSE stream from Modal
-      const jobId = url.pathname.split("/").pop();
-      const modalResp = await fetch(`${env.MODAL_URL}/stream/${jobId}`);
-      return new Response(modalResp.body, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "X-Request-ID": requestId,
-        },
-      });
+
+    try {
+      // POST /api/analyze — upload audio → R2 → forward to Modal
+      if (url.pathname === '/api/analyze' && request.method === 'POST') {
+        const formData = await request.formData();
+        const file = formData.get('file') as File;
+        if (!file) return errorResponse(400, 'Missing file field', requestId, origin, env);
+        if (file.size > 10 * 1024 * 1024) return errorResponse(413, 'File exceeds 10MB limit', requestId, origin, env);
+
+        const key = `audio/${requestId}.wav`;
+        await env.AUDIO_BUCKET.put(key, file.stream());
+
+        const modalResp = await fetch(`${env.MODAL_URL}/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audioKey: key, requestId }),
+        });
+
+        if (!modalResp.ok) return errorResponse(modalResp.status, 'Modal processing failed', requestId, origin, env);
+
+        return new Response(modalResp.body, {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Request-ID': requestId,
+            ...corsHeaders(origin, env),
+          },
+        });
+      }
+
+      // GET /api/stream/:jobId — proxy SSE from Modal
+      if (url.pathname.startsWith('/api/stream/') && request.method === 'GET') {
+        const jobId = url.pathname.split('/').pop();
+        if (!jobId) return errorResponse(400, 'Missing job ID', requestId, origin, env);
+
+        const modalResp = await fetch(`${env.MODAL_URL}/stream/${jobId}`);
+        if (!modalResp.ok) return errorResponse(modalResp.status, 'Stream unavailable', requestId, origin, env);
+
+        return new Response(modalResp.body, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Request-ID': requestId,
+            ...corsHeaders(origin, env),
+          },
+        });
+      }
+
+      // POST /api/generate-deepfake — TTS via OpenAI (key held server-side)
+      if (url.pathname === '/api/generate-deepfake' && request.method === 'POST') {
+        const { text, voice } = await request.json<{ text: string; voice?: string }>();
+        if (!text || text.length > 1000) return errorResponse(400, 'Text required (max 1000 chars)', requestId, origin, env);
+
+        const ttsResp = await fetch('https://api.openai.com/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'tts-1',
+            voice: voice || 'alloy',
+            input: text,
+            response_format: 'wav',
+            speed: 1.0,
+          }),
+        });
+
+        if (!ttsResp.ok) return errorResponse(ttsResp.status, 'OpenAI TTS failed', requestId, origin, env);
+
+        return new Response(ttsResp.body, {
+          headers: {
+            'Content-Type': 'audio/wav',
+            'X-Request-ID': requestId,
+            ...corsHeaders(origin, env),
+          },
+        });
+      }
+
+      return errorResponse(404, 'Not Found', requestId, origin, env);
+
+    } catch (err) {
+      console.error(`[${requestId}] Worker error:`, err);
+      return errorResponse(500, 'Internal server error', requestId, origin, env);
     }
-    
-    return new Response("Not Found", { status: 404 });
   },
 };
 ```

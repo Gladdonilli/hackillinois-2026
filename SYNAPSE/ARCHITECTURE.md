@@ -127,6 +127,28 @@ App
 
 ## API Design
 
+### Shared API Envelope (from `shared/contracts/api-common.md`)
+
+All SYNAPSE API responses use the shared envelope:
+
+```typescript
+// Re-exported from shared/types/api.ts
+interface ApiResponse<T> {
+  success: boolean;
+  data: T | null;
+  error: ApiError | null;
+}
+
+interface ApiError {
+  code: ErrorCode;
+  message: string;
+}
+
+type ErrorCode = 'UPLOAD_TOO_LARGE' | 'INVALID_FORMAT' | 'PROCESSING_FAILED' | 'MODEL_UNAVAILABLE' | 'RATE_LIMITED';
+```
+
+All endpoint responses below are wrapped: `ApiResponse<GenerateData>`, `ApiResponse<FeaturesData>`, etc.
+
 ### `POST /api/generate`
 
 Send a prompt, receive the model's response plus a job ID for the cached activation state.
@@ -141,16 +163,19 @@ interface GenerateRequest {
 }
 ```
 
-**Response:**
+**Response:** `ApiResponse<GenerateData>`
 
 ```typescript
-interface GenerateResponse {
+interface GenerateData {
   job_id: string;           // UUID, references cached activations on Modal
   response: string;         // generated text
   token_count: number;      // tokens generated
   layers_cached: number;    // number of layers with cached activations (32)
   generation_time_ms: number;
 }
+
+// Example:
+// { success: true, data: { job_id: "...", response: "...", ... }, error: null }
 ```
 
 ### `POST /api/features/{job_id}`
@@ -167,7 +192,7 @@ interface FeaturesRequest {
 }
 ```
 
-**Response:**
+**Response:** `ApiResponse<FeaturesData>`
 
 ```typescript
 interface Feature {
@@ -180,7 +205,7 @@ interface Feature {
   umap_xyz: [number, number, number]; // 3D coordinates from UMAP
 }
 
-interface FeaturesResponse {
+interface FeaturesData {
   job_id: string;
   features: Feature[];
   total_features: number;
@@ -210,10 +235,10 @@ interface AblateRequest {
 }
 ```
 
-**Response:**
+**Response:** `ApiResponse<AblateData>`
 
 ```typescript
-interface AblateResponse {
+interface AblateData {
   job_id: string;
   original_response: string;
   steered_response: string;
@@ -240,10 +265,10 @@ interface SteerRequest {
 }
 ```
 
-**Response:**
+**Response:** `ApiResponse<SteerData>`
 
 ```typescript
-interface SteerResponse {
+interface SteerData {
   original_response: string;    // unsteered generation
   steered_response: string;     // steered generation
   steering_layer: number;
