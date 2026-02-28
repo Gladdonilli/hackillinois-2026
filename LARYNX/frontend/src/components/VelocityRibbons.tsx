@@ -25,6 +25,8 @@ export function VelocityRibbons() {
   const curve = useMemo(() => new THREE.CatmullRomCurve3([
     new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()
   ]), [])
+  // Pre-allocate Float32Array for setPositions (avoid flatMap allocating new array every frame)
+  const positionsBuffer = useRef(new Float32Array(153))
 
   // Memoize attenuation so it doesn't trigger Trail component re-renders
   const handleAttenuation = useMemo(() => (t: number) => t * t, [])
@@ -50,10 +52,17 @@ export function VelocityRibbons() {
         curve.points[2].set(t3.x / 50, t3.y / 50, 0.3)
         curve.points[3].set(jaw.x / 50, jaw.y / 50, 0.3)
 
-        const interpolated = curve.getPoints(50)
+        // Copy interpolated points into pre-allocated buffer (avoids flatMap allocation per frame)
+        const pts = curve.getPoints(50)
+        const positions = positionsBuffer.current
+        for (let i = 0; i < pts.length; i++) {
+          positions[i * 3] = pts[i].x
+          positions[i * 3 + 1] = pts[i].y
+          positions[i * 3 + 2] = pts[i].z
+        }
         const lineAsMesh = lineRef.current as unknown as Line2Mesh
         if (lineAsMesh.geometry?.setPositions) {
-          lineAsMesh.geometry.setPositions(interpolated.flatMap(p => [p.x, p.y, p.z]))
+          lineAsMesh.geometry.setPositions(positions as unknown as number[])
         }
       }
 
