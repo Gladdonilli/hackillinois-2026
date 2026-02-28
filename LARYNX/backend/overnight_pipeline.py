@@ -31,8 +31,8 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("libsndfile1", "ffmpeg", "wget", "sox", "git")
     .pip_install(
-        "torch==2.5.1",
-        "torchaudio==2.5.1",
+        "torch==2.7.0+cu128",
+        "torchaudio==2.7.0+cu128",
         "s3prl==0.4.18",
         "librosa==0.10.2.post1",
         "soundfile==0.12.1",
@@ -40,6 +40,7 @@ image = (
         "pyyaml",
         "scipy==1.11.4",
         "numpy<2",
+        extra_index_url="https://download.pytorch.org/whl/cu128",
     )
     .run_commands(
         "pip install git+https://github.com/articulatory/articulatory.git",

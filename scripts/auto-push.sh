@@ -31,11 +31,7 @@ while true; do
         TIMESTAMP=$(date +"%Y-%m-%d %H:%M")
         jj describe -m "auto: checkpoint $TIMESTAMP" 2>/dev/null
     fi
-    
-    # Describe current working copy with timestamp
-    TIMESTAMP=$(date +"%Y-%m-%d %H:%M")
-    jj describe -m "auto: checkpoint $TIMESTAMP" 2>/dev/null
-    
+
     # Create new empty change on top
     jj new 2>/dev/null
     
