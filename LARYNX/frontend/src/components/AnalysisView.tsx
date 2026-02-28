@@ -8,6 +8,8 @@ import { TongueModel } from '@/components/TongueModel';
 import { EMAMarkers } from '@/components/EMAMarkers';
 import { PostProcessingEffects } from '@/components/PostProcessingEffects';
 import { CameraController } from '@/components/CameraController';
+import { ParticleField } from '@/components/ParticleField';
+import { SkullClipEffect } from '@/components/SkullClipEffect';
 
 function Loader() {
   return (
@@ -45,6 +47,8 @@ export function AnalysisView() {
           <HeadModel />
           <TongueModel />
           <EMAMarkers />
+          <ParticleField />
+          <SkullClipEffect />
 
           {/* Global Systems */}
           <PostProcessingEffects />

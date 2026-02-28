@@ -5,6 +5,7 @@ import { AnalysisView } from '@/components/AnalysisView'
 import { VelocityHUD } from '@/components/VelocityHUD'
 import { VerdictPanel } from '@/components/VerdictPanel'
 import { WaveformDisplay } from '@/components/WaveformDisplay'
+import { AnalysisOverlay } from '@/components/AnalysisOverlay'
 import { SoundEngine } from '@/audio/SoundEngine'
 
 export default function App() {
@@ -87,6 +88,9 @@ export default function App() {
     <main className="w-full h-screen bg-black relative overflow-hidden">
       {/* 3D Scene Layer */}
       <AnalysisView />
+
+      {/* Analysis Progress Overlay */}
+      <AnalysisOverlay />
 
       {/* HUD Layers */}
       <div className="hud-overlay absolute top-0 left-0 z-10 p-4">

@@ -23,7 +23,7 @@ interface LarynxState {
 
   setAudioFile: (file: File | null) => void
   setStatus: (status: AnalysisStatus) => void
-  startAnalysis: () => void
+  startAnalysis: () => void // Legacy mock fallback — prefer useAnalysisStream
   setPostProcessingEnabled: (enabled: boolean) => void
   reset: () => void
   setProgress: (progress: AnalysisProgress) => void
@@ -31,45 +31,6 @@ interface LarynxState {
   setVerdict: (verdict: Verdict) => void
 }
 
-const generateMockFrames = (): EMAFrame[] => {
-  const frames: EMAFrame[] = []
-  const sensors: SensorName[] = ['UL', 'LL', 'JAW', 'T1', 'T2', 'T3']
-  
-  for (let i = 0; i < 120; i++) {
-    const frameSensors = {} as Record<SensorName, any>
-    let tVelSum = 0
-    
-    sensors.forEach(sensor => {
-      const velocity = 5 + Math.random() * 25 // 5 to 30 cm/s
-      if (sensor.startsWith('T')) tVelSum += velocity
-      
-      frameSensors[sensor] = {
-        x: -0.5 + Math.random(),
-        y: -0.5 + Math.random(),
-        velocity
-      }
-    })
-    
-    frames.push({
-      sensors: frameSensors,
-      tongueVelocity: tVelSum / 3,
-      timestamp: i * 33
-    })
-  }
-  return frames
-}
-
-const generateMockFormants = (): FormantData[] => {
-  const formants: FormantData[] = []
-  for (let i = 0; i < 120; i++) {
-    formants.push({
-      f1: 300 + Math.random() * 500, // 300 to 800 Hz
-      f2: 800 + Math.random() * 1700, // 800 to 2500 Hz
-      f3: 1800 + Math.random() * 1700 // 1800 to 3500 Hz
-    })
-  }
-  return formants
-}
 
 const useLarynxStore = create<LarynxState>((set, get) => ({
   status: 'idle',
@@ -120,13 +81,40 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   setVerdict: (verdict) => set({ verdict }),
 
   startAnalysis: () => {
-    const frames = generateMockFrames()
-    const formants = generateMockFormants()
-    
+    // Mock fallback: generate inline data when no backend is available
+    const mockFrames: EMAFrame[] = Array.from({ length: 120 }, (_, i) => {
+      const t = i / 120
+      const makeSensor = () => ({
+        x: (Math.random() - 0.5) * 0.8,
+        y: (Math.random() - 0.5) * 0.8,
+        velocity: 5 + Math.random() * 25,
+      })
+      const sensors: Record<SensorName, { x: number; y: number; velocity?: number }> = {
+        UL: makeSensor(),
+        LL: makeSensor(),
+        JAW: makeSensor(),
+        T1: makeSensor(),
+        T2: makeSensor(),
+        T3: makeSensor(),
+      }
+      const tongueVelocity = (
+        (sensors.T1.velocity ?? 0) +
+        (sensors.T2.velocity ?? 0) +
+        (sensors.T3.velocity ?? 0)
+      ) / 3
+      return { sensors, tongueVelocity, timestamp: t }
+    })
+
+    const mockFormants: FormantData[] = Array.from({ length: 120 }, () => ({
+      f1: 300 + Math.random() * 500,
+      f2: 800 + Math.random() * 1700,
+      f3: 1800 + Math.random() * 1700,
+    }))
+
     set({
       status: 'analyzing',
-      frames,
-      formants,
+      frames: mockFrames,
+      formants: mockFormants,
       currentFrame: 0,
       progress: { message: 'Analyzing acoustic characteristics...', percent: 0 }
     })
@@ -134,12 +122,12 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
     let frameIndex = 0
     const intervalId = setInterval(() => {
       frameIndex++
-      
+
       if (frameIndex >= 120) {
         clearInterval(intervalId)
-        
-        const maxVelocity = Math.max(...frames.map(f => f.tongueVelocity))
-        
+
+        const maxVelocity = Math.max(...mockFrames.map((frame) => frame.tongueVelocity))
+
         set({
           status: 'complete',
           currentFrame: 119,
@@ -152,13 +140,13 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
           }
         })
       } else {
-        const currentFrameData = frames[frameIndex]
+        const currentFrameData = mockFrames[frameIndex]
         set({
           currentFrame: frameIndex,
           tongueVelocity: currentFrameData.tongueVelocity,
-          tongueT1: { 
-            x: currentFrameData.sensors.T1.x, 
-            y: currentFrameData.sensors.T1.y 
+          tongueT1: {
+            x: currentFrameData.sensors.T1.x,
+            y: currentFrameData.sensors.T1.y
           },
           progress: {
             message: 'Inverting formants to articulatory kinematics...',
