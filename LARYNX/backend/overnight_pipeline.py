@@ -330,10 +330,10 @@ def download_librispeech() -> list[tuple[str, bytes]]:
     ),
     timeout=600,
     secrets=[modal.Secret.from_name("elevenlabs-api-key")],
-    max_containers=50,           # Force 50 separate CPU containers
+    max_containers=3,            # ElevenLabs rate limits: 2-4 concurrent requests
     volumes={"/model-cache": model_cache},
     )
-@modal.concurrent(max_inputs=1)  # One chunk per container = max parallelism
+@modal.concurrent(max_inputs=1)  # One chunk per container, sequential within chunk
 def generate_elevenlabs_chunk(chunk: list[tuple[int, str, str, str, str]]) -> list[tuple[str, bytes]]:
     """Generate a chunk of ElevenLabs deepfakes in one container.
 
@@ -361,24 +361,37 @@ def generate_elevenlabs_chunk(chunk: list[tuple[int, str, str, str, str]]) -> li
         wav_path = work_dir / f"{filename}.wav"
 
         try:
-            resp = requests.post(
-                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
-                headers={
-                    "xi-api-key": api_key,
-                    "Content-Type": "application/json",
-                    "Accept": "audio/mpeg",
-                },
-                json={
-                    "text": sentence,
-                    "model_id": model_id,
-                    "voice_settings": {
-                        "stability": 0.5,
-                        "similarity_boost": 0.75,
+            # Retry with exponential backoff on 429 rate limits
+            max_retries = 5
+            for attempt in range(max_retries):
+                resp = requests.post(
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+                    headers={
+                        "xi-api-key": api_key,
+                        "Content-Type": "application/json",
+                        "Accept": "audio/mpeg",
                     },
-                },
-                timeout=30,
-            )
-            resp.raise_for_status()
+                    json={
+                        "text": sentence,
+                        "model_id": model_id,
+                        "voice_settings": {
+                            "stability": 0.5,
+                            "similarity_boost": 0.75,
+                        },
+                    },
+                    timeout=30,
+                )
+                if resp.status_code == 429:
+                    wait = (2 ** attempt) * 5  # 5, 10, 20, 40, 80 seconds
+                    print(f"    Rate limited on {filename}, waiting {wait}s (attempt {attempt + 1}/{max_retries})")
+                    import time
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                break  # Success
+            else:
+                print(f"  FAIL {filename}: rate limited after {max_retries} retries")
+                continue
 
             with open(mp3_path, "wb") as f:
                 f.write(resp.content)
@@ -397,9 +410,6 @@ def generate_elevenlabs_chunk(chunk: list[tuple[int, str, str, str, str]]) -> li
 
         except Exception as e:
             print(f"  FAIL {filename}: {e}")
-            if "429" in str(e) or "rate" in str(e).lower():
-                import time
-                time.sleep(30)
             continue
 
     # Save to volume cache
@@ -482,7 +492,7 @@ def main():
                 el_items.append((idx, voice_id, voice_name, model_id, sentence))
                 idx += 1
 
-        CHUNK_SIZE = 50
+        CHUNK_SIZE = 300  # Larger chunks — only 3 containers, process serially within each
         el_chunks = [el_items[i:i + CHUNK_SIZE] for i in range(0, len(el_items), CHUNK_SIZE)]
         print(f"  Dispatching {len(el_items)} ElevenLabs calls across {len(el_chunks)} chunks...")
 
