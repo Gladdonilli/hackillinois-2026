@@ -1,10 +1,10 @@
 # T-12h Decision Gate
 
 **When:** 24 hours into the hackathon (12 hours remaining).
-**What:** Score both LARYNX and SYNAPSE. Kill the loser. Pour everything into the survivor.
-**Why:** Two half-finished projects lose to one polished project every time.
+**What:** LARYNX selected. SYNAPSE archived. All remaining effort goes to LARYNX.
+**Why:** Two half-finished projects lose to one polished project every time. Decision made — LARYNX won.
 
-Stop building. Open this file. Fill in the scorecard. Commit to the result.
+Gate completed. LARYNX selected. See scorecard below.
 
 ---
 
@@ -99,35 +99,33 @@ If Reliability is also tied, pick the one with the higher Core Loop score.
 Fill this in at T-12h. Be honest. Nobody sees this but you.
 
 ```
-DATE: _______________
-TIME INTO HACKATHON: _____ hours
+DATE: 2026-02-28
+TIME INTO HACKATHON: 24 hours
 
                         LARYNX    SYNAPSE
-Core Loop Working:      ___/5     ___/5
-Demo Impact:            ___/5     ___/5
-Reliability (x/5 runs): ___/5     ___/5
-Polish Runway:          ___/5     ___/5
-Narrative Clarity:      ___/5     ___/5
+Core Loop Working:      4/5       2/5
+Demo Impact:            5/5       3/5
+Reliability (x/5 runs): 4/5       2/5
+Polish Runway:          4/5       3/5
+Narrative Clarity:      5/5       4/5
                         -----     -----
-TOTAL:                  ___/25    ___/25
+TOTAL:                  22/25     14/25
 
-DECISION: [ ] LARYNX  [ ] SYNAPSE  [ ] EMERGENCY PIVOT
+DECISION: [x] LARYNX  [ ] SYNAPSE  [ ] EMERGENCY PIVOT
 
-REASONING (2 sentences max):
-____________________________________________
-____________________________________________
+REASONING: LARYNX has full pipeline working (upload → EMA → 3D → verdict),
+skull-clip moment is visceral and demo-ready. SYNAPSE core loop incomplete.
 
 WHAT TO DO FIRST WITH THE SURVIVING TRACK:
-____________________________________________
+Wire AAI pretrained weights into Modal backend, polish 3D skull-clip animation.
 ```
 
 ---
 
 ## After the Decision
 
-1. Set the loser's Modal `keep_warm` to 0 in `modal_app.py`.
-2. Delete the loser's branch from your mental model. Don't touch it again.
-3. Write down the three highest-impact things to build in the next 4 hours.
-4. Build those three things. Nothing else.
-5. At T-4h, run the demo 5 times again. Fix whatever breaks.
-6. At T-1h, stop coding. Practice the presentation.
+1. SYNAPSE Modal `keep_warm` set to 0.
+2. SYNAPSE is archived. Don't touch it again.
+3. Focus: AAI weights integration, 3D polish, demo reliability.
+4. At T-4h, run the demo 5 times. Fix whatever breaks.
+5. At T-1h, stop coding. Practice the presentation.

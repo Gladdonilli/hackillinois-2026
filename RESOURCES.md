@@ -1,6 +1,6 @@
 # HackIllinois 2026 — Free Resources & Access Map
 
-> **Purpose**: Complete inventory of free tools, credits, and access points available during the hackathon, mapped to Prism's needs.
+> **Purpose**: Complete inventory of free tools, credits, and access points available during the hackathon, mapped to LARYNX's needs.
 >
 > **Key Distinction**: AI used during *development* (Cliproxy, OpenCode, agents) is NOT disclosed. Only AI the *product* uses post-development requires README disclosure per HackIllinois AI policy.
 
@@ -8,13 +8,13 @@
 
 ## Product-Facing AI (Requires README Disclosure)
 
-These are the AI services Prism's end-users interact with through the product:
+These are the AI services LARYNX's end-users interact with through the product:
 
-| Service | Role in Prism | Free Tier / Access |
+| Service | Role in LARYNX | Free Tier / Access |
 |---------|--------------|-------------------|
-| **OpenAI API** | Multi-model fan-out (GPT-4o, GPT-4o-mini, etc.) | Real API key needed for final demo only. Dev uses Cliproxy. |
-| **Cloudflare Workers AI** | BGE embeddings (bge-base-en-v1.5, 768d) for cosine similarity | 10K neurons/day free. No CC needed. |
-| **Supermemory** | Memory layer — query history, divergence graph, user profiles | Account already active. Visit booth for rate-limit top-up. |
+| **OpenAI API** | TTS audio generation for deepfake test samples | Real API key needed for TTS sample generation. Dev uses Cliproxy. |
+| **Cloudflare Workers AI** | BGE embeddings for audio fingerprinting (optional) | 10K neurons/day free. No CC needed. |
+| **Supermemory** | Memory layer — analysis history, user profiles | Account already active. Visit booth for rate-limit top-up. |
 
 ---
 
@@ -43,9 +43,9 @@ These are the AI services Prism's end-users interact with through the product:
 npm install -g wrangler
 npx wrangler login          # browser auth
 # 4. Provision services
-npx wrangler d1 create prism-db
-npx wrangler r2 bucket create prism-logs
-npx wrangler vectorize create prism-vectors --dimensions 768 --metric cosine
+npx wrangler d1 create larynx-db
+npx wrangler r2 bucket create larynx-audio
+npx wrangler vectorize create larynx-vectors --dimensions 768 --metric cosine
 ```
 
 ---
@@ -55,7 +55,7 @@ npx wrangler vectorize create prism-vectors --dimensions 768 --metric cosine
 ### Modal ($250 Upfront Credits)
 - **What**: GPU/inference compute credits
 - **How**: Create account at `modal.com` → Billing → Enter promo code `VVN-YQS-E55`
-- **Relevance**: Only if choosing Modal track. Not needed for core Prism stack.
+- **Relevance**: Primary track. LARYNX runs AAI inference on Modal GPU. Credits essential.
 - **Prize**: Winning adds $5K credits + SF/NY trip
 
 ### OpenAI (Free via Cliproxy During Dev)
@@ -114,4 +114,4 @@ npx wrangler vectorize create prism-vectors --dimensions 768 --metric cosine
 | **Cloudflare $5K = prize only** | No upfront credits, free tier during hack |
 | **OpenAI key = demo only** | Use Cliproxy for dev, real key for final submission |
 | **Repo visibility** | Must be PUBLIC before Devpost deadline (Sun 6AM) |
-| **AI disclosure** | README must list product-facing AI only (OpenAI, Workers AI, Supermemory) |
+| **AI disclosure** | README must list product-facing AI only (AAI model, OpenAI TTS for samples, Workers AI if used) |

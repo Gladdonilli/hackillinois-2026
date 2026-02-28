@@ -6,20 +6,44 @@ import { Button } from "@/components/ui/button"
 import useLarynxStore from "@/store/useLarynxStore"
 import { useAnalysisStream } from '@/hooks/useAnalysisStream'
 
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_TYPES = ["audio/wav", "audio/mpeg", "audio/ogg", "audio/flac", "audio/x-m4a"]
 const ALLOWED_EXTS = [".wav", ".mp3", ".ogg", ".flac"]
 
 export default function UploadPanel() {
+  const panelRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [duration, setDuration] = useState<number | null>(null)
   const [status, setStatus] = useState<"idle" | "analyzing">("idle")
+  const [tilt, setTilt] = useState({ x: 0, y: 0 })
+  const [glitchActive, setGlitchActive] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioFile = useLarynxStore((state) => state.audioFile)
   const setAudioFile = useLarynxStore((state) => state.setAudioFile)
   const { startStream } = useAnalysisStream()
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setGlitchActive(true)
+      setTimeout(() => setGlitchActive(false), 200)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleMouseMove = React.useCallback((e: React.MouseEvent) => {
+    if (!panelRef.current) return
+    const rect = panelRef.current.getBoundingClientRect()
+    const x = (e.clientX - rect.left - rect.width / 2) / rect.width
+    const y = (e.clientY - rect.top - rect.height / 2) / rect.height
+    setTilt({ x: y * -3, y: x * 3 })
+  }, [])
+
+  const handleMouseLeave = React.useCallback(() => {
+    setTilt({ x: 0, y: 0 })
+  }, [])
 
   const validateAndProcessFile = async (file: File) => {
     setError(null)
@@ -105,15 +129,24 @@ export default function UploadPanel() {
   }
 
   return (
-    <div className="flex w-full flex-col items-center justify-center p-6">
+    <div
+      className="flex w-full flex-col items-center justify-center p-6 min-h-[60vh]"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{ perspective: "1000px" }}
+    >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
+        ref={panelRef}
+        style={{ transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`, transition: "transform 0.15s ease-out" }}
         className="w-full max-w-lg"
       >
         <div className="mb-8 text-center">
-          <h2 className="text-4xl font-mono tracking-[0.3em] uppercase glitch-text text-glow-cyan text-[#EDEDED] mb-2" data-text="LARYNX.">
+          <h2 className="text-4xl font-mono tracking-[0.3em] uppercase glitch-text text-glow-cyan text-[#EDEDED] mb-2"
+            style={{ animationPlayState: glitchActive ? 'running' : 'paused' }}
+            data-text="LARYNX.">
             LARYNX.
           </h2>
           <p className="text-xs tracking-[0.4em] uppercase text-[#666] mt-2">
@@ -126,10 +159,10 @@ export default function UploadPanel() {
           whileHover={{ scale: audioFile ? 1 : 1.01 }}
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
           className={cn(
-            "relative flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg transition-all duration-300 hud-panel",
+            "relative flex min-h-[200px] cursor-pointer flex-col items-center justify-center rounded-lg transition-all duration-300 hud-panel group",
             isDragging
               ? "border-[var(--cyan)] bg-[rgba(0,255,255,0.03)]"
-              : "border-glow bg-[#0A0A0A]/80 backdrop-blur-sm"
+              : "border-glow bg-[#0A0A0A]/80 backdrop-blur-sm group-hover:shadow-[0_0_30px_rgba(0,255,255,0.15)] group-hover:border-solid border-dashed"
           )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -151,7 +184,7 @@ export default function UploadPanel() {
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
               className={cn(
                 "rounded-full p-4 transition-colors",
-                isDragging ? "text-[var(--cyan)] glow-cyan" : "text-[var(--cyan)] animate-pulse-glow"
+                isDragging ? "text-[var(--cyan)] glow-cyan" : "text-[var(--cyan)] animate-breathe"
               )}>
               <Upload className="h-8 w-8" strokeWidth={1.5} />
             </motion.div>
@@ -192,10 +225,15 @@ export default function UploadPanel() {
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className="mt-6 flex flex-col gap-4"
             >
-              <div className="hud-panel hud-sweep p-4 flex items-center justify-between border-[var(--cyan)]/20">
+              <div className="hud-panel hud-sweep p-4 flex items-center justify-between border-[var(--cyan)]/20 hover:-translate-y-0.5 transition-transform duration-300">
                 <div className="flex items-center space-x-4 overflow-hidden">
-                  <div className="text-[var(--cyan)] glow-cyan shrink-0">
-                    <AudioWaveform className="h-6 w-6" strokeWidth={1.5} />
+                  <div className="text-[var(--cyan)] glow-cyan shrink-0 relative flex items-center justify-center h-8 w-8">
+                    <motion.div
+                      animate={{ scaleY: [0.5, 1.2, 0.8, 1.5, 0.5], opacity: [0.5, 1, 0.7, 1, 0.5] }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                      className="absolute inset-0 border border-[var(--cyan)] rounded-full opacity-30"
+                    />
+                    <AudioWaveform className="h-5 w-5 z-10" strokeWidth={1.5} />
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-mono text-foreground text-sm">{audioFile.name}</p>
@@ -214,21 +252,26 @@ export default function UploadPanel() {
               </div>
 
               <motion.div
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ scale: 1.03 }}
+                transition={{ type: "spring", stiffness: 400, damping: 25 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full"
               >
                 <Button 
                   onClick={handleAnalyze} 
                   disabled={status === "analyzing"}
-                  className="w-full h-12 bg-transparent border border-[var(--cyan)] text-[var(--cyan)] uppercase tracking-[0.2em] font-mono text-sm hover:bg-[var(--cyan)]/10 hover:glow-cyan transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={cn(
+                    "w-full h-12 bg-transparent border border-[var(--cyan)] text-[var(--cyan)] uppercase tracking-[0.2em] font-mono text-sm hover:bg-[var(--cyan)]/10 hover:glow-cyan transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
+                    status === "idle" && "animate-pulse-glow"
+                  )}
                 >
                   {status === "analyzing" ? (
                     <span className="flex items-center space-x-2">
-                      <span className="animate-pulse">INITIATING SCAN...</span>
+                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="h-4 w-4 border-2 border-[var(--cyan)] border-t-transparent rounded-full" />
+                      <span className="animate-pulse">INITIALIZING...</span>
                     </span>
                   ) : (
-                    "ANALYZE"
+                    "INITIATE SCAN"
                   )}
                 </Button>
               </motion.div>
@@ -237,13 +280,13 @@ export default function UploadPanel() {
         </AnimatePresence>
 
         {/* Info Footer */}
-        <div className="mt-8 flex justify-center items-center space-x-3 text-[10px] text-[#555] font-mono tracking-wider uppercase">
-          <span>PROTOCOL v2.1</span>
+        <motion.div className="mt-8 flex justify-center items-center space-x-3 text-[10px] text-[#555] font-mono tracking-wider uppercase" initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.2 } } }}>
+          <motion.span variants={{ hidden: { opacity: 0, y: 5 }, visible: { opacity: 1, y: 0 } }}>PROTOCOL v2.1</motion.span>
           <span className="h-[2px] w-[2px] rounded-full bg-[#444]" />
-          <span>ARTICULATORY PHYSICS</span>
+          <motion.span variants={{ hidden: { opacity: 0, y: 5 }, visible: { opacity: 1, y: 0 } }}>ARTICULATORY PHYSICS</motion.span>
           <span className="h-[2px] w-[2px] rounded-full bg-[#444]" />
-          <span>EMA 6-SENSOR</span>
-        </div>
+          <motion.span variants={{ hidden: { opacity: 0, y: 5 }, visible: { opacity: 1, y: 0 } }}>EMA 6-SENSOR</motion.span>
+        </motion.div>
       </motion.div>
     </div>
   )

@@ -16,8 +16,7 @@ Start this 30 minutes before judging. Not 10 minutes. Not "when they call your n
 ## Demo Content (T-25 min)
 
 - [ ] **Audio/prompt samples loaded and tested.**
-  - LARYNX: 1 genuine WAV + 1 deepfake WAV. Both tested end-to-end. Genuine returns "genuine," deepfake returns "deepfake." Not the other way around.
-  - SYNAPSE: 3 different prompts. Each tested with the feature ablation flow. All produce visibly different steered output.
+  - 1 genuine WAV + 1 deepfake WAV. Both tested end-to-end. Genuine returns "genuine," deepfake returns "deepfake." Not the other way around.
 - [ ] **Backup samples on local disk.** Copy your test files to `~/demo-backup/`. If your CDN goes down or you accidentally delete something, you can drag-and-drop from the local folder. No network dependency for the core demo input.
 - [ ] **Supermemory pre-populated.** Add 2-3 pre-existing analysis entries so the history panel looks like a real product with actual usage, not an empty state someone built 6 hours ago.
 
@@ -48,7 +47,7 @@ Start this 30 minutes before judging. Not 10 minutes. Not "when they call your n
 
 - [ ] **Timer visible.** Pull up a stopwatch app on your phone or a second monitor. Practice hitting the 3:00 mark exactly. Most hackathon presentations are 3 minutes. Going over means getting cut off mid-sentence, which is the worst possible ending.
 - [ ] **Opening line rehearsed.** Say it out loud once. Not in your head. Out loud. First 10 seconds set the energy for the entire pitch.
-- [ ] **"One more thing" moment planned.** Know exactly when the skull-clip / neuron-death moment happens. Build to it. Pause before it. Let judges react.
+- [ ] **"One more thing" moment planned.** Know exactly when the skull-clip moment happens. Build to it. Pause before it. Let judges react.
 
 ---
 

@@ -1,6 +1,6 @@
 # Modal App Layout
 
-One Modal App. Two route classes. At the decision gate, the loser's `keep_warm` drops to zero and you never think about it again.
+One Modal App. One route class — `LarynxProcessor`. SYNAPSE was archived at the decision gate; its processor class has been removed.
 
 ---
 
@@ -11,18 +11,12 @@ modal_app.py
 ├── app = modal.App("hackillinois-2026")
 ├── shared_image (base container)
 ├── model_cache (persistent volume)
-├── LarynxProcessor (cls, GPU=A100-80GB)
-└── SynapseProcessor (cls, GPU=A100-80GB)
+└── LarynxProcessor (cls, GPU=A100-80GB)
 ```
 
-Both classes live in the same file. They share the base image and the model cache volume. Only one should have `keep_warm=1` at any time during the final push (after decision gate). During parallel development, both can be warm if you're actively testing.
+Only `LarynxProcessor` remains active.
 
-## GPU
-
-**A100-80GB** for both tracks. Non-negotiable.
-
-- LARYNX needs it for the AAI model (Wav2Vec2 backbone, ~3GB VRAM) and optional real-time spectrogram generation. Could technically run on A10G, but cold starts are 2x longer.
-- SYNAPSE needs it for Llama-3.1-8B (16-bit = ~16GB VRAM) plus TransformerLens overhead for SAE extraction. Won't fit on anything smaller.
+- LARYNX needs A100 for the AAI model (Wav2Vec2 backbone, ~3GB VRAM) and optional real-time spectrogram generation. Could technically run on A10G, but cold starts are 2x longer.
 
 ## Container Image
 
@@ -39,9 +33,6 @@ shared_image = (
         "librosa==0.10.2",
         "parselmouth==0.4.4",
         "soundfile==0.12.1",
-        # SAE / interpretability (SYNAPSE)
-        "transformer-lens==2.8.1",
-        "sae-lens==4.1.1",
         # Shared
         "numpy==1.26.4",
         "scipy==1.14.1",
@@ -52,7 +43,7 @@ shared_image = (
 )
 ```
 
-Yes, both tracks' deps are in one image. The image builds once, and unused packages don't cost runtime memory. Splitting into two images doubles your cold-start debugging surface for zero gain in a 36-hour sprint.
+SYNAPSE deps (`transformer-lens`, `sae-lens`) removed — no longer needed.
 
 ## Persistent Volume
 
@@ -60,7 +51,7 @@ Yes, both tracks' deps are in one image. The image builds once, and unused packa
 model_cache = modal.Volume.from_name("model-cache", create_if_missing=True)
 ```
 
-Mounted at `/model-cache`. Stores HuggingFace model weights so cold starts don't re-download 16GB of Llama weights every time.
+Mounted at `/model-cache`. Stores HuggingFace model weights (AAI Wav2Vec2 backbone) so cold starts don't re-download.
 
 Pre-warm the volume early in the hackathon:
 
@@ -75,7 +66,7 @@ hf_secret = modal.Secret.from_name("huggingface")
 # Set via: modal secret create huggingface HF_TOKEN=hf_xxx
 ```
 
-Needed for Llama-3.1-8B (gated model). Set this up before you need it, not during a demo.
+Needed for AAI model weights if hosted as a gated model. Set this up before you need it, not during a demo.
 
 ## App Definition
 
@@ -89,7 +80,7 @@ shared_image = (
     .pip_install(
         "torch==2.5.1", "torchaudio==2.5.1", "transformers==4.47.0",
         "safetensors==0.4.5", "librosa==0.10.2", "parselmouth==0.4.4",
-        "soundfile==0.12.1", "transformer-lens==2.8.1", "sae-lens==4.1.1",
+        "soundfile==0.12.1",
         "numpy==1.26.4", "scipy==1.14.1", "pydantic==2.10.3", "fastapi==0.115.6",
     )
     .env({"HF_HOME": "/model-cache"})
@@ -104,8 +95,8 @@ hf_secret = modal.Secret.from_name("huggingface")
     gpu="A100-80GB",
     volumes={"/model-cache": model_cache},
     timeout=300,
-    keep_warm=1,  # Set to 0 after decision gate if LARYNX loses
-    container_idle_timeout=120,
+    min_containers=1,
+    scaledown_window=120,
 )
 class LarynxProcessor:
     @modal.enter()
@@ -128,48 +119,11 @@ class LarynxProcessor:
         pass
 
 
-@app.function(
-    image=shared_image,
-    gpu="A100-80GB",
-    volumes={"/model-cache": model_cache},
-    secrets=[hf_secret],
-    timeout=300,
-    keep_warm=1,  # Set to 0 after decision gate if SYNAPSE loses
-    container_idle_timeout=120,
-)
-class SynapseProcessor:
-    @modal.enter()
-    def load_models(self):
-        from transformer_lens import HookedTransformer
-        # Load Llama-3.1-8B + pre-trained SAEs
-        self.model = HookedTransformer.from_pretrained(
-            "meta-llama/Llama-3.1-8B",
-            device="cuda",
-            torch_dtype="float16",
-        )
-        self.model_ready = True
-
-    @modal.method()
-    def health(self):
-        return {"status": "warm", "model": self.model_ready}
-
-    @modal.method()
-    def steer(self, prompt: str, features_to_ablate: list[int]):
-        # 1. Run base generation
-        # 2. Extract SAE features at target layers
-        # 3. Ablate specified features (set activation to 0)
-        # 4. Re-run generation with ablated features
-        # 5. Return before/after comparison
-        pass
-
-
 @app.function(image=shared_image, volumes={"/model-cache": model_cache}, secrets=[hf_secret])
 def download_models():
     """Pre-warm the model cache. Run this early: `modal run modal_app.py::download_models`"""
     from transformers import AutoModel, AutoTokenizer
-    # Downloads to /model-cache via HF_HOME env var
-    AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B")
-    AutoModel.from_pretrained("meta-llama/Llama-3.1-8B")
+    # Downloads AAI model weights to /model-cache
     print("Models cached to /model-cache")
 ```
 
@@ -180,7 +134,6 @@ From your CF Worker or local dev:
 ```typescript
 // Deploy gives you a URL like: https://your-workspace--hackillinois-2026-larynxprocessor-analyze.modal.run
 const LARYNX_URL = import.meta.env.VITE_LARYNX_ENDPOINT;
-const SYNAPSE_URL = import.meta.env.VITE_SYNAPSE_ENDPOINT;
 
 // Health check (GET)
 const health = await fetch(`${LARYNX_URL}/health`);
@@ -197,16 +150,10 @@ const result = await fetch(`${LARYNX_URL}/analyze`, {
 
 | Config | Value | Why |
 |--------|-------|-----|
-| `timeout` | 300s | Llama generation + SAE extraction can take 60-90s. 300s gives headroom. |
-| `keep_warm` | 1 | One container always hot. Cold start on A100 is 45-90s, which kills a live demo. |
-| `container_idle_timeout` | 120s | Container stays alive 2 min after last request. Covers back-to-back demo runs. |
+| `timeout` | 300s | AAI inference + formant extraction can take 30-60s. 300s gives headroom. |
+| `min_containers` | 1 | One container always hot. Cold start on A100 is 45-90s, which kills a live demo. |
+| `scaledown_window` | 120s | Container stays alive 2 min after last request. Covers back-to-back demo runs. |
 
-## At the Decision Gate
+Decision gate complete — LARYNX won. SYNAPSE processor class removed from this layout. Only `LarynxProcessor` remains active.
 
-1. Open `modal_app.py`
-2. Find the loser's class
-3. Change `keep_warm=1` to `keep_warm=0`
-4. `modal deploy modal_app.py`
-5. Done. The loser's container drains in ~2 minutes. You're no longer paying for it.
-
-Don't delete the loser's class. Just zero out `keep_warm`. If something goes catastrophically wrong in the last 12 hours, you can flip it back in 30 seconds.
+If you need to reference the old SYNAPSE processor code, check git history.

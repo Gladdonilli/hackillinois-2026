@@ -1,6 +1,6 @@
 # Shared API Conventions
 
-Every endpoint across both LARYNX and SYNAPSE follows these conventions. No exceptions. Consistency here means the frontend can swap backends at the decision gate without touching API client code.
+Every LARYNX endpoint follows these conventions. No exceptions. Consistency here means the frontend can rely on a stable API contract without surprise format changes.
 
 ---
 
@@ -86,21 +86,6 @@ interface EMAFrame {
 
 type EMASensor = 'UL' | 'LL' | 'JAW' | 'T1' | 'T2' | 'T3';
 
-// SYNAPSE-specific
-interface SteerResult {
-  baseGeneration: string;
-  steeredGeneration: string;
-  featuresAblated: FeatureAblation[];
-  processingTimeMs: number;
-}
-
-interface FeatureAblation {
-  featureId: number;
-  label: string;
-  activationBefore: number;
-  activationAfter: number; // should be ~0 post-ablation
-  layerIndex: number;
-}
 ```
 
 ---
@@ -127,7 +112,7 @@ CF Worker validates size before forwarding to Modal. Don't waste GPU time on a 5
 
 ## SSE (Server-Sent Events)
 
-For processing progress. Both projects stream status updates during inference.
+For processing progress. LARYNX streams status updates during inference.
 
 ```
 event: progress

@@ -18,8 +18,8 @@ cd hackillinois-2026
 # Frontend
 npm install
 
-# Python (SYNAPSE)
-cd backend/synapse
+# Python (LARYNX)
+cd LARYNX/backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cd ../..
@@ -34,11 +34,11 @@ cd ../..
 ## 2. Secrets Setup (1 min)
 
 ```bash
-# Modal (required for both tracks)
+# Modal (required for LARYNX)
 modal token new
 
-# Modal secrets (LARYNX needs OpenAI for TTS)
-modal secret create larynx-secrets OPENAI_API_KEY=sk-...
+# Modal secrets (LARYNX needs HuggingFace for AAI weights)
+modal secret create larynx-secrets HF_TOKEN=hf_...
 
 # Cloudflare (for Worker deployment)
 npx wrangler login
@@ -47,23 +47,7 @@ npx wrangler secret put OPENAI_API_KEY  # enter key when prompted
 
 ## 3. Smoke Tests
 
-### SYNAPSE Smoke (no GPU needed for basic check)
-
-```bash
-# Verify transformer-lens + sae-lens load without errors
-python3 -c "
-import transformer_lens
-import sae_lens
-print(f'transformer-lens {transformer_lens.__version__}')
-print(f'sae-lens {sae_lens.__version__}')
-print('✓ SYNAPSE deps OK')
-"
-
-# Verify Modal deploys (dry run)
-cd backend/synapse
-modal run app.py  # should print endpoint URL
-cd ../..
-```
+### LARYNX Smoke (no GPU needed)
 
 ### LARYNX Smoke (no GPU needed)
 
@@ -108,25 +92,17 @@ For demo testing, use these pre-recorded samples:
 |-------|------|---------|--------|
 | Real voice | `assets/test-real.wav` | 5s human speech for genuine baseline | Record yourself saying "The quick brown fox" |
 | TTS voice | `assets/test-tts.wav` | 5s OpenAI TTS for deepfake detection | `curl https://api.openai.com/v1/audio/speech -H "Authorization: Bearer $OPENAI_API_KEY" -H "Content-Type: application/json" -d '{"model":"tts-1","voice":"alloy","input":"The quick brown fox jumps over the lazy dog","response_format":"wav"}' --output assets/test-tts.wav` |
-| Test prompt | `assets/test-prompt.txt` | SYNAPSE steering test input | "Explain why nuclear energy is beneficial for the environment" |
 
 **Create assets directory and test files FIRST** — both smoke tests and the demo script depend on them.
 
 ```bash
 mkdir -p assets
-echo "Explain why nuclear energy is beneficial for the environment" > assets/test-prompt.txt
 # Record test-real.wav on your phone/laptop mic (5s, "The quick brown fox...")
 # Generate test-tts.wav using the curl command above
-```
 
 ## 5. Full Vertical Slice Smoke (after implementation)
 
 ```bash
-# SYNAPSE end-to-end: prompt → generate → extract features → ablate
-curl -X POST http://localhost:8000/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{"prompt":"Explain nuclear energy","max_tokens":100}' | jq .
-
 # LARYNX end-to-end: upload audio → formants → velocity → verdict
 curl -X POST http://localhost:8000/api/analyze \
   -F "file=@assets/test-real.wav" | jq .
@@ -136,9 +112,8 @@ curl -X POST http://localhost:8000/api/analyze \
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `ModuleNotFoundError: transformer_lens` | Wrong venv | `source backend/synapse/.venv/bin/activate` |
+| `ModuleNotFoundError: parselmouth` | Wrong venv | `source LARYNX/backend/.venv/bin/activate` |
 | `modal.exception.AuthError` | No token | `modal token new` |
-| Modal cold start >30s | No warm container | Add `keep_warm=1` to `@app.function()` |
+| Modal cold start >30s | No warm container | Add `min_containers=1` to `@app.function()` |
 | `CORS error` in browser | Worker missing headers | Deploy worker: `npx wrangler deploy` |
 | Formant extraction returns NaN | Audio too short/quiet | Use ≥3s audio at normal speaking volume |
-| `sae_lens` import error | Version mismatch | Ensure `sae-lens==4.1.1` not 3.19.0 |

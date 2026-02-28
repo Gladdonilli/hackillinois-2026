@@ -1,6 +1,6 @@
 # Frontend Performance Rules
 
-These are non-negotiable. Both LARYNX and SYNAPSE run GPU-driven 3D scenes with real-time data streams. Drop below 60fps and the demo looks broken. Drop below 30fps and judges walk away.
+These are non-negotiable. LARYNX runs a GPU-driven 3D scene with real-time data streams. Drop below 60fps and the demo looks broken. Drop below 30fps and judges walk away.
 
 ---
 
@@ -137,7 +137,7 @@ function RevealSequence() {
 
 ### Timelines for Choreographed Sequences
 
-Use GSAP timelines for the demo's "hero moment" (skull reveal, neuron death). Don't try to choreograph multi-step sequences with chained promises or setTimeout.
+Use GSAP timelines for the demo's "hero moment" (skull reveal, tongue clip). Don't try to choreograph multi-step sequences with chained promises or setTimeout.
 
 ```tsx
 const heroTimeline = gsap.timeline({ paused: true });
