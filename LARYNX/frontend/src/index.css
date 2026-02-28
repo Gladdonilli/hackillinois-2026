@@ -617,3 +617,9 @@ button:focus-visible, input:focus-visible, [data-interactive]:focus-visible {
 .animate-data-stream {
   animation: data-stream 3s ease-in-out infinite;
 }
+
+/* Scene transition fade-in — replaces AnimatePresence (incompatible with R3F Canvas) */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

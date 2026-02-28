@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
-import { TIMING, SPRING } from '@/constants'
-import { motion, AnimatePresence } from 'motion/react'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import UploadPanel from '@/components/UploadPanel'
 import { AnalysisView } from '@/components/AnalysisView'
@@ -150,189 +148,142 @@ export default function App() {
       {/* Background effects — always visible */}
       <div className="grid-bg" />
       <div className="vignette" />
-      <AnimatePresence mode="sync">
-        {appState === 'intro' && (
-          <IntroSequence key="intro" onComplete={() => setShowIntro(false)} />
-        )}
-        
-        {(appState === 'idle' || isPortalTransition) && (
-          <motion.div 
-            key="landing" 
-            className="relative z-10 flex items-center justify-center h-screen"
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0, scale: 0.95, filter: 'blur(4px)' }}
-            transition={{ duration: TIMING.VIEW_TRANSITION }}
+      {/* Scene views — no AnimatePresence (incompatible with R3F Canvas teardown) */}
+      {appState === 'intro' && (
+        <IntroSequence key="intro" onComplete={() => setShowIntro(false)} />
+      )}
+      
+      {(appState === 'idle' || isPortalTransition) && (
+        <div
+          className="relative z-10 flex items-center justify-center h-screen transition-opacity duration-500"
+        >
+          <LandingScene />
+          {/* LARYNX title overlay */}
+          <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none">
+            <h1 className="text-5xl font-mono tracking-[0.5em] text-white/90 text-glow-cyan glitch-text">LARYNX.</h1>
+            <p className="text-xs font-mono tracking-[0.3em] text-dim mt-2">DEEPFAKE VOICE DETECTION</p>
+          </div>
+          {/* Hide upload panel during portal transition to focus on mouth opening */}
+          {!isPortalTransition && <UploadPanel />}
+        </div>
+      )}
+      
+      {(appState === 'analyzing' || (appState === 'uploading' && !isPortalTransition)) && (
+        <div
+          className="absolute inset-0 z-20 animate-[fadeIn_0.6s_ease-out]"
+        >
+          <div className="canvas-container w-full h-full">
+            <AnalysisView />
+          </div>
+          
+          <AnalysisOverlay />
+          
+          <div className="hud-overlay absolute top-4 left-4 z-10">
+            <WaveformDisplay />
+          </div>
+          
+          <div className="hud-overlay absolute top-4 right-4 z-10">
+            <VelocityHUD />
+          </div>
+          
+          <div className="hud-overlay absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-xl z-10">
+            <VerdictPanel />
+          </div>
+        </div>
+      )}
+      
+      {appState === 'complete' && (
+        <div
+          className="absolute inset-0 z-10 animate-[fadeIn_0.8s_ease-out]"
+        >
+          <div className="canvas-container w-full h-full opacity-30">
+            <AnalysisView />
+          </div>
+          
+          {/* Verdict gets major emphasis — HUD panels hidden to avoid overlap */}
+          <div
+            className="hud-overlay absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl z-20 animate-[fadeIn_0.5s_ease-out_0.2s_both]"
           >
-            <LandingScene />
-            {/* LARYNX title overlay */}
-            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none">
-              <h1 className="text-5xl font-mono tracking-[0.5em] text-white/90 text-glow-cyan glitch-text">LARYNX.</h1>
-              <p className="text-xs font-mono tracking-[0.3em] text-dim mt-2">DEEPFAKE VOICE DETECTION</p>
-            </div>
-            {/* Hide upload panel during portal transition to focus on mouth opening */}
-            {!isPortalTransition && <UploadPanel />}
-          </motion.div>
-        )}
-        
-        {(appState === 'analyzing' || (appState === 'uploading' && !isPortalTransition)) && (
-          <motion.div
-            key="analysis" 
-            className="absolute inset-0 z-20"
-            initial={{ opacity: 0, scale: 1.05 }} 
-            animate={{ opacity: 1, scale: 1 }} 
-            exit={{ opacity: 0 }}
-            transition={{ duration: TIMING.COMPLETE_FADE_IN, ease: "easeOut" }}
-          >
-            <div className="canvas-container w-full h-full">
-              <AnalysisView />
-            </div>
-            
-            <AnalysisOverlay />
-            
-            <div className="hud-overlay absolute top-4 left-4 z-10">
-              <WaveformDisplay />
-            </div>
-            
-            <div className="hud-overlay absolute top-4 right-4 z-10">
-              <VelocityHUD />
-            </div>
-            
-            <div className="hud-overlay absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-xl z-10">
+            <div className="shadow-[0_0_100px_rgba(56,189,248,0.15)] rounded-sm">
               <VerdictPanel />
             </div>
-          </motion.div>
-        )}
-        
-        {appState === 'complete' && (
-          <motion.div 
-            key="verdict" 
-            className="absolute inset-0 z-10"
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            transition={{ duration: TIMING.COMPLETE_FADE_IN }}
-          >
-            <div className="canvas-container w-full h-full opacity-30">
-              <AnalysisView />
-            </div>
-            
-            {/* Verdict gets major emphasis — HUD panels hidden to avoid overlap */}
-            <motion.div 
-              className="hud-overlay absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl z-20"
-              initial={{ scale: 0.9, y: "-40%" }}
-              animate={{ scale: 1, y: "-50%" }}
-              transition={{ delay: 0.2, type: "spring", stiffness: SPRING.VERDICT_STIFFNESS, damping: SPRING.VERDICT_DAMPING }}
-            >
-              <div className="shadow-[0_0_100px_rgba(56,189,248,0.15)] rounded-sm">
-                <VerdictPanel />
-              </div>
-            </motion.div>
+          </div>
 
-            {/* Navigation to demo flow */}
-            <motion.button
-              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: TIMING.VERDICT_NAV_DELAY }}
-              onClick={() => useLarynxStore.getState().setStatus('comparing')}
+          {/* Navigation to demo flow */}
+          <button
+            className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all animate-[fadeIn_0.5s_ease-out_1.5s_both]"
+            onClick={() => useLarynxStore.getState().setStatus('comparing')}
+            data-interactive
+          >
+            COMPARE ANALYSIS →
+          </button>
+        </div>
+      )}
+
+      {appState === 'comparing' && (
+        <div
+          className="absolute inset-0 z-10 animate-[fadeIn_0.6s_ease-out]"
+        >
+          <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
+            <CompareView />
+          </Suspense>
+          <button
+            className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all animate-[fadeIn_0.5s_ease-out_0.8s_both]"
+            onClick={() => useLarynxStore.getState().setStatus('technical')}
+            data-interactive
+          >
+            TECHNICAL DETAILS →
+          </button>
+        </div>
+      )}
+
+      {appState === 'technical' && (
+        <div
+          className="absolute inset-0 z-10 animate-[fadeIn_0.6s_ease-out]"
+        >
+          <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
+            <TechnicalDetailPanel />
+          </Suspense>
+          <button
+            className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all animate-[fadeIn_0.5s_ease-out_0.8s_both]"
+            onClick={() => useLarynxStore.getState().setStatus('closing')}
+            data-interactive
+          >
+            CLOSING →
+          </button>
+        </div>
+      )}
+
+      {appState === 'error' && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center animate-[fadeIn_0.6s_ease-out]"
+        >
+          <div className="hud-panel p-12 max-w-md text-center flex flex-col items-center gap-6">
+            <div className="text-warn text-6xl font-mono">⚠</div>
+            <h2 className="text-2xl font-mono tracking-[0.2em] text-white/90">ANALYSIS FAILED</h2>
+            <p className="text-sm font-mono text-dim leading-relaxed">
+              Pipeline encountered an error during processing. This may be due to audio format incompatibility or a backend timeout.
+            </p>
+            <button
+              className="px-6 py-3 border border-warn/40 bg-black/60 backdrop-blur-sm text-warn font-mono text-sm tracking-wider hover:bg-warn/10 hover:border-warn/60 transition-all rounded-sm"
+              onClick={() => useLarynxStore.getState().reset()}
               data-interactive
             >
-              COMPARE ANALYSIS →
-            </motion.button>
-          </motion.div>
-        )}
+              TRY AGAIN
+            </button>
+          </div>
+        </div>
+      )}
 
-        {appState === 'comparing' && (
-          <motion.div
-            key="compare"
-            className="absolute inset-0 z-10"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: TIMING.VIEW_TRANSITION }}
-          >
-            <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
-              <CompareView />
-            </Suspense>
-            <motion.button
-              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: TIMING.NAV_BUTTON_DELAY }}
-              onClick={() => useLarynxStore.getState().setStatus('technical')}
-              data-interactive
-            >
-              TECHNICAL DETAILS →
-            </motion.button>
-          </motion.div>
-        )}
-
-        {appState === 'technical' && (
-          <motion.div
-            key="technical"
-            className="absolute inset-0 z-10"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: TIMING.VIEW_TRANSITION }}
-          >
-            <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
-              <TechnicalDetailPanel />
-            </Suspense>
-            <motion.button
-              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: TIMING.NAV_BUTTON_DELAY }}
-              onClick={() => useLarynxStore.getState().setStatus('closing')}
-              data-interactive
-            >
-              CLOSING →
-            </motion.button>
-          </motion.div>
-        )}
-
-        {appState === 'error' && (
-          <motion.div
-            key="error"
-            className="absolute inset-0 z-10 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: TIMING.VIEW_TRANSITION }}
-          >
-            <div className="hud-panel p-12 max-w-md text-center flex flex-col items-center gap-6">
-              <div className="text-warn text-6xl font-mono">⚠</div>
-              <h2 className="text-2xl font-mono tracking-[0.2em] text-white/90">ANALYSIS FAILED</h2>
-              <p className="text-sm font-mono text-dim leading-relaxed">
-                Pipeline encountered an error during processing. This may be due to audio format incompatibility or a backend timeout.
-              </p>
-              <button
-                className="px-6 py-3 border border-warn/40 bg-black/60 backdrop-blur-sm text-warn font-mono text-sm tracking-wider hover:bg-warn/10 hover:border-warn/60 transition-all rounded-sm"
-                onClick={() => useLarynxStore.getState().reset()}
-                data-interactive
-              >
-                TRY AGAIN
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {appState === 'closing' && (
-          <motion.div
-            key="closing"
-            className="absolute inset-0 z-10"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: TIMING.COMPLETE_FADE_IN }}
-          >
-            <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
-              <ClosingScreen onReset={() => useLarynxStore.getState().reset()} />
-            </Suspense>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {appState === 'closing' && (
+        <div
+          className="absolute inset-0 z-10 animate-[fadeIn_0.8s_ease-out]"
+        >
+          <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
+            <ClosingScreen onReset={() => useLarynxStore.getState().reset()} />
+          </Suspense>
+        </div>
+      )}
       
       {/* Scanline overlay — always on top */}
       <div className="scanline-overlay pointer-events-none z-50" />

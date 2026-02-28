@@ -539,6 +539,77 @@ CREATE TABLE analyses (
 );
 ```
 
+## Supermemory Forensic Memory
+
+LARYNX writes forensic voice analysis records to Supermemory for pattern recall,
+similarity search, and forensic timeline reconstruction.
+
+### Scoping Model
+
+```
+Supermemory Space (API key = space scope)
+  └── Container Tag: "larynx-forensic"   ← CF Worker forensic records
+  └── Container Tag: <.supermemory-id>    ← opencode dev workflow memories (separate)
+```
+
+- **Container tags** partition memories within a single Space — same API key, no cross-contamination
+- The CF Worker uses container tag `"larynx-forensic"` (hardcoded in `MEMORY_CONFIG.CONTAINER_TAG`)
+- The opencode-supermemory plugin uses the `.supermemory-id` file as its container tag (dev workflow)
+- Both share the same Space/API key but NEVER see each other's memories due to tag filtering
+
+### Worker Integration
+
+```typescript
+// Write forensic record (fire-and-forget via waitUntil)
+POST https://api.supermemory.ai/v3/memories
+Headers: { Authorization: "Bearer <SUPERMEMORY_API_KEY>" }
+Body: { content: "<structured forensic text>", containerTag: "larynx-forensic" }
+
+// Search forensic records (scoped to larynx-forensic tag only)
+POST https://api.supermemory.ai/v3/memories/search
+Headers: { Authorization: "Bearer <SUPERMEMORY_API_KEY>" }
+Body: { query: "<search text>", limit: 5, containerTags: ["larynx-forensic"] }
+```
+
+### Secrets
+
+| Secret | Where | How Set |
+|--------|-------|---------|
+| `SUPERMEMORY_API_KEY` | CF Worker secret | `npx wrangler secret put SUPERMEMORY_API_KEY` |
+
+Only ONE secret needed — API key implies the Space. No space ID required.
+Container tag is hardcoded in `supermemory.ts` as `MEMORY_CONFIG.CONTAINER_TAG`.
+
+### Data Flow
+
+```
+Modal verdict SSE → CF Worker intercepts "verdict" event
+  → c.executionCtx.waitUntil(Promise.allSettled([
+       embedAndStore(env, verdictData),       // Workers AI embedding → Vectorize
+       storeForensicRecord(env, verdictData),  // Supermemory forensic write
+     ]))
+  → Never blocks SSE stream to client
+  → All operations fail-open (console.error on failure, no user impact)
+```
+
+### Forensic Record Format
+
+Each verdict generates a structured text record containing:
+- Verdict label (GENUINE/DEEPFAKE) + confidence score
+- Peak velocity + threshold + severity classification
+- Anomaly ratio (anomalyFrames / totalFrames)
+- SHA-256 truncated IP hash (privacy-safe)
+- ISO 8601 timestamp
+
+### Setup Checklist
+
+- [x] `supermemory.ts` created with write + search functions
+- [x] Container tag `"larynx-forensic"` configured in `MEMORY_CONFIG`
+- [x] `SUPERMEMORY_API_KEY` Worker secret set via wrangler
+- [x] Wired into verdict path via `waitUntil()` (fire-and-forget)
+- [x] Search endpoint: `POST /api/intelligence/similar` (fuses Vectorize + Supermemory)
+- [x] Stats endpoint: `GET /api/intelligence/stats` shows `supermemory.configured: true`
+- [x] Deployed and verified
 ## Performance Rules (Non-Negotiable)
 
 1. **NEVER `useState`** for animation data. Use `useLarynxStore.getState()` in `useFrame`.
