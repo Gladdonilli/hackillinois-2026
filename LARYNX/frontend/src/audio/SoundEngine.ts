@@ -13,6 +13,24 @@ let ambientOsc: Tone.Oscillator | null = null
 let ambientGain: Tone.Gain | null = null
 let ambientLfo: Tone.LFO | null = null
 
+let uploadSine: Tone.Synth | null = null
+let uploadAM: Tone.AMSynth | null = null
+let uploadMembrane: Tone.MembraneSynth | null = null
+
+let riserNoise: Tone.Noise | null = null
+let riserFilter: Tone.Filter | null = null
+let riserVolume: Tone.Volume | null = null
+
+let subImpact: Tone.MembraneSynth | null = null
+let noiseBurst: Tone.NoiseSynth | null = null
+let noiseBurstFilter: Tone.Filter | null = null
+
+let horrorSynth: Tone.FMSynth | null = null
+let horrorLfo: Tone.LFO | null = null
+let horrorTremolo: Tone.Tremolo | null = null
+
+let ambientOsc2: Tone.Oscillator | null = null
+
 let scannerBeepSynth: Tone.Synth | null = null
 
 let processingTickSynth: Tone.MetalSynth | null = null
@@ -68,6 +86,58 @@ const ensureInitializedGraph = (): void => {
   ambientLfo.connect(ambientOsc.frequency)
   ambientOsc.start()
   ambientLfo.start()
+
+  ambientOsc2 = new Tone.Oscillator({
+    type: 'sine',
+    frequency: 150,
+    volume: -25,
+  })
+  ambientOsc2.connect(ambientGain)
+  ambientOsc2.start()
+
+  uploadSine = new Tone.Synth({
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.05 }
+  }).connect(masterCompressor)
+
+  uploadAM = new Tone.AMSynth({
+    envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 }
+  }).connect(masterCompressor)
+
+  uploadMembrane = new Tone.MembraneSynth({
+    pitchDecay: 0.05
+  }).connect(masterCompressor)
+
+  riserNoise = new Tone.Noise('white')
+  riserFilter = new Tone.Filter(50, 'lowpass')
+  riserVolume = new Tone.Volume(-Infinity)
+  riserNoise.chain(riserFilter, riserVolume, masterCompressor)
+
+  subImpact = new Tone.MembraneSynth({
+    pitchDecay: 0.05,
+    octaves: 6,
+    oscillator: { type: 'sine' },
+    envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 1.4 }
+  }).connect(masterCompressor)
+
+  noiseBurst = new Tone.NoiseSynth({
+    noise: { type: 'pink' },
+    envelope: { attack: 0.001, decay: 0.15, sustain: 0, release: 0.3 }
+  })
+  noiseBurstFilter = new Tone.Filter(8000, 'highpass')
+  noiseBurst.chain(noiseBurstFilter, masterCompressor)
+
+  horrorSynth = new Tone.FMSynth({
+    harmonicity: 3.14,
+    modulationIndex: 10,
+    oscillator: { type: 'sine' },
+    modulation: { type: 'square' },
+    envelope: { attack: 2, decay: 1, sustain: 1, release: 2 }
+  })
+  horrorLfo = new Tone.LFO({ frequency: 0.1, min: 2.5, max: 4.5 })
+  horrorTremolo = new Tone.Tremolo(19, 1).start()
+  horrorLfo.connect(horrorSynth.harmonicity)
+  horrorSynth.chain(horrorTremolo, masterCompressor)
 
   scannerBeepSynth = new Tone.Synth({
     oscillator: { type: 'sine' },
@@ -244,7 +314,8 @@ export const SoundEngine = {
       tickingActive = true
     }
     if (Tone.Transport.state !== 'started') {
-      Tone.Transport.start()
+    Tone.Transport.bpm.value = DEFAULT_TICK_BPM
+    Tone.Transport.bpm.rampTo(120, 8)
     }
   },
 
@@ -262,6 +333,95 @@ export const SoundEngine = {
     const now = Tone.now()
     const clampedBpm = clamp(bpm, 60, 120)
     Tone.Transport.bpm.setTargetAtTime(clampedBpm, now, 0.08)
+  },
+
+  playUploadThunk: (): void => {
+    if (!requireAudioReady()) return
+    const now = Tone.now()
+    uploadSine?.triggerAttackRelease(800 + (Math.random() * 80 - 40), '64n', now)
+    uploadAM?.triggerAttackRelease(400, '16n', now)
+    uploadMembrane?.triggerAttackRelease('C2', '8n', now)
+  },
+
+  startRiser: (): void => {
+    if (!requireAudioReady()) return
+    const now = Tone.now()
+    riserNoise?.start(now)
+    riserFilter?.frequency.setValueAtTime(50, now)
+    riserFilter?.frequency.linearRampToValueAtTime(8000, now + 5)
+    riserVolume?.volume.setValueAtTime(-Infinity, now)
+    riserVolume?.volume.linearRampToValueAtTime(-5, now + 5)
+  },
+
+  stopRiser: (): void => {
+    if (!initialized) return
+    riserNoise?.stop()
+  },
+
+  triggerSilence: (): void => {
+    if (!masterBus) return
+    const now = Tone.now()
+    masterBus.volume.setValueAtTime(-Infinity, now)
+    masterBus.volume.setValueAtTime(0, now + 0.25)
+  },
+
+  playSubImpact: (): void => {
+    if (!requireAudioReady()) return
+    const now = Tone.now()
+    subImpact?.triggerAttackRelease('C1', '2n', now)
+    if (ambientGain) {
+      ambientGain.gain.setTargetAtTime(0.02, now, 0.01)
+      ambientGain.gain.setTargetAtTime(0.15, now + 4, 1)
+    }
+  },
+
+  playNoiseBurst: (): void => {
+    if (!requireAudioReady()) return
+    const now = Tone.now()
+    noiseBurst?.triggerAttackRelease('8n', now)
+    if (ambientGain) {
+      ambientGain.gain.setTargetAtTime(0.02, now, 0.01)
+      ambientGain.gain.setTargetAtTime(0.15, now + 4, 1)
+    }
+  },
+
+  startHorror: (): void => {
+    if (!requireAudioReady()) return
+    horrorLfo?.start()
+    horrorSynth?.triggerAttack('C2')
+  },
+
+  stopHorror: (): void => {
+    if (!initialized) return
+    horrorSynth?.triggerRelease()
+    horrorLfo?.stop()
+  },
+
+  playResolution: (type: 'genuine' | 'deepfake'): void => {
+    if (!requireAudioReady()) return
+    if (type === 'genuine') {
+      ambientOsc?.frequency.rampTo(150, 2)
+      ambientOsc2?.frequency.rampTo(225, 2)
+      if (ambientOsc2) ambientOsc2.type = 'sine'
+    } else {
+      ambientOsc?.frequency.rampTo(150, 2)
+      ambientOsc2?.frequency.rampTo(160, 2)
+      if (ambientOsc2) ambientOsc2.type = 'sawtooth'
+    }
+  },
+
+  triggerDeepfakeReveal: (): void => {
+    SoundEngine.stopTicking()
+    SoundEngine.startRiser()
+    setTimeout(() => {
+      SoundEngine.triggerSilence()
+      setTimeout(() => {
+        SoundEngine.playSubImpact()
+        SoundEngine.playNoiseBurst()
+        SoundEngine.playVerdict('deepfake')
+        SoundEngine.startHorror()
+      }, 250)
+    }, 5000)
   },
 
   playVerdict: (result: VerdictResult): void => {

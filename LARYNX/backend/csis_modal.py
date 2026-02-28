@@ -150,7 +150,8 @@ def predict_ema_velocity(wav_bytes: bytes, filename: str) -> dict:
 
     # ---- Load AAI inversion model (match predict_ema.py exactly) ----
     from articulatory.utils import load_model
-    from articulatory.bin.decode import ar_loop
+    # NOTE: ar_loop import removed — it transitively imports tkinter (GUI) which
+    # is not available in headless Modal containers. We only need model.inference().
 
     config_path = os.path.join(CHECKPOINT_DIR, "config.yml")
     ckpt_path = os.path.join(CHECKPOINT_DIR, "best_mel_ckpt.pkl")
@@ -199,8 +200,11 @@ def predict_ema_velocity(wav_bytes: bytes, filename: str) -> dict:
         feat = feature.to(device)
 
         # ---- Run inversion model (check use_ar like original) ----
-        if "use_ar" in inversion_config["generator_params"] and inversion_config["generator_params"]["use_ar"]:
-            pred = ar_loop(inversion_model, feat, inversion_config, normalize_before=False)
+        if inversion_config.get("generator_params", {}).get("use_ar", False):
+            raise RuntimeError(
+                "use_ar=True requires ar_loop which depends on tkinter (not available in Modal). "
+                "This checkpoint should not need AR decoding — check config.yml."
+            )
         else:
             pred = inversion_model.inference(feat, normalize_before=False)
         ema = pred.squeeze(0).cpu().numpy()  # (T, 12)

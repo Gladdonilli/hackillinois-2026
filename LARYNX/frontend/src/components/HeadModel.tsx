@@ -1,91 +1,20 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { MeshTransmissionMaterial } from '@react-three/drei';
+import { MeshTransmissionMaterial, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useLarynxStore } from '@/store/useLarynxStore';
+import type { GLTF } from 'three-stdlib';
 
-/**
- * Procedural cranium geometry — elongated skull profile with jaw ridge.
- * Sagittal-sliced via clipping plane for x-ray cross-section view.
- * Will be replaced with GLTF model when Ready Player Me export is ready.
- */
-function createCraniumGeometry(): THREE.BufferGeometry {
-  // Start from a sphere and deform to skull-like profile
-  const geo = new THREE.SphereGeometry(1.2, 64, 64);
-  const pos = geo.attributes.position;
-  const vertex = new THREE.Vector3();
-
-  for (let i = 0; i < pos.count; i++) {
-    vertex.fromBufferAttribute(pos, i);
-
-    // Normalize to unit sphere for deformation
-    const r = vertex.length();
-    // const theta = Math.atan2(vertex.z, vertex.x); // azimuth (reserved for future asymmetric deformation)
-    const phi = Math.acos(vertex.y / r);           // polar
-
-    let scale = 1.0;
-
-    // Elongate cranium top (flatten slightly on top, extend back)
-    // More volume in back of skull (occipital)
-    const yNorm = vertex.y / r;
-    if (yNorm > 0.3) {
-      // Top of head — slight flattening
-      scale *= 0.95 + 0.05 * Math.cos(phi * 0.8);
-    }
-
-    // Push back of skull outward (occipital bulge)
-    const zNorm = vertex.z / r;
-    if (zNorm < -0.2) {
-      scale *= 1.0 + 0.12 * Math.pow(Math.abs(zNorm), 2);
-    }
-
-    // Forehead — slight forward prominence
-    if (yNorm > 0.2 && zNorm > 0.3) {
-      scale *= 1.0 + 0.08 * yNorm * zNorm;
-    }
-
-    // Jaw ridge — pinch inward at bottom, slight chin protrusion
-    if (yNorm < -0.3) {
-      // Narrow the jaw laterally
-      const jawPinch = 0.85 + 0.15 * (1.0 + yNorm); // tighter at bottom
-      vertex.x *= jawPinch;
-
-      // Chin protrusion forward
-      if (zNorm > 0.1 && yNorm < -0.5) {
-        vertex.z += 0.08 * (1.0 - (yNorm + 1.0));
-      }
-    }
-
-    // Cheekbone ridges — subtle lateral bulge at mid-height
-    if (Math.abs(yNorm) < 0.2) {
-      const xNorm = Math.abs(vertex.x / r);
-      if (xNorm > 0.5) {
-        scale *= 1.0 + 0.05 * xNorm;
-      }
-    }
-
-    // Temple indent — slight inward curve above cheekbones
-    if (yNorm > 0.1 && yNorm < 0.4) {
-      const xNorm = Math.abs(vertex.x / r);
-      if (xNorm > 0.6) {
-        scale *= 0.97;
-      }
-    }
-
-    vertex.x *= scale;
-    vertex.y *= scale;
-    vertex.z *= scale;
-
-    pos.setXYZ(i, vertex.x, vertex.y, vertex.z);
-  }
-
-  geo.computeVertexNormals();
-  return geo;
-}
+type FacecapGLTF = GLTF & {
+  nodes: Record<string, THREE.Mesh>;
+  materials: Record<string, THREE.Material>;
+};
 
 export function HeadModel() {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  const headMeshRef = useRef<THREE.Mesh>(null);
   const { gl } = useThree();
+  const { nodes } = useGLTF('/models/facecap.glb') as FacecapGLTF;
 
   useEffect(() => {
     gl.localClippingEnabled = true;
@@ -96,31 +25,71 @@ export function HeadModel() {
     []
   );
 
-  // Memoize the cranium geometry so it's only computed once
-  const craniumGeo = useMemo(() => createCraniumGeometry(), []);
-
   useFrame(() => {
-    const { status } = useLarynxStore.getState();
-    if (status === 'idle' && meshRef.current) {
-      meshRef.current.rotation.y += 0.001;
+    const { status, frames, currentFrame } = useLarynxStore.getState();
+    
+    if (status === 'idle' && groupRef.current) {
+      groupRef.current.rotation.y += 0.001;
+    }
+
+    if (headMeshRef.current && frames && frames.length > 0 && currentFrame < frames.length) {
+      const frame = frames[currentFrame];
+      if (frame?.sensors?.JAW && frame?.sensors?.T1) {
+        const dict = headMeshRef.current.morphTargetDictionary;
+        const influences = headMeshRef.current.morphTargetInfluences;
+        if (dict && influences) {
+          const jawOpenIdx = dict['jawOpen'];
+          const tongueOutIdx = dict['tongueOut'];
+
+          if (jawOpenIdx !== undefined) {
+            const jawY = frame.sensors.JAW.y || 0;
+            // Jaw: un-clamped max, only clamped at 0 for closure (allows deepfake to break limit)
+            influences[jawOpenIdx] = THREE.MathUtils.clamp(-jawY / 20, 0, 3.5); 
+          }
+
+          if (tongueOutIdx !== undefined) {
+            const t1x = frame.sensors.T1.x || 0;
+            influences[tongueOutIdx] = Math.max(0, t1x / 15);
+          }
+        }
+      }
     }
   });
 
+  // Render the core head mesh with the exact transforms from gltfjsx
   return (
-    <mesh ref={meshRef} position={[0, 0, 0]} scale={[1, 1.3, 1]} geometry={craniumGeo}>
-      <MeshTransmissionMaterial
-        transmission={0.92}
-        thickness={2.5}
-        roughness={0.1}
-        chromaticAberration={0.5}
-        anisotropy={0.3}
-        color="#88ccff"
-        backside={true}
-        samples={6}
-        resolution={512}
-        clippingPlanes={clippingPlanes}
-        clipShadows={true}
-      />
-    </mesh>
+    <group ref={groupRef} position={[0, -0.5, 0]} scale={[1.5, 1.5, 1.5]}>
+      <group name="Empty" scale={10}>
+        <group name="grp_scale" rotation={[Math.PI / 2, 0, 0]} scale={0.01}>
+          <group name="grp_transform" rotation={[-0.022, -0.033, -0.008]}>
+            <mesh 
+              name="head"
+              ref={headMeshRef}
+              geometry={nodes.mesh_2.geometry}
+              morphTargetDictionary={nodes.mesh_2.morphTargetDictionary}
+              morphTargetInfluences={nodes.mesh_2.morphTargetInfluences}
+              position={[-10.903, -18.028, -18.131]}
+              scale={0.002}
+            >
+              <MeshTransmissionMaterial
+                transmission={0.92}
+                thickness={2.5}
+                roughness={0.1}
+                chromaticAberration={0.5}
+                anisotropy={0.3}
+                color="#88ccff"
+                backside={true}
+                samples={6}
+                resolution={512}
+                clippingPlanes={clippingPlanes}
+                clipShadows={true}
+              />
+            </mesh>
+          </group>
+        </group>
+      </group>
+    </group>
   );
 }
+
+useGLTF.preload('/models/facecap.glb');
