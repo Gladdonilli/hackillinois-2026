@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { SoundEngine } from '@/audio/SoundEngine'
-import { motion, AnimatePresence } from 'motion/react'
 
 interface IntroSequenceProps {
   onComplete: () => void;

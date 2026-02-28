@@ -179,6 +179,7 @@ export function VerdictPanel() {
             }, badgePopTime + 0.7 + (i * 0.1));
           });
         }
+        }
     }
   }, [status, verdict]);
 
