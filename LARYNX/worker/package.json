@@ -15,5 +15,10 @@
   },
   "dependencies": {
     "hono": "^4.6.14"
-  }
+  },
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
