@@ -329,6 +329,7 @@ def download_librispeech() -> list[tuple[str, bytes]]:
     timeout=600,
     secrets=[modal.Secret.from_name("elevenlabs-api-key")],
     max_containers=50,           # Force 50 separate CPU containers
+    volumes={"/model-cache": model_cache},
     )
 @modal.concurrent(max_inputs=1)  # One chunk per container = max parallelism
 def generate_elevenlabs_chunk(chunk: list[tuple[int, str, str, str, str]]) -> list[tuple[str, bytes]]:
@@ -352,7 +353,7 @@ def generate_elevenlabs_chunk(chunk: list[tuple[int, str, str, str, str]]) -> li
 
     items = []
     for idx, voice_id, voice_name, model_id, sentence in chunk:
-        model_tag = "v3" if "v3" in model_id else "v2"
+        model_tag = "flash" if "flash" in model_id else ("v3" if "v3" in model_id else "v2")
         filename = f"elevenlabs_{voice_name}_{model_tag}_{idx:04d}"
         mp3_path = work_dir / f"{filename}.mp3"
         wav_path = work_dir / f"{filename}.wav"
@@ -399,6 +400,34 @@ def generate_elevenlabs_chunk(chunk: list[tuple[int, str, str, str, str]]) -> li
                 time.sleep(30)
             continue
 
+    # Save to volume cache
+    if items:
+        from pathlib import Path as _P
+        cache_dir = _P("/model-cache/elevenlabs")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        for fname, wav_bytes in items:
+            cache_path = cache_dir / fname
+            if not cache_path.exists():
+                with open(cache_path, "wb") as f:
+                    f.write(wav_bytes)
+        model_cache.commit()
+        print(f"  Cached {len(items)} fakes to volume")
+
+    return items
+
+
+@app.function(image=image, volumes={"/model-cache": model_cache}, timeout=120)
+def load_elevenlabs_cache() -> list[tuple[str, bytes]]:
+    """Load cached ElevenLabs fakes from volume. Returns (filename, wav_bytes) pairs."""
+    from pathlib import Path
+    cache_dir = Path("/model-cache/elevenlabs")
+    if not cache_dir.exists():
+        return []
+    items: list[tuple[str, bytes]] = []
+    for wav_path in sorted(cache_dir.glob("*.wav")):
+        with open(wav_path, "rb") as f:
+            items.append((wav_path.name, f.read()))
+    print(f"  Volume cache: found {len(items)} cached ElevenLabs fakes")
     return items
 
 
@@ -423,23 +452,28 @@ def main():
     # ---- Step 1: Generate data in parallel ----
     print("\n\U0001f4e6 Step 1: Downloading LibriSpeech + generating ElevenLabs deepfakes (parallel)...")
     libri_handle = download_librispeech.spawn()
+    # Check volume cache for existing ElevenLabs fakes first
+    cached_fakes = load_elevenlabs_cache.remote()
+    if len(cached_fakes) >= N_FAKE_SAMPLES:
+        print(f"  \u2705 Loaded {len(cached_fakes)} cached ElevenLabs fakes from volume (skipping generation)")
+        fake_items = cached_fakes[:N_FAKE_SAMPLES]
+        el_results_iter = None
+    else:
+        # Build ElevenLabs work items using Flash v2.5 (cheapest model)
+        import random as _rng
+        el_rng = _rng.Random(42)
+        el_items: list[tuple[int, str, str, str, str]] = []
+        for i in range(N_FAKE_SAMPLES):
+            voice_id, voice_name = el_rng.choice(ELEVENLABS_VOICES)
+            sentence = el_rng.choice(SENTENCES)
+            el_items.append((i, voice_id, voice_name, "eleven_flash_v2_5", sentence))
 
-    # Build ElevenLabs work items: 300 fakes using Flash v2.5 (cheapest model)
-    import random as _rng
-    el_rng = _rng.Random(42)
-    el_items: list[tuple[int, str, str, str, str]] = []
-    for i in range(N_FAKE_SAMPLES):
-        voice_id, voice_name = el_rng.choice(ELEVENLABS_VOICES)
-        sentence = el_rng.choice(SENTENCES)
-        el_items.append((i, voice_id, voice_name, "eleven_flash_v2_5", sentence))
+        CHUNK_SIZE = 50
+        el_chunks = [el_items[i:i + CHUNK_SIZE] for i in range(0, len(el_items), CHUNK_SIZE)]
+        print(f"  Dispatching {len(el_items)} ElevenLabs calls across {len(el_chunks)} chunks...")
 
-    # Split into chunks of 50, dispatch across up to 50 containers via .map()
-    CHUNK_SIZE = 50
-    el_chunks = [el_items[i:i + CHUNK_SIZE] for i in range(0, len(el_items), CHUNK_SIZE)]
-    print(f"  Dispatching {len(el_items)} ElevenLabs calls across {len(el_chunks)} chunks (up to 50 containers)...")
-
-    # Fire ElevenLabs .map() — streams results as chunks complete
-    el_results_iter = generate_elevenlabs_chunk.map(el_chunks, return_exceptions=True, wrap_returned_exceptions=False)
+        el_results_iter = generate_elevenlabs_chunk.map(el_chunks, return_exceptions=True, wrap_returned_exceptions=False)
+        fake_items = []
 
     # Also load existing local samples while ElevenLabs runs remotely
     existing_real: list[tuple[str, bytes]] = []
@@ -461,19 +495,16 @@ def main():
     libri_items = libri_handle.get()
     print(f"  \u2705 LibriSpeech: {len(libri_items)} real utterances")
 
-    print("  Collecting ElevenLabs deepfakes from parallel containers...")
-    fake_items: list[tuple[str, bytes]] = []
-    el_errors = 0
-    for chunk_idx, chunk_result in enumerate(el_results_iter):
-        if isinstance(chunk_result, Exception):
-            print(f"    \u26a0\ufe0f Chunk {chunk_idx + 1}/{len(el_chunks)} failed: {chunk_result}")
-            el_errors += 1
-            continue
-        fake_items.extend(chunk_result)
-        if (chunk_idx + 1) % 10 == 0 or chunk_idx + 1 == len(el_chunks):
-            print(f"    \u2705 Collected {chunk_idx + 1}/{len(el_chunks)} chunks ({len(fake_items)} fakes so far)")
-    print(f"  \u2705 ElevenLabs: {len(fake_items)} deepfakes ({el_errors} chunk failures)")
-
+    if el_results_iter is not None:
+        print("  Collecting ElevenLabs deepfakes from parallel containers...")
+        el_errors = 0
+        for chunk_idx, chunk_result in enumerate(el_results_iter):
+            if isinstance(chunk_result, Exception):
+                print(f"    \u26a0\ufe0f Chunk {chunk_idx + 1} failed: {chunk_result}")
+                el_errors += 1
+                continue
+            fake_items.extend(chunk_result)
+        print(f"  \u2705 ElevenLabs: {len(fake_items)} deepfakes ({el_errors} chunk failures)")
     # Combine all samples
     all_real = existing_real + libri_items
     all_fake = existing_fake + fake_items
