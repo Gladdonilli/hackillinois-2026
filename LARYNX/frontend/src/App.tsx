@@ -20,6 +20,8 @@ export default function App() {
   const status = useLarynxStore((state) => state.status)
   const [showIntro, setShowIntro] = useState(true)
   const initRef = useRef(false)
+  // DEBUG: expose store for visual audit (remove before demo)
+  useEffect(() => { (window as any).__LARYNX_STORE = useLarynxStore; }, [])
 
   // Preload demo panels when analysis starts
   useEffect(() => {
