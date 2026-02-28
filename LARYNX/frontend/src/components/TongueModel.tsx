@@ -8,8 +8,13 @@ export function TongueModel() {
   const meshRef = useRef<THREE.Mesh>(null);
   const matRef = useRef<any>(null); // MeshDistortMaterial ref
   const colorObj = useRef(new THREE.Color('#00FFFF'));
-  useFrame(() => {
+  const scalePulseRef = useRef(1.0);
+  const wasAbove80Ref = useRef(false);
+
+  useFrame((_, delta) => {
     const { frames, currentFrame, tongueVelocity } = useLarynxStore.getState();
+    const velocity = tongueVelocity || 0;
+    
     if (!meshRef.current || !matRef.current) return;
     
     // Position from EMA data
@@ -19,22 +24,48 @@ export function TongueModel() {
       meshRef.current.position.y += (frame.sensors.T1.y - meshRef.current.position.y) * 0.15;
     }
     
-    // Velocity-driven distortion
-    const normalizedVel = Math.min(tongueVelocity / 100, 1);
-    matRef.current.distort = 0.1 + normalizedVel * 0.7;
-    matRef.current.speed = 2 + normalizedVel * 15;
-    
-    // Color lerp: cyan → warn → red
-    if (tongueVelocity > 80) {
-      colorObj.current.lerp(new THREE.Color('#FF0000'), 0.1);
-    } else if (tongueVelocity > 50) {
-      colorObj.current.lerp(new THREE.Color('#FF3366'), 0.1);
-    } else {
-      colorObj.current.lerp(new THREE.Color('#00FFFF'), 0.05);
+    let targetDistort = 0.1;
+    let targetSpeed = 2;
+    let targetEmissive = 0.3;
+    let targetHex = '#00FFFF'; // cyan
+
+    if (velocity > 80) {
+        targetDistort = 0.9;
+        targetSpeed = 25;
+        targetEmissive = 4.0;
+        targetHex = '#FF0000'; // bright red
+    } else if (velocity > 50) {
+        targetDistort = 0.6;
+        targetSpeed = 15;
+        targetEmissive = 2.0;
+        targetHex = '#FFA500'; // orange
+    } else if (velocity > 22) {
+        targetDistort = 0.3;
+        targetSpeed = 8;
+        targetEmissive = 1.0;
+        targetHex = '#FFFF00'; // yellow
     }
+
+    matRef.current.distort += (targetDistort - matRef.current.distort) * 10 * delta;
+    matRef.current.speed += (targetSpeed - matRef.current.speed) * 10 * delta;
+    matRef.current.emissiveIntensity += (targetEmissive - matRef.current.emissiveIntensity) * 10 * delta;
+    
+    colorObj.current.lerp(new THREE.Color(targetHex), 10 * delta);
     matRef.current.color = colorObj.current;
-    matRef.current.emissiveIntensity = 0.3 + normalizedVel * 2.5;
+    matRef.current.emissive = colorObj.current;
+
+    // Scale pulse
+    if (velocity > 80 && !wasAbove80Ref.current) {
+        scalePulseRef.current = 1.3;
+    }
+    wasAbove80Ref.current = velocity > 80;
+
+    if (scalePulseRef.current > 1.0) {
+        scalePulseRef.current = Math.max(1.0, scalePulseRef.current - delta * 3.0); // 1.3 -> 1.0 in ~100ms
+    }
+    meshRef.current.scale.setScalar(scalePulseRef.current);
   });
+
   return (
     <Float speed={1.5} rotationIntensity={0.05} floatIntensity={0.1}>
       <mesh ref={meshRef} position={[0, -0.3, 0.3]}>

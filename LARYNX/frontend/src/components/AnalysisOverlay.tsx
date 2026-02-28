@@ -10,7 +10,7 @@ export function AnalysisOverlay() {
   const frames = useLarynxStore((state) => state.frames)
   
   const [elapsed, setElapsed] = useState(0)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const isVisible = status === 'uploading' || status === 'analyzing'
 

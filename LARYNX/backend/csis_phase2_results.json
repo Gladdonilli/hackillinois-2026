@@ -1,0 +1,134 @@
+[
+  {
+    "filename": "cmu-arctic-16k.wav",
+    "num_frames": 322,
+    "ema_shape": [
+      322,
+      53
+    ],
+    "duration_s": 3.235,
+    "ema_rate_hz": 200.0,
+    "tt_peak_vel": 3.7965,
+    "tt_mean_vel": 0.7393,
+    "tt_p95_vel": 2.0726,
+    "tt_p99_vel": 2.813,
+    "tt_median_vel": 0.5648,
+    "tb_peak_vel": 3.7961,
+    "tb_mean_vel": 0.9057,
+    "tb_p95_vel": 2.4087,
+    "td_peak_vel": 3.3583,
+    "td_mean_vel": 0.7232,
+    "td_p95_vel": 1.8564,
+    "label": "real"
+  },
+  {
+    "filename": "cmu-arctic-sample.wav",
+    "num_frames": 322,
+    "ema_shape": [
+      322,
+      53
+    ],
+    "duration_s": 3.235,
+    "ema_rate_hz": 200.0,
+    "tt_peak_vel": 3.7965,
+    "tt_mean_vel": 0.7393,
+    "tt_p95_vel": 2.0726,
+    "tt_p99_vel": 2.813,
+    "tt_median_vel": 0.5648,
+    "tb_peak_vel": 3.7961,
+    "tb_mean_vel": 0.9057,
+    "tb_p95_vel": 2.4087,
+    "td_peak_vel": 3.3583,
+    "td_mean_vel": 0.7232,
+    "td_p95_vel": 1.8564,
+    "label": "real"
+  },
+  {
+    "filename": "ava-neural-16k.wav",
+    "num_frames": 306,
+    "ema_shape": [
+      306,
+      53
+    ],
+    "duration_s": 3.072,
+    "ema_rate_hz": 200.0,
+    "tt_peak_vel": 3.2163,
+    "tt_mean_vel": 0.9785,
+    "tt_p95_vel": 2.1324,
+    "tt_p99_vel": 2.7219,
+    "tt_median_vel": 0.8718,
+    "tb_peak_vel": 3.3443,
+    "tb_mean_vel": 1.025,
+    "tb_p95_vel": 2.3513,
+    "td_peak_vel": 1.8924,
+    "td_mean_vel": 0.7908,
+    "td_p95_vel": 1.6309,
+    "label": "deepfake"
+  },
+  {
+    "filename": "edge-ava-deepfake.wav",
+    "num_frames": 306,
+    "ema_shape": [
+      306,
+      53
+    ],
+    "duration_s": 3.072,
+    "ema_rate_hz": 200.0,
+    "tt_peak_vel": 3.1417,
+    "tt_mean_vel": 0.9758,
+    "tt_p95_vel": 2.1433,
+    "tt_p99_vel": 2.7643,
+    "tt_median_vel": 0.9027,
+    "tb_peak_vel": 3.3465,
+    "tb_mean_vel": 1.0332,
+    "tb_p95_vel": 2.3428,
+    "td_peak_vel": 1.8554,
+    "td_mean_vel": 0.7912,
+    "td_p95_vel": 1.6184,
+    "label": "deepfake"
+  },
+  {
+    "filename": "edge-guy-deepfake.wav",
+    "num_frames": 378,
+    "ema_shape": [
+      378,
+      53
+    ],
+    "duration_s": 3.792,
+    "ema_rate_hz": 200.0,
+    "tt_peak_vel": 3.2772,
+    "tt_mean_vel": 0.9188,
+    "tt_p95_vel": 2.4513,
+    "tt_p99_vel": 3.1395,
+    "tt_median_vel": 0.7343,
+    "tb_peak_vel": 4.176,
+    "tb_mean_vel": 0.9698,
+    "tb_p95_vel": 2.7109,
+    "td_peak_vel": 3.5558,
+    "td_mean_vel": 0.7958,
+    "td_p95_vel": 2.365,
+    "label": "deepfake"
+  },
+  {
+    "filename": "guy-neural-16k.wav",
+    "num_frames": 378,
+    "ema_shape": [
+      378,
+      53
+    ],
+    "duration_s": 3.792,
+    "ema_rate_hz": 200.0,
+    "tt_peak_vel": 3.2759,
+    "tt_mean_vel": 0.9186,
+    "tt_p95_vel": 2.4582,
+    "tt_p99_vel": 3.1445,
+    "tt_median_vel": 0.7221,
+    "tb_peak_vel": 4.1837,
+    "tb_mean_vel": 0.97,
+    "tb_p95_vel": 2.6958,
+    "td_peak_vel": 3.5699,
+    "td_mean_vel": 0.7962,
+    "td_p95_vel": 2.3548,
+    "label": "deepfake"
+  }
+]

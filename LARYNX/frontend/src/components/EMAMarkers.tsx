@@ -1,6 +1,6 @@
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
+import { Billboard, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useLarynxStore } from '@/store/useLarynxStore';
 import { VELOCITY_THRESHOLDS } from '@/types/larynx';
@@ -74,37 +74,46 @@ export function EMAMarkers() {
   );
 }
 
+type TextMaterial = THREE.Material & { color: THREE.Color };
+type TextMesh = THREE.Mesh & { text: string, color: THREE.Color, material: TextMaterial, sync?: () => void };
+
 function MarkerLabel({ name }: { name: SensorNameType }) {
   const groupRef = useRef<THREE.Group>(null);
+  const textRef = useRef<TextMesh>(null);
   
   useFrame(() => {
-    if (!groupRef.current) return;
+    if (!groupRef.current || !textRef.current) return;
     const { frames, currentFrame } = useLarynxStore.getState();
     const frame = frames[currentFrame];
     if (!frame || !frame.sensors || !frame.sensors[name]) return;
     
-    // Mirror the exact position of the instance
+    // Position the group (Billboard handles camera facing)
     const sensor = frame.sensors[name];
-    groupRef.current.position.set(sensor.x / 50, sensor.y / 50, 0.3);
+    groupRef.current.position.set(sensor.x / 50, (sensor.y / 50) + 0.08, 0.3);
+
+    // Directly update text and color for 60fps
+    const velocity = sensor.velocity || 0;
+    const threshold = VELOCITY_THRESHOLDS[name];
+    
+    textRef.current.text = `${name} ${velocity.toFixed(1)}`;
+    textRef.current.color = velocity > threshold ? WARN_COLOR : NORMAL_COLOR;
+    
+    if (textRef.current.sync) {
+      textRef.current.sync();
+    }
   });
 
   return (
     <group ref={groupRef}>
-      <Html 
-        distanceFactor={4} 
-        zIndexRange={[100, 0]}
-        style={{
-          color: 'rgba(255, 255, 255, 0.4)',
-          fontSize: '10px',
-          fontFamily: 'monospace',
-          pointerEvents: 'none',
-          textShadow: '0 0 2px #000000',
-          transition: 'color 0.2s',
-        }}
-        className="hover:text-cyan-400"
-      >
-        <div>{name}</div>
-      </Html>
+      <Billboard>
+        <Text 
+          ref={textRef}
+          fontSize={0.08}
+          color={NORMAL_COLOR}
+          anchorX="center"
+          anchorY="middle"
+        >{' '}</Text>
+      </Billboard>
     </group>
   );
 }
