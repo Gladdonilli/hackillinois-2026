@@ -194,7 +194,7 @@ ELEVENLABS_VOICES = [
     max_containers=10,            # 10 GPU cap on Modal account
     keep_warm=1,                  # 1 container always hot — models in VRAM, zero cold start
     )
-@modal.concurrent(max_inputs=10) # 10 concurrent batches per container — model loaded once, CPU handles preprocessing
+@modal.concurrent(max_inputs=20) # 20 concurrent batches per container — model loaded once, GPU stays saturated
 def predict_ema_batch(wav_paths: list[str]) -> list[dict]:
     """Process a batch of WAV files from volume paths through AAI model."""
     import torch
@@ -263,7 +263,7 @@ def predict_ema_batch(wav_paths: list[str]) -> list[dict]:
 
             wavs = torch.FloatTensor(audio).unsqueeze(0).to(device)
 
-            with torch.no_grad():
+            with torch.inference_mode(), torch.autocast('cuda', dtype=torch.bfloat16):
                 hidden = hubert_model(wavs)["hidden_states"][-1].squeeze(0)  # (T, 1024)
                 feat = hidden.unsqueeze(0).transpose(1, 2)
                 feat = torch.nn.functional.interpolate(feat, scale_factor=2, mode="linear", align_corners=False)
@@ -548,7 +548,7 @@ def main():
     )
 
     # Batch into groups of 20 for fewer scheduling round trips
-    BATCH_SIZE = 20
+    BATCH_SIZE = 100  # Larger batches = fewer scheduling round trips, containers stay saturated
     all_items_labeled = [(p, "real") for p in real_paths] + [(p, "deepfake") for p in fake_paths]
     labels = {Path(p).name: l for p, l in all_items_labeled}
 

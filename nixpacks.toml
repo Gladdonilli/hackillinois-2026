@@ -1,0 +1,8 @@
+[phases.install]
+cmds = ['cd LARYNX/frontend && npm install']
+
+[phases.build]
+cmds = ['cd LARYNX/frontend && npx vite build']
+
+[start]
+cmd = 'cd LARYNX/frontend && npx serve dist -s -l 8000'
