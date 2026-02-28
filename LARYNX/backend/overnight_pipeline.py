@@ -58,7 +58,7 @@ N_REAL_SAMPLES = 300
 N_FAKE_SAMPLES = 300
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
-INFERENCE_PASSES = 130
+INFERENCE_PASSES = 10
 
 # Phonetically diverse sentences for TTS generation
 SENTENCES = [
@@ -146,7 +146,7 @@ EDGE_TTS_VOICES = [
     volumes={"/model-cache": model_cache},
     gpu="A100",
     timeout=600,
-    retries=2,
+    retries=3,
 )
 def predict_ema_batch(wav_items: list[tuple[str, bytes]]) -> list[dict]:
     """Process a batch of WAV files through AAI model. Each item is (filename, wav_bytes)."""
@@ -450,7 +450,23 @@ def main():
 
         pass_results = []
         for i, handle in enumerate(handles):
-            batch_results = handle.get()
+            # Retry logic: if a batch fails with transient error, retry up to 3 times
+            for attempt in range(3):
+                try:
+                    batch_results = handle.get()
+                    break
+                except Exception as e:
+                    err_str = str(e)
+                    if attempt < 2 and ("503" in err_str or "502" in err_str or "temporarily" in err_str.lower() or "timeout" in err_str.lower()):
+                        wait_secs = 30 * (attempt + 1)
+                        print(f"    ⚠️ Batch {i+1} attempt {attempt+1} failed ({err_str[:80]}), retrying in {wait_secs}s...")
+                        time.sleep(wait_secs)
+                        # Re-spawn the failed batch
+                        handle = predict_ema_batch.spawn(batches[i])
+                    else:
+                        print(f"    ❌ Batch {i+1} failed permanently: {err_str[:120]}")
+                        batch_results = [{"filename": f, "error": err_str[:200]} for f, _ in batches[i]]
+                        break
             for r in batch_results:
                 if "filename" in r:
                     r["pass_idx"] = pass_idx + 1
@@ -476,6 +492,13 @@ def main():
             f"{pass_good} success, {pass_err} errors, {pass_minutes:.1f} min "
             f"(elapsed {elapsed_hours:.2f}h)"
         )
+
+        # Checkpoint results after each pass so we don't lose everything on crash
+        checkpoint_path = RESULTS_DIR / "aai_results_checkpoint.json"
+        checkpoint_good = [r for r in all_results if "error" not in r]
+        with open(checkpoint_path, "w") as f:
+            json.dump(checkpoint_good, f)
+        print(f"    💾 Checkpoint: {len(checkpoint_good)} results saved")
 
     # Filter out errors
     good_results = [r for r in all_results if "error" not in r]

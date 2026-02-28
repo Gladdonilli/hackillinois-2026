@@ -7,6 +7,8 @@ let initialized = false
 let masterCompressor: Tone.Compressor | null = null
 let masterHighpass: Tone.Filter | null = null
 let masterLimiter: Tone.Limiter | null = null
+let masterReverb: Tone.Reverb | null = null
+let masterEq: Tone.EQ3 | null = null
 let masterBus: Tone.Volume | null = null
 
 let ambientOsc: Tone.Oscillator | null = null
