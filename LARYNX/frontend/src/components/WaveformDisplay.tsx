@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { useLarynxStore } from '@/store/useLarynxStore';
 import type { FormantData } from '@/types/larynx';
@@ -6,12 +6,14 @@ import type { FormantData } from '@/types/larynx';
 export function WaveformDisplay() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioUrl = useLarynxStore((state) => state.audioUrl);
+  const [duration, setDuration] = useState('00:00.00');
   
   const waveformDataRef = useRef<Float32Array | null>(null);
 
   useEffect(() => {
     if (!audioUrl) {
       waveformDataRef.current = null;
+      setDuration('00:00.00');
       return;
     }
 
@@ -23,11 +25,19 @@ export function WaveformDisplay() {
       .then(buf => ctx.decodeAudioData(buf))
       .then(audioBuffer => {
         if (!isMounted) return;
+
+        const d = audioBuffer.duration;
+        const m = Math.floor(d / 60).toString().padStart(2, '0');
+        const s = Math.floor(d % 60).toString().padStart(2, '0');
+        const ms = Math.floor((d % 1) * 100).toString().padStart(2, '0');
+        setDuration(`${m}:${s}.${ms}`);
+
         const channelData = audioBuffer.getChannelData(0);
-        // Downsample for visual rendering
-        const step = Math.ceil(channelData.length / 384);
-        const downsampled = new Float32Array(384);
-        for (let i = 0; i < 384; i++) {
+        // Need enough bins for 2px rect + 1px gap across 384px width = 128 bins
+        const bins = 128;
+        const step = Math.ceil(channelData.length / bins);
+        const downsampled = new Float32Array(bins);
+        for (let i = 0; i < bins; i++) {
           let min = 1.0;
           let max = -1.0;
           for (let j = 0; j < step; j++) {
@@ -69,11 +79,10 @@ export function WaveformDisplay() {
       const currentFrame = storeState.currentFrame || 0;
       const totalFrames = Array.isArray(storeState.frames) ? storeState.frames.length : Math.max(1, currentFrame);
 
-      // Draw background grid
-      ctx.strokeStyle = '#1F1F1F';
+      // Draw background grid (25%, 50%, 75%)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      // 4 horizontal lines
       for (let i = 1; i <= 3; i++) {
         const y = Math.floor((height / 4) * i) + 0.5;
         ctx.moveTo(0, y);
@@ -81,48 +90,48 @@ export function WaveformDisplay() {
       }
       ctx.stroke();
 
-      // Tick marks at bottom
-      ctx.beginPath();
-      for (let i = 0; i <= 10; i++) {
-        const x = Math.floor((width / 10) * i) + 0.5;
-        ctx.moveTo(x, height - 5);
-        ctx.lineTo(x, height);
-      }
-      ctx.stroke();
-
-      // Draw Waveform
+      // Draw Waveform bars
       if (waveformDataRef.current) {
         const data = waveformDataRef.current;
-        ctx.strokeStyle = '#333333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (let i = 0; i < data.length; i++) {
-          const x = i;
-          const amplitude = data[i] * Math.max(10, (height / 2));
-          const y1 = (height / 2) - amplitude;
-          const y2 = (height / 2) + amplitude;
+        const bins = data.length;
+        const barWidth = 2;
+        const gap = 1;
+
+        for (let i = 0; i < bins; i++) {
+          const x = i * (barWidth + gap);
+          let amplitude = data[i] * (height * 0.8);
+          if (amplitude < 1) amplitude = 1;
           
-          ctx.moveTo(x, Math.floor(y1));
-          ctx.lineTo(x, Math.floor(y2));
+          const y = height - amplitude;
+
+          const grad = ctx.createLinearGradient(0, height, 0, y);
+          grad.addColorStop(0, 'rgba(0, 255, 255, 0.1)');
+          grad.addColorStop(1, 'rgba(0, 255, 255, 0.6)');
+          
+          ctx.fillStyle = grad;
+          ctx.fillRect(x, y, barWidth, amplitude);
         }
-        ctx.stroke();
       }
 
       // Draw Formants overlapping
       const formantsData = storeState.formants;
-      if (Array.isArray(formantsData) && formantsData.length > 0) {
-        const xStep = width / formantsData.length;
-        
-        const drawFormantLine = (key: keyof FormantData, color: string, maxFreq: number) => {
+      if (Array.isArray(formantsData) && formantsData.length > 0 && totalFrames > 0) {
+        const drawFormantLine = (key: keyof FormantData, color: string, maxFreq: number, label: string) => {
           ctx.strokeStyle = color;
           ctx.lineWidth = 1.5;
+          ctx.setLineDash([2, 5]);
           ctx.beginPath();
           let started = false;
-          for (let i = 0; i < formantsData.length; i++) {
+          let lastX = 0;
+          let lastY = 0;
+          
+          const dataLength = formantsData.length;
+          for (let i = 0; i < dataLength; i++) {
+            const progress = i / Math.max(1, (totalFrames || dataLength));
+            const x = progress * width;
             const formantFrame = formantsData[i];
             const freq = formantFrame[key];
-            if (typeof freq === 'number') {
-              const x = i * xStep;
+            if (typeof freq === 'number' && !isNaN(freq)) {
               const y = height - Math.min(1, Math.max(0, freq / maxFreq)) * height;
               if (!started) {
                 ctx.moveTo(x, y);
@@ -130,30 +139,61 @@ export function WaveformDisplay() {
               } else {
                 ctx.lineTo(x, y);
               }
+              lastX = x;
+              lastY = y;
             } else {
               started = false;
             }
           }
           ctx.stroke();
+          ctx.setLineDash([]);
+
+          if (started) {
+            ctx.font = '8px monospace';
+            ctx.fillStyle = color;
+            ctx.fillText(label, Math.min(width - 12, lastX + 4), lastY + 3);
+          }
         };
 
-        drawFormantLine('f1', '#FF6B6B', 1500);
-        drawFormantLine('f2', '#4ECDC4', 4000);
-        drawFormantLine('f3', '#FFE66D', 6000);
+        drawFormantLine('f1', 'rgba(255, 100, 100, 0.4)', 1500, 'F1');
+        drawFormantLine('f2', 'rgba(100, 255, 200, 0.4)', 3000, 'F2');
+        drawFormantLine('f3', 'rgba(255, 255, 100, 0.3)', 4500, 'F3');
       }
 
       // Draw Playhead
-      if (totalFrames > 0) {
-        const playheadX = (currentFrame / totalFrames) * width;
-        ctx.strokeStyle = '#00FFFF';
-        ctx.lineWidth = 2;
-        ctx.shadowBlur = 4;
-        ctx.shadowColor = '#00FFFF';
+      if (totalFrames > 0 && currentFrame > 0) {
+        let playheadX = (currentFrame / totalFrames) * width;
+        if (playheadX > width) playheadX = width;
+
         ctx.beginPath();
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+        ctx.lineWidth = 4;
         ctx.moveTo(playheadX, 0);
         ctx.lineTo(playheadX, height);
         ctx.stroke();
-        ctx.shadowBlur = 0; // Reset shadow
+
+        ctx.beginPath();
+        ctx.strokeStyle = '#00FFFF';
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#00FFFF';
+        ctx.moveTo(playheadX, 0);
+        ctx.lineTo(playheadX, height);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      // Update DOM values directly to avoid React state re-renders
+      if (formantsData && currentFrame > 0 && currentFrame < formantsData.length) {
+         const f1El = document.getElementById('wave-f1-val');
+         const f2El = document.getElementById('wave-f2-val');
+         const f3El = document.getElementById('wave-f3-val');
+         const frameData: any = formantsData[currentFrame];
+         if (frameData) {
+            if(f1El) f1El.textContent = `F1: ${Math.round(frameData.f1 || 0)} Hz`;
+            if(f2El) f2El.textContent = `F2: ${Math.round(frameData.f2 || 0)} Hz`;
+            if(f3El) f3El.textContent = `F3: ${Math.round(frameData.f3 || 0)} Hz`;
+         }
       }
 
       animationId = requestAnimationFrame(render);
@@ -168,25 +208,33 @@ export function WaveformDisplay() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -50 }}
+      initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="fixed top-4 left-4 w-96 bg-card/80 backdrop-blur-sm border border-border rounded-lg p-3 z-50 text-text shadow-lg"
+      transition={{ duration: 0.5, delay: 0.2 }}
+      className="fixed top-4 left-4 w-96 hud-panel hud-sweep !bg-black/80 backdrop-blur-md p-3 z-50 pointer-events-none"
     >
-      <div className="font-mono text-xs text-dim tracking-widest mb-2">WAVEFORM</div>
+      <div className="flex justify-between items-center mb-2">
+        <div className="font-mono text-[10px] tracking-[0.3em] uppercase text-[#666]">
+          AUDIO WAVEFORM
+        </div>
+        <div className="font-mono text-[10px] text-cyan">
+          {duration}
+        </div>
+      </div>
       
-      <div className="relative w-full h-[120px] rounded overflow-hidden bg-black/50 border border-[#1F1F1F]">
-        {!audioUrl && (
-          <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-dim z-10 pointer-events-none">
-            NO AUDIO DATA
-          </div>
-        )}
+      <div className="relative w-full h-[100px] bg-transparent">
         <canvas
           ref={canvasRef}
           width={384}
-          height={120}
-          className="block w-full h-full object-cover mix-blend-screen"
-          style={{ width: '384px', height: '120px' }}
+          height={100}
+          className="block w-full h-full mix-blend-screen"
         />
+      </div>
+
+      <div className="flex flex-row justify-between items-center mt-2 border-t border-border/30 pt-2">
+        <div id="wave-f1-val" className="font-mono text-[9px] text-[#555] w-1/3">F1: --- Hz</div>
+        <div id="wave-f2-val" className="font-mono text-[9px] text-[#555] w-1/3 text-center">F2: --- Hz</div>
+        <div id="wave-f3-val" className="font-mono text-[9px] text-[#555] w-1/3 text-right">F3: --- Hz</div>
       </div>
     </motion.div>
   );

@@ -66,37 +66,57 @@ export function VelocityHUD() {
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.3 }}
-      className="fixed top-4 right-4 w-72 bg-card/80 backdrop-blur-sm border border-border rounded-lg p-4 z-50 text-text shadow-lg"
+      className="fixed top-4 right-4 w-72 z-50 hud-panel hud-sweep p-4 text-[#EDEDED]"
     >
-      <div className="font-mono text-xs text-dim tracking-widest mb-4">VELOCITY</div>
-      <div className="grid grid-cols-2 gap-4">
-        {sensors.map((s) => {
-          const valStr = s.velocity !== null ? s.velocity.toFixed(1) : '—';
-          const isOver = s.velocity !== null && s.velocity > s.threshold;
-          const pct = s.velocity !== null ? Math.min(s.velocity / (s.threshold * 2), 1) * 100 : 0;
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse-glow" />
+        <div className="text-[10px] tracking-[0.3em] uppercase text-[#666] font-mono">VELOCITY ANALYSIS</div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3">
+        {/* Tongue Group */}
+        <div className="flex flex-col gap-2">
+            <div className="text-[8px] text-[#333] tracking-[0.3em] uppercase mb-1">TONGUE</div>
+            {sensors.slice(0, 3).map((s) => (
+                <SensorRow key={s.label} s={s} />
+            ))}
+        </div>
 
-          return (
-            <div key={s.label} className="flex flex-col gap-1">
-              <div className="flex justify-between items-end">
-                <span className="font-mono text-xs text-dim">{s.label}</span>
-                <span className={cn("font-mono text-sm", isOver ? "text-warn" : "text-cyan")}>
-                  {valStr} <span className="text-xs text-dim">cm/s</span>
-                </span>
-              </div>
-              <div className="relative h-1 w-full bg-[#1F1F1F] rounded-full overflow-hidden">
-                {s.velocity !== null && (
-                  <div
-                    className={cn("h-full rounded-full transition-all duration-75", isOver ? "bg-warn" : "bg-cyan")}
-                    style={{ width: `${pct}%` }}
-                  />
-                )}
-                {/* 50% Threshold marker */}
-                <div className="absolute top-0 bottom-0 left-1/2 w-px bg-white/30" />
-              </div>
-            </div>
-          );
-        })}
+        {/* Articulators Group */}
+        <div className="flex flex-col gap-2">
+            <div className="text-[8px] text-[#333] tracking-[0.3em] uppercase mb-1">ARTICULATORS</div>
+            {sensors.slice(3, 6).map((s) => (
+                <SensorRow key={s.label} s={s} />
+            ))}
+        </div>
       </div>
     </motion.div>
   );
+}
+
+function SensorRow({ s }: { s: SensorData }) {
+    const valStr = s.velocity !== null ? s.velocity.toFixed(1) : '—';
+    const isOver = s.velocity !== null && s.velocity > s.threshold;
+    const pct = s.velocity !== null ? Math.min(s.velocity / (s.threshold * 2), 1) * 100 : 0;
+
+    return (
+        <div className={cn("flex flex-col gap-1 p-1 -mx-1 rounded transition-colors", isOver && "bg-warn/5")}>
+        <div className="flex justify-between items-end">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[#666]">{s.label}</span>
+            <span className={cn("text-sm font-mono tabular-nums leading-none", isOver ? "text-warn text-glow-warn animate-flicker" : "text-cyan")}>
+            {valStr} <span className="text-[9px] text-[#444] ml-0.5">cm/s</span>
+            </span>
+        </div>
+        <div className="gauge-track relative w-full h-1 mt-0.5 bg-[#1a1a1a]">
+            {s.velocity !== null && (
+            <div
+                className={cn("absolute top-0 left-0 h-full transition-all duration-75", isOver ? "gauge-fill-warn" : "gauge-fill")}
+                style={{ width: `${pct}%` }}
+            />
+            )}
+            {/* Threshold marker */}
+            <div className="absolute top-0 bottom-0 w-px bg-[#444] z-10" style={{ left: '50%' }} />
+        </div>
+        </div>
+    );
 }

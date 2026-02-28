@@ -1,6 +1,6 @@
-import { Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, Html } from '@react-three/drei';
+import { Suspense, useRef } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 
 import { HeadModel } from '@/components/HeadModel';
@@ -11,58 +11,96 @@ import { CameraController } from '@/components/CameraController';
 import { ParticleField } from '@/components/ParticleField';
 import { SkullClipEffect } from '@/components/SkullClipEffect';
 
-function Loader() {
+function ScannerLoader() {
   return (
-    <Html center>
-      <div style={{ color: '#00FFFF', fontFamily: 'monospace', fontSize: '14px', letterSpacing: '0.1em' }}>
-        SCANNING...
+    <div className="fixed inset-0 z-20 flex flex-col items-center justify-center bg-black">
+      {/* Pulsing ring */}
+      <div className="relative w-20 h-20">
+        <div className="absolute inset-0 rounded-full border border-cyan/30 animate-ping" />
+        <div className="absolute inset-2 rounded-full border border-cyan/50 animate-pulse" />
+        <div className="absolute inset-4 rounded-full border border-cyan animate-breathe" />
       </div>
-    </Html>
+      {/* Text */}
+      <p className="mt-6 text-[10px] font-mono tracking-[0.4em] uppercase text-cyan/60 animate-pulse-glow">
+        Initializing Scanner
+      </p>
+      {/* Progress dots */}
+      <div className="flex gap-1 mt-2">
+        <div className="w-1 h-1 rounded-full bg-cyan animate-pulse" style={{ animationDelay: '0s' }} />
+        <div className="w-1 h-1 rounded-full bg-cyan animate-pulse" style={{ animationDelay: '0.2s' }} />
+        <div className="w-1 h-1 rounded-full bg-cyan animate-pulse" style={{ animationDelay: '0.4s' }} />
+      </div>
+    </div>
+  );
+}
+
+function GridFloor() {
+  return (
+    <mesh rotation-x={-Math.PI / 2} position={[0, -2.5, 0]}>
+      <planeGeometry args={[40, 40]} />
+      <meshBasicMaterial color="#00FFFF" opacity={0.015} transparent wireframe />
+    </mesh>
+  );
+}
+
+function AnimatedSpotLight() {
+  const lightRef = useRef<THREE.SpotLight>(null);
+
+  useFrame((state) => {
+    if (lightRef.current) {
+      lightRef.current.position.x = 3 + Math.sin(state.clock.elapsedTime * 0.5) * 0.5;
+      lightRef.current.position.z = 5 + Math.cos(state.clock.elapsedTime * 0.3) * 0.5;
+    }
+  });
+
+  return (
+    <spotLight
+      ref={lightRef}
+      position={[3, 4, 5]}
+      color="#00FFFF"
+      intensity={2}
+      angle={0.4}
+      penumbra={0.5}
+      castShadow
+    />
   );
 }
 
 export function AnalysisView() {
   return (
     <div className="w-full h-full absolute inset-0 bg-black">
-      <Canvas
-        camera={{ position: [0, 0, 5], fov: 50 }}
-        gl={{
-          antialias: true,
-          alpha: true,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.2
-        }}
-      >
-        <Suspense fallback={<Loader />}>
-          <fogExp2 attach="fog" args={['#000000', 0.15]} />
-
-          {/* Lighting Setup */}
-          <ambientLight intensity={0.15} />
-          <pointLight position={[5, 5, 5]} intensity={0.8} color="#00FFFF" />
-          <pointLight position={[-3, -2, 4]} intensity={0.4} color="#FF3366" />
-          
-          <Environment preset="night" />
-
-          {/* Scene Contents */}
-          <HeadModel />
-          <TongueModel />
-          <EMAMarkers />
-          <ParticleField />
-          <SkullClipEffect />
-
-          {/* Global Systems */}
-          <PostProcessingEffects />
-          <CameraController />
-          
-          <OrbitControls 
-            enablePan={false} 
-            enableZoom={true} 
-            minDistance={2} 
-            maxDistance={10} 
-            autoRotate={false} 
-          />
-        </Suspense>
-      </Canvas>
+      <Suspense fallback={<ScannerLoader />}>
+        <Canvas
+          camera={{ position: [0, 0, 5], fov: 45, near: 0.1, far: 100 }}
+          gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+          dpr={[1, 1.5]}
+          style={{ background: 'transparent' }}
+        >
+          <Suspense fallback={null}> {/* Loader is outside Canvas */}
+            <fog attach="fog" args={['#000000', 8, 25]} />
+            
+            {/* Lighting */}
+            <ambientLight intensity={0.08} />
+            <AnimatedSpotLight />
+            <pointLight position={[-4, 0, 3]} intensity={0.5} color="#1a1a4a" /> {/* fill */}
+            <pointLight position={[0, 2, -4]} intensity={0.3} color="#FF3366" /> {/* rim */}
+            
+            {/* Scene */}
+            <HeadModel />
+            <TongueModel />
+            <EMAMarkers />
+            <ParticleField />
+            <SkullClipEffect />
+            <GridFloor />
+            
+            {/* Effects */}
+            <PostProcessingEffects />
+            <CameraController />
+            <OrbitControls enablePan={false} enableZoom={true} minDistance={2} maxDistance={10} />
+            <Environment preset="night" />
+          </Suspense>
+        </Canvas>
+      </Suspense>
     </div>
   );
 }

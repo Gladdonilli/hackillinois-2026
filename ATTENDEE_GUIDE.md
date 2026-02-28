@@ -207,33 +207,49 @@ Optional company-sponsored themes. Building a Track project qualifies for that T
 
 ## Prizes
 
+### Path Prizes
+
+| Path | Prize |
+|---|---|
+| **Best Voyager Hack** | $5,000 |
+| **Best General Hack** | $2,500 |
+
 ### HackIllinois Prizes
 
-- **Best Beginner Hack** — Teams with ≥50% first-time hackers automatically considered.
-- **Most Popular** — Determined by attendee voting on Devpost.
+- **Best Beginner Hack** — EPOMAKER Mechanical Keyboard per member. Teams with ≥50% first-time hackers automatically considered.
+- **Most Popular** — SONY Headphones per member. Determined by attendee voting on Devpost.
 
 **Submit to up to 2** of:
-- Best Social
-- Best UI/UX
-- Most Creative
-- Most Useless
+- **Best Social Impact** — MARSHALL Speakers + $50 charity donation per member
+- **Best UI/UX Design** — FUJIFILM Instax Mini 12 Camera (film included) per member
+- **Most Creative** — NINJA Coffee Machine per member
+- **Most Useless** — NERF Gun + Walkie Talkie per member (must be well-designed and functional, not broken/unfinished)
+
+### Company-Sponsored Tracks
+
+| Track | 1st Place | 2nd Place | 3rd Place |
+|---|---|---|---|
+| **Stripe: Best Web API** | $2,000 + JBL Tour One M2 Headphones/member | $500 + $100 Amazon GC/member | — |
+| **Modal: Best AI Inference** | $2,000 + $5K Modal Credits/person + SF/NY trip | $500 + $1K Credits + AirPods/member | $1K Credits + AirPods/member |
+| **Caterpillar: Best AI Inspection** | $1,500 + Ray-Ban Meta AI Glasses/member + CAT Swag + Exec Pitch | $700 + Gaming Keyboard/member + CAT Swag + Exec Pitch | $300 + Gaming Keyboard/member + CAT Swag |
+| **John Deere: Best Hardware Hack** | $2,000 + Coal Valley Ranch Ride Along + Leadership Call + Extra HW Kit | $500 + YETI Rambler/member | JD Merch/member |
 
 ### Company & MLH Prizes
 
 **Submit to up to 5** of:
-- Best Use of Cloudflare Developer Platform
-- Best Use of OpenAI API
-- Best Use of Capital One Nessie (API)
-- Best Use of Supermemory
-- Best Use of Solana
-- Best Use of Actian VectorAI DB
-- Best Deployed on Aedify
-- Best Use of Gemini API
-- Best Use of ElevenLabs
-- Best Use of Snowflake API
-- Best Use of DigitalOcean
-- Best Use of Presage
-- Best .Tech Domain Name
+- **Best Use of Cloudflare Developer Platform** — $5,000 in CF Credits per member
+- **Best Use of OpenAI API** — $5,000 in OpenAI API Credits per member
+- **Best Use of Capital One Nessie (API)** — $300 Gift Card per member
+- **Best Use of Supermemory** — Meta RayBans per member
+- **Best Use of Solana** — $5,000 in Crypto for team + Ledger Nano S Plus per member
+- **Best Use of Actian VectorAI DB** — 1st: $300 AmEx GC/team, 2nd: $120 AmEx GC/team, 3rd: Anker USB-C Hubs/member (quality-gated)
+- **Best Deployed on Aedify** — $300 Platform Credits + 5mo free OpenClaw ($100 value) per member
+- **[MLH] Best Use of ElevenLabs** — Wireless Earbuds
+- **[MLH] Best Use of Gemini API** — Google Swag Kits
+- **[MLH] Best Use of AI powered by Reach Capital** — Logitech Webcam + chance to meet Reach Capital Investors
+- **[MLH] Best Use of Presage** — Fitbit Inspire + Presage Perks (3mo dev credits + 30% off yr1)
+- **[MLH] Best Use of DigitalOcean** — Retro Wireless Mouse
+- **[MLH] Best Use of Snowflake API** — M5Stack Tab5
 
 **Full Prize List**: https://go.hackillinois.org/prizes
 
