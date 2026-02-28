@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import useLarynxStore from "@/store/useLarynxStore"
 import { useAnalysisStream } from '@/hooks/useAnalysisStream'
+import { useUIEarcons } from '@/hooks/useUIEarcons'
 
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -13,6 +14,7 @@ const ALLOWED_EXTS = [".wav", ".mp3", ".ogg", ".flac"]
 
 export default function UploadPanel() {
   const panelRef = useRef<HTMLDivElement>(null)
+  const { playHover, playClick, playSwoosh } = useUIEarcons()
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [duration, setDuration] = useState<number | null>(null)
@@ -104,12 +106,14 @@ export default function UploadPanel() {
   }
 
   const handleAnalyze = () => {
+    playClick()
     setStatus("analyzing")
     startStream()
   }
 
   const clearFile = (e: React.MouseEvent) => {
     e.stopPropagation()
+    playSwoosh()
     setAudioFile(null)
     setDuration(null)
     setError(null)
