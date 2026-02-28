@@ -29,8 +29,7 @@ bucket_name = "larynx-audio"
 [ai]
 binding = "AI"
 
-# Vectorize index must be provisioned before uncommenting:
-# npx wrangler vectorize create larynx-signatures --dimensions=768 --metric=cosine
-# [[vectorize]]
-# binding = "VECTOR_SIGNATURES"
-# index_name = "larynx-signatures"
+# ─── Vectorize ───
+[[vectorize]]
+binding = "VECTOR_SIGNATURES"
+index_name = "larynx-signatures"

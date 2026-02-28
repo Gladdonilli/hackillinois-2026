@@ -1,0 +1,11 @@
+{
+  "name": "hackillinois-2026",
+  "private": true,
+  "scripts": {
+    "build": "cd LARYNX/frontend && npm install && npm run build",
+    "start": "npx serve LARYNX/frontend/dist -s -l 8000"
+  },
+  "dependencies": {
+    "serve": "^14.2.4"
+  }
+}
