@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { useLarynxStore } from '@/store/useLarynxStore';
 import { VELOCITY_THRESHOLDS } from '@/types/larynx';
 import { cn } from '@/lib/utils';
+import { useUIEarcons } from '@/hooks/useUIEarcons';
 
 interface SensorData {
   label: string;
@@ -23,8 +24,59 @@ export function VelocityHUD() {
   ]);
 
   const panelRef = useRef<HTMLDivElement>(null);
-  const flashData = useRef({ isFlashing: false, timeoutId: 0 as any, lastColor: '' });
+  const flashData = useRef<{ isFlashing: boolean; timeoutId: ReturnType<typeof setTimeout> | null; lastColor: string }>({ isFlashing: false, timeoutId: null, lastColor: '' });
   const wasBreaching = useRef(false);
+  const headerTextRef = useRef<HTMLDivElement>(null);
+  const maxVelRef = useRef<HTMLDivElement>(null);
+  const maxTargets = useRef({ vel: 0 });
+  const maxDisplay = useRef({ vel: 0 });
+
+  useEffect(() => {
+    maxTargets.current.vel = Math.max(0, ...sensors.map(s => s.velocity || 0));
+  }, [sensors]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const trg = maxTargets.current.vel;
+      const cur = maxDisplay.current.vel;
+      const next = cur + (trg - cur) * 0.2;
+      maxDisplay.current.vel = next;
+      
+      const isDanger = next > 80;
+      
+      if (maxVelRef.current) {
+        maxVelRef.current.textContent = `MAX: ${next.toFixed(1)} cm/s`;
+        maxVelRef.current.className = cn(
+          "text-[24px] font-mono tracking-tighter transition-colors",
+          next < 22 ? "text-cyan text-glow-cyan" :
+          next < 50 ? "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" :
+          next <= 80 ? "text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" :
+          "text-warn text-glow-warn animate-flicker"
+        );
+      }
+
+      if (panelRef.current) {
+        if (isDanger) {
+          panelRef.current.classList.add('danger-mode-panel');
+          panelRef.current.style.backgroundColor = 'rgba(255, 51, 102, 0.15)';
+        } else {
+          panelRef.current.classList.remove('danger-mode-panel');
+          panelRef.current.style.backgroundColor = '';
+        }
+      }
+
+      if (headerTextRef.current) {
+        if (isDanger) {
+          headerTextRef.current.classList.add('glitch-text', 'text-warn');
+          headerTextRef.current.classList.remove('text-[#666]');
+        } else {
+          headerTextRef.current.classList.remove('glitch-text', 'text-warn');
+          headerTextRef.current.classList.add('text-[#666]');
+        }
+      }
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const thresholds = VELOCITY_THRESHOLDS as Record<string, number> | undefined;
@@ -73,7 +125,9 @@ export function VelocityHUD() {
         panelRef.current.style.setProperty('border-color', 'rgba(255, 51, 102, 0.8)', 'important');
         panelRef.current.classList.add('bg-warn/10', 'border-warn/50');
         
-        clearTimeout(flashData.current.timeoutId);
+        if (flashData.current.timeoutId !== null) {
+          clearTimeout(flashData.current.timeoutId);
+        }
         flashData.current.timeoutId = setTimeout(() => {
           if (panelRef.current) {
             panelRef.current.style.removeProperty('border-color');
@@ -97,25 +151,50 @@ export function VelocityHUD() {
 
   useEffect(() => {
     flashData.current.lastColor = reactiveBorderColor;
-    if (panelRef.current && !flashData.current.isFlashing) {
+    if (panelRef.current && !flashData.current.isFlashing && !panelRef.current.classList.contains('danger-mode-panel')) {
       panelRef.current.style.borderColor = reactiveBorderColor;
     }
   }, [reactiveBorderColor]);
 
   return (
-    <motion.div
-      ref={panelRef as any}
-      initial={{ opacity: 0, x: 50 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.3 }}
-      className="fixed top-4 right-4 w-72 z-50 hud-panel p-4 text-[#EDEDED] transition-colors duration-200 border"
-    >
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse-glow" />
-        <div className="text-[10px] tracking-[0.3em] uppercase text-[#666] font-mono animate-flicker">VELOCITY ANALYSIS</div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-3">
+    <>
+      <style>{`
+        @keyframes pulse-sensor {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+          100% { transform: scale(1); }
+        }
+        .animate-pulse-fast {
+          animation: pulse-sensor 0.25s ease-in-out infinite;
+        }
+        @keyframes danger-blink {
+          0%, 100% { border-color: rgba(255, 51, 102, 1); }
+          50% { border-color: transparent; }
+        }
+        .danger-mode-panel {
+          animation: danger-blink 0.125s step-end infinite !important;
+        }
+      `}</style>
+      <motion.div
+        ref={panelRef as React.RefObject<HTMLDivElement>}
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.3 }}
+        className="fixed top-4 right-4 w-72 z-50 hud-panel p-4 text-[#EDEDED] transition-colors duration-200 border"
+      >
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse-glow" />
+            <div ref={headerTextRef} className="text-[10px] tracking-[0.3em] uppercase text-[#666] font-mono animate-flicker transition-colors">VELOCITY SENSORS</div>
+          </div>
+          <div className="flex justify-center py-2 bg-black/40 rounded border border-[#333]">
+            <span ref={maxVelRef} className="text-[24px] font-mono tracking-tighter text-cyan text-glow-cyan">
+              MAX: 0.0 cm/s
+            </span>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3">
         {/* Tongue Group */}
         <div className="flex flex-col gap-2">
             <div className="text-[8px] text-[#333] tracking-[0.3em] uppercase mb-1">TONGUE</div>
@@ -142,11 +221,13 @@ export function VelocityHUD() {
           <span>{new Date().toLocaleTimeString('en-US', { hour12: false })}</span>
         </div>
       </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 }
 
 function SensorRow({ s }: { s: SensorData }) {
+    const { playHover } = useUIEarcons();
     const valRef = useRef<HTMLSpanElement>(null);
     const barRef = useRef<HTMLDivElement>(null);
     const rowRef = useRef<HTMLDivElement>(null);
@@ -197,9 +278,9 @@ function SensorRow({ s }: { s: SensorData }) {
 
             if (rowRef.current) {
                 if (isOver) {
-                    rowRef.current.classList.add('bg-warn/5');
+                    rowRef.current.classList.add('bg-warn/5', 'animate-pulse-fast');
                 } else {
-                    rowRef.current.classList.remove('bg-warn/5');
+                    rowRef.current.classList.remove('bg-warn/5', 'animate-pulse-fast');
                 }
             }
         }, 50);
@@ -212,7 +293,11 @@ function SensorRow({ s }: { s: SensorData }) {
     const initOver = s.velocity !== null && s.velocity > s.threshold;
 
     return (
-        <div ref={rowRef} className={cn("flex flex-col gap-1 p-1 -mx-1 rounded transition-colors hud-sweep relative overflow-hidden", initOver && "bg-warn/5")}>
+        <div 
+          ref={rowRef} 
+          onMouseEnter={() => playHover()}
+          className={cn("group flex flex-col gap-1 p-1 -mx-1 rounded transition-colors hud-sweep relative overflow-hidden", initOver && "bg-warn/5 animate-pulse-fast")}
+        >
         <div className="flex justify-between items-end relative z-10">
             <span className="text-[10px] font-mono uppercase tracking-wider text-[#666]">{s.label}</span>
             <span className="text-sm font-mono tabular-nums leading-none">
@@ -231,7 +316,9 @@ function SensorRow({ s }: { s: SensorData }) {
             />
             )}
             {/* Threshold marker */}
-            <div className="absolute top-0 bottom-0 w-px bg-[#444] z-10" style={{ left: '50%' }} />
+            <div className="absolute top-0 bottom-0 w-px bg-[#444] z-10 group-hover:bg-[#888] transition-colors" style={{ left: '50%' }}>
+                <span className="absolute left-1 -top-[10px] text-[7px] text-[#888] opacity-0 group-hover:opacity-100 transition-opacity font-mono">LIMIT</span>
+            </div>
         </div>
         </div>
     );
