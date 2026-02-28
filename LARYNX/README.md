@@ -36,14 +36,15 @@ Audio (16kHz WAV)
 
 Core insight: speech synthesis models optimize for acoustic plausibility (sounds right) but do NOT model articulatory physics (how the mouth actually moves). The kinematic constraints of the human vocal tract — mass, inertia, muscle speed limits — are a forensic invariant that synthetic speech cannot satisfy.
 
-## Why Formants, Not Full AAI
+## Hybrid Approach: Formants + AAI
 
-We verified every acoustic-to-articulatory inversion (AAI) model available:
-- `haoyunlf/aai` (Interspeech 2024) — training scripts only, **no pre-trained weights**
-- `sarthaxxxxx/AAI-ALS` (ICASSP 2021) — training scripts only, **no pre-trained weights**
-- HuggingFace — **zero** audio-to-EMA models exist
+**Primary path (demo-ready):** F1/F2 formant tracking via parselmouth/Praat is the gold standard in phonetics research. F1 inversely correlates with tongue height, F2 with tongue advancement. Runs on CPU, processes 5s of audio in ~300ms, zero model loading. Same physics, same demo impact.
 
-F1/F2 formant tracking via parselmouth/Praat is the gold standard in phonetics research. F1 inversely correlates with jaw openness of tongue, F2 with tongue advancement. Same physics, same demo impact, zero training time.
+**Enhancement path (in progress):** The [articulatory/articulatory](https://github.com/articulatory/articulatory) repo (Peter Wu, UC Berkeley, Interspeech 2022 / ICASSP 2023) provides pre-trained Wav2Vec2-based weights that map audio directly to 12-dimensional EMA sensor positions (tongue tip, tongue body, tongue dorsum, jaw, upper/lower lip). This gives physically-grounded articulatory coordinates rather than formant-derived approximations.
+
+Earlier AAI repos we checked (`haoyunlf/aai`, `sarthaxxxxx/AAI-ALS`) have training scripts only with no usable weights. The Peter Wu model is the exception: real pre-trained inference, 200Hz native output, decimated to 100fps to match our pipeline.
+
+**Why formants first:** For a 3-minute hackathon demo, formant extraction is the right call. It's fast, deterministic, needs no GPU for the extraction step, and the velocity gap between real and fake speech is just as visible. AAI integration runs in parallel as an accuracy upgrade, feeding the same 3D visualization pipeline.
 
 **DO NOT USE** forced phoneme alignment (MFA/WhisperX) — it quantizes into discrete phonemes, forcing smooth interpolation that destroys the deepfake signal.
 

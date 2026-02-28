@@ -326,6 +326,35 @@ def compute_velocity(frames: list[dict], fps: int = 100) -> list[float]:
 
 Gap is enormous — even "good" deepfakes exceed human limits by 2-5x.
 
+## Hybrid AAI Pipeline (In Progress)
+
+LARYNX uses two parallel paths for extracting articulatory motion from audio. Both feed the same 3D visualization and velocity-threshold logic.
+
+### Primary Path: Formant Extraction (Current, Working)
+
+Parselmouth/Praat extracts F1-F4 formants at 100fps, mapped to articulatory parameters via linear scaling (F1→jaw, F2→tongue). Runs on CPU, ~300ms for 5s audio. This is the demo-day pipeline.
+
+### Enhancement Path: articulatory/articulatory (Integration In Progress)
+
+The [articulatory/articulatory](https://github.com/articulatory/articulatory) repo (Peter Wu, UC Berkeley) provides a pre-trained Wav2Vec2-based model that predicts 6-sensor EMA positions directly from 16kHz audio:
+
+- **Input:** 16kHz WAV
+- **Output:** 12 dimensions (LI_x/y, UL_x/y, LL_x/y, TT_x/y, TB_x/y, TD_x/y) at 200Hz native, decimated 2x → 100fps
+- **Inference:** `predict_ema.py` from the repo, requires GPU for Wav2Vec2 forward pass
+- **Papers:** Interspeech 2022, ICASSP 2023
+
+### Why Hybrid
+
+| Dimension | Formants (parselmouth) | AAI (Peter Wu model) |
+|-----------|----------------------|---------------------|
+| Speed | ~300ms / 5s audio, CPU only | ~1-2s / 5s audio, needs GPU |
+| Coordinates | Derived (F1/F2 → approximate position) | Direct EMA sensor positions |
+| Accuracy | Good enough for velocity gap detection | Physically grounded, higher fidelity |
+| Dependencies | parselmouth only | Wav2Vec2 + model weights (~1GB) |
+| Status | Working, demo-ready | Integration in progress |
+
+Both pipelines produce per-frame articulatory coordinates at 100fps. The velocity calculation and threshold logic are identical downstream. For the hackathon demo, formants are the safe bet. AAI gives us a credibility upgrade if we land it.
+
 ## Zustand Store Interface
 
 ```typescript
