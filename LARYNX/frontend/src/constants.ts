@@ -93,6 +93,9 @@ export const CAMERA = {
   QUICK_TO_DURATION: 0.3,
   /** CameraController zoom-in factor */
   ZOOM_FACTOR: 1.2,
+  SHAKE_JITTER_INTERVAL_MS: 30,
+  SHAKE_SETTLE_DELAY_S: 0.3,
+  SKULL_CLIP_RETURN_DELAY_S: 0.5,
 } as const
 
 // ============================================================================
@@ -147,6 +150,13 @@ export const TIMING = {
   NAV_BUTTON_DELAY: 0.8,
   /** Verdict nav button appear delay */
   VERDICT_NAV_DELAY: 1.5,
+  PORTAL_ENTER_DURATION: 2.0,
+} as const
+
+export const STREAM = {
+  WATCHDOG_INITIAL_MS: 60_000,
+  WATCHDOG_ACTIVE_MS: 20_000,
+  WATCHDOG_TERMINAL_MS: 5_000,
 } as const
 
 // ============================================================================

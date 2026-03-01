@@ -143,7 +143,6 @@ describe('UploadPanel', () => {
     });
 
     await waitFor(() => {
-      expect(mockSetPortalState).toHaveBeenCalledWith('entering')
       expect(mockStartStream).toHaveBeenCalled()
     })
   });

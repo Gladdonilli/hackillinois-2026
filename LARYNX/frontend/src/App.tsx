@@ -24,6 +24,8 @@ declare global {
 
 export default function App() {
   const status = useLarynxStore((state) => state.status)
+  const portalState = useLarynxStore((state) => state.portalState)
+  const setPortalState = useLarynxStore((state) => state.setPortalState)
   const [showIntro, setShowIntro] = useState(true)
   const initRef = useRef(false)
   const prevStatusRef = useRef(status)
@@ -38,6 +40,20 @@ export default function App() {
   }, [status])
 
   const appState = showIntro ? 'intro' : status
+  const isDemoFlowStage = appState === 'comparing' || appState === 'technical' || appState === 'closing'
+
+  useEffect(() => {
+    if (showIntro) return
+
+    if ((status === 'uploading' || status === 'analyzing') && portalState === 'idle') {
+      setPortalState('entering')
+      return
+    }
+
+    if ((status === 'idle' || status === 'error') && (portalState === 'entering' || portalState === 'warping')) {
+      setPortalState('idle')
+    }
+  }, [portalState, setPortalState, showIntro, status])
 
   // Initialize SoundEngine on first user interaction
   useEffect(() => {
@@ -144,8 +160,6 @@ export default function App() {
     }
   }, [status, showIntro])
 
-  // Portal state sound effects
-  const portalState = useLarynxStore((state) => state.portalState)
   const isPortalTransition = portalState === 'entering' || portalState === 'warping'
 
 
@@ -193,89 +207,104 @@ export default function App() {
         </div>
       )}
       
-      {(appState === 'analyzing' || (appState === 'uploading' && !isPortalTransition)) && (
+      {(appState === 'uploading' || appState === 'analyzing' || appState === 'complete') && !isPortalTransition && (
         <div
-          className="absolute inset-0 z-20 animate-[fadeIn_0.6s_ease-out]"
+          className={appState === 'complete'
+            ? 'absolute inset-0 z-10 animate-[fadeIn_0.8s_ease-out]'
+            : 'absolute inset-0 z-20 animate-[fadeIn_0.6s_ease-out]'}
         >
-          <div className="canvas-container w-full h-full">
+          <div className={appState === 'complete'
+            ? 'canvas-container w-full h-full opacity-30 transition-opacity duration-700'
+            : 'canvas-container w-full h-full opacity-100 transition-opacity duration-700'}>
             <AnalysisView />
           </div>
-          
-          <AnalysisOverlay />
-          
-          <div className="hud-overlay absolute top-4 left-4 z-10">
-            <WaveformDisplay />
-          </div>
-          
-          <div className="hud-overlay absolute top-4 right-4 z-10">
-            <VelocityHUD />
-          </div>
-          
-          <div className="hud-overlay absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-xl z-10">
-            <VerdictPanel />
-          </div>
-        </div>
-      )}
-      
-      {appState === 'complete' && (
-        <div
-          className="absolute inset-0 z-10 animate-[fadeIn_0.8s_ease-out]"
-        >
-          <div className="canvas-container w-full h-full opacity-30">
-            <AnalysisView />
-          </div>
-          
-          {/* Verdict gets major emphasis — HUD panels hidden to avoid overlap */}
-          <div
-            className="hud-overlay absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl z-20 animate-[fadeIn_0.5s_ease-out_0.2s_both]"
-          >
-            <div className="shadow-[0_0_100px_rgba(56,189,248,0.15)] rounded-sm">
-              <VerdictPanel />
-            </div>
-          </div>
 
-          {/* Navigation to demo flow */}
-          <button
-            className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all animate-[fadeIn_0.5s_ease-out_1.5s_both]"
-            onClick={() => useLarynxStore.getState().setStatus('comparing')}
-            data-interactive
-          >
-            COMPARE ANALYSIS →
-          </button>
+          {(appState === 'uploading' || appState === 'analyzing') && (
+            <>
+              <AnalysisOverlay />
+
+              <div className="hud-overlay absolute top-4 left-4 z-10">
+                <WaveformDisplay />
+              </div>
+
+              <div className="hud-overlay absolute top-4 right-4 z-10">
+                <VelocityHUD />
+              </div>
+
+              <div className="hud-overlay absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-xl z-10">
+                <VerdictPanel />
+              </div>
+            </>
+          )}
+
+          {appState === 'complete' && (
+            <>
+              <div
+                className="hud-overlay absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl z-20 animate-[fadeIn_0.5s_ease-out_0.2s_both]"
+              >
+                <div className="shadow-[0_0_100px_rgba(56,189,248,0.15)] rounded-sm">
+                  <VerdictPanel />
+                </div>
+              </div>
+
+              <button
+                className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all animate-[fadeIn_0.5s_ease-out_1.5s_both]"
+                onClick={() => useLarynxStore.getState().setStatus('comparing')}
+                data-interactive
+              >
+                COMPARE ANALYSIS →
+              </button>
+            </>
+          )}
         </div>
       )}
 
-      {appState === 'comparing' && (
-        <div
-          className="absolute inset-0 z-10 animate-[fadeIn_0.6s_ease-out]"
-        >
-          <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
-            <CompareView />
-          </Suspense>
-          <button
-            className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all animate-[fadeIn_0.5s_ease-out_0.8s_both]"
-            onClick={() => useLarynxStore.getState().setStatus('technical')}
-            data-interactive
-          >
-            TECHNICAL DETAILS →
-          </button>
-        </div>
+      {appState === 'complete' && isPortalTransition && (
+        <div className="absolute inset-0 z-10" />
       )}
 
-      {appState === 'technical' && (
-        <div
-          className="absolute inset-0 z-10 animate-[fadeIn_0.6s_ease-out]"
-        >
-          <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
-            <TechnicalDetailPanel />
-          </Suspense>
-          <button
-            className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all animate-[fadeIn_0.5s_ease-out_0.8s_both]"
-            onClick={() => useLarynxStore.getState().setStatus('closing')}
-            data-interactive
-          >
-            CLOSING →
-          </button>
+      {isDemoFlowStage && (
+        <div className="absolute inset-0 z-10">
+          <div className={appState === 'comparing'
+            ? 'absolute inset-0 opacity-100 transition-opacity duration-500'
+            : 'absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-500'}>
+            <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
+              <CompareView />
+            </Suspense>
+            <button
+              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
+              onClick={() => useLarynxStore.getState().setStatus('technical')}
+              data-interactive
+            >
+              TECHNICAL DETAILS →
+            </button>
+          </div>
+
+          <div className={appState === 'technical'
+            ? 'absolute inset-0 opacity-100 transition-opacity duration-500'
+            : 'absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-500'}>
+            <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
+              <TechnicalDetailPanel />
+            </Suspense>
+            <button
+              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
+              onClick={() => useLarynxStore.getState().setStatus('closing')}
+              data-interactive
+            >
+              CLOSING →
+            </button>
+          </div>
+
+          <div className={appState === 'closing'
+            ? 'absolute inset-0 opacity-100 transition-opacity duration-600'
+            : 'absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-600'}>
+            <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
+              <ClosingScreen
+                onReset={() => useLarynxStore.getState().reset()}
+                onShowHistory={() => useLarynxStore.getState().toggleHistory()}
+              />
+            </Suspense>
+          </div>
         </div>
       )}
 
@@ -300,19 +329,6 @@ export default function App() {
         </div>
       )}
 
-      {appState === 'closing' && (
-        <div
-          className="absolute inset-0 z-10 animate-[fadeIn_0.8s_ease-out]"
-        >
-          <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
-            <ClosingScreen 
-              onReset={() => useLarynxStore.getState().reset()} 
-              onShowHistory={() => useLarynxStore.getState().toggleHistory()}
-            />
-          </Suspense>
-        </div>
-      )}
-      
       <HistoryPanel />
       {/* Scanline overlay — always on top */}
       <div className="scanline-overlay pointer-events-none z-50" />

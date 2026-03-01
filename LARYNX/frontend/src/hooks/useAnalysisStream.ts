@@ -1,8 +1,15 @@
 import { useCallback, useRef } from 'react'
+import { STREAM } from '@/constants'
 import { useLarynxStore } from '@/store/useLarynxStore'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://larynx-api.tianyi35.workers.dev'
 const BACKEND_URL = `${API_BASE.replace(/\/$/, '')}/api/analyze`
+
+function normalizeProgressPercent(progress: unknown): number {
+  if (typeof progress !== 'number' || !Number.isFinite(progress)) return 0
+  const scaled = progress <= 1 ? progress * 100 : progress
+  return Math.max(0, Math.min(100, Math.round(scaled)))
+}
 
 export function useAnalysisStream() {
   const abortRef = useRef<AbortController | null>(null)
@@ -47,14 +54,18 @@ export function useAnalysisStream() {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
-
-      // Timeout: 60s inactivity guard for conference WiFi drops
-      const STREAM_TIMEOUT_MS = 60_000
+      let hasReceivedEvent = false
+      let terminalEventSeen = false
 
       while (true) {
         const readPromise = reader.read()
         const timeoutPromise = new Promise<{ done: true; value: undefined }>((_, reject) => {
-          const id = setTimeout(() => reject(new Error('Stream timeout: no data for 60s')), STREAM_TIMEOUT_MS)
+          const timeoutMs = terminalEventSeen
+            ? STREAM.WATCHDOG_TERMINAL_MS
+            : hasReceivedEvent
+              ? STREAM.WATCHDOG_ACTIVE_MS
+              : STREAM.WATCHDOG_INITIAL_MS
+          const id = setTimeout(() => reject(new Error(`Stream timeout: no data for ${timeoutMs}ms`)), timeoutMs)
           readPromise.then(() => clearTimeout(id), () => clearTimeout(id))
         })
 
@@ -88,13 +99,15 @@ export function useAnalysisStream() {
 
             switch (eventType) {
               case 'progress':
+                hasReceivedEvent = true
                 store.setProgress({
                   message: parsed.message,
-                  percent: Math.round(parsed.progress * 100),
+                  percent: normalizeProgressPercent(parsed.progress),
                 })
                 break
 
               case 'frame':
+                hasReceivedEvent = true
                 store.addFrame({
                   sensors: parsed.sensors,
                   tongueVelocity: parsed.tongueVelocity,
@@ -104,6 +117,8 @@ export function useAnalysisStream() {
                 break
 
               case 'verdict':
+                hasReceivedEvent = true
+                terminalEventSeen = true
                 store.setVerdict({
                   isGenuine: parsed.isGenuine,
                   confidence: parsed.confidence,
@@ -120,6 +135,8 @@ export function useAnalysisStream() {
                 break
 
               case 'error':
+                hasReceivedEvent = true
+                terminalEventSeen = true
                 store.setStatus('error')
                 store.setProgress({ message: parsed.message || 'Analysis failed', percent: 0 })
                 break

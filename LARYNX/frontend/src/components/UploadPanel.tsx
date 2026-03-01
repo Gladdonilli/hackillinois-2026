@@ -77,7 +77,6 @@ export default function UploadPanel() {
   const isProcessingRef = useRef(false)
   const audioFile = useLarynxStore((s) => s.audioFile)
   const setAudioFile = useLarynxStore((s) => s.setAudioFile)
-  const setPortalState = useLarynxStore((s) => s.setPortalState)
   const { startStream } = useAnalysisStream()
 
   const validateAndProcessFile = async (file: File) => {
@@ -148,7 +147,6 @@ export default function UploadPanel() {
 
   const handleAnalyze = () => {
     playClick()
-    setPortalState('entering')
     startStream()
   }
 
