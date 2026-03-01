@@ -107,11 +107,11 @@ export const CAMERA = {
 
 export const SCENE = {
   /** MouthBeacon position — centered on actual mouth of 2.5x-scaled facecap.glb */
-  MOUTH_BEACON_POSITION: [0, -1.1, 0.5] as const,
+  MOUTH_BEACON_POSITION: [0, -0.8, 0.5] as const,
   /** FaceModel group scale */
   FACE_MODEL_SCALE: 2.5,
   /** FaceModel group position [x, y, z] */
-  FACE_MODEL_POSITION: [0, -0.3, 0] as const,
+  FACE_MODEL_POSITION: [0, 0.1, 0] as const,
   /** CompareView model Y position (raised to show full face including jaw/chin) */
   COMPARE_MODEL_Y: -0.2,
   /** CompareView model scale */
@@ -141,6 +141,12 @@ export const TIMING = {
   WARP_PHASE_FREEZE: 0.15,
   /** Warp transition phase 2 (expand) */
   WARP_PHASE_EXPAND: 0.8,
+  /** Warp flash-to-white duration */
+  WARP_FLASH: 0.1,
+  /** Warp tunnel fade-out duration */
+  WARP_TUNNEL_FADE: 0.2,
+  /** Intro sequence total auto-complete duration (milliseconds) */
+  INTRO_DURATION_MS: 5500,
   /** Intro sequence fade delay (milliseconds) */
   INTRO_FADE_DELAY_MS: 1200,
   /** State transition fade duration */
@@ -149,12 +155,34 @@ export const TIMING = {
   COMPLETE_FADE_IN: 0.8,
   /** View transition default */
   VIEW_TRANSITION: 0.6,
+  /** Demo flow stage opacity transition (seconds) */
+  DEMO_STAGE_TRANSITION: 0.5,
   /** Compare/Technical nav button appear delay */
   NAV_BUTTON_DELAY: 0.8,
   /** Verdict nav button appear delay */
   VERDICT_NAV_DELAY: 1.5,
   /** Landing camera portal enter animation duration */
   PORTAL_ENTER_DURATION: 2.0,
+  /** Closing screen container fade-in */
+  CLOSING_FADE_IN: 1.0,
+  /** Closing subtitle appear delay */
+  CLOSING_SUBTITLE_DELAY: 1.2,
+  /** Closing sponsor row base delay */
+  CLOSING_SPONSOR_BASE_DELAY: 1.8,
+  /** Closing sponsor stagger interval */
+  CLOSING_SPONSOR_STAGGER: 0.2,
+  /** Closing team info delay */
+  CLOSING_TEAM_DELAY: 2.8,
+  /** Closing CTA button delay */
+  CLOSING_CTA_DELAY: 3.2,
+  /** Closing history button delay */
+  CLOSING_HISTORY_DELAY: 3.5,
+  /** Technical detail stat counter duration (short) */
+  STATS_DURATION_SHORT: 1.5,
+  /** Technical detail stat counter duration (long) */
+  STATS_DURATION_LONG: 2.0,
+  /** Technical detail stat stagger base delay */
+  STATS_STAGGER_DELAY: 0.2,
 } as const
 
 // ============================================================================
@@ -248,4 +276,35 @@ export const Z_INDEX = {
   NOISE: 90,
   /** Verdict flash overlay */
   FLASH: 100,
+} as const
+
+// ============================================================================
+// DEMO MODE
+// ============================================================================
+
+/** Toggle to use local fake data instead of hitting the real backend */
+export const DEMO_MODE_ENABLED = true
+
+// ============================================================================
+// UNIFIED THRESHOLD GROUPS (derived from VELOCITY_THRESHOLDS)
+// Import these instead of hardcoding magic numbers in components.
+// ============================================================================
+
+export const THRESHOLDS = {
+  /** Primary breach detection — tongue velocity above this is suspicious */
+  BREACH: VELOCITY_THRESHOLDS.TONGUE,
+  /** Normalization divisor for breach intensity (0..1 range) */
+  BREACH_RANGE: VELOCITY_THRESHOLDS.SKULL_CLIP - VELOCITY_THRESHOLDS.TONGUE,
+  /** Human physiological ceiling — compare-view threshold line */
+  COMPARE_LINE: VELOCITY_THRESHOLDS.HUMAN_MAX,
+  /** Glitch FX trigger */
+  GLITCH: VELOCITY_THRESHOLDS.GLITCH,
+  /** Skull-clip / alarm trigger */
+  SKULL_CLIP: VELOCITY_THRESHOLDS.SKULL_CLIP,
+  /** IEC alarm trigger (same as breach) */
+  IEC_ALARM: VELOCITY_THRESHOLDS.TONGUE,
+  /** Geiger 'normal' upper bound */
+  GEIGER_NORMAL_MAX: 15,
+  /** Geiger 'deepfake' threshold */
+  GEIGER_DEEPFAKE: VELOCITY_THRESHOLDS.GLITCH,
 } as const

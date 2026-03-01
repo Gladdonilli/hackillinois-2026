@@ -4,9 +4,9 @@
 
 ## Stack
 
-- **Frontend**: Vite + React 19 + React Three Fiber + Zustand + GSAP + Tone.js (TypeScript)
+- **Frontend**: Vite + React 18.3.1 + React Three Fiber + Zustand + GSAP + Tone.js (TypeScript)
 - **Worker**: Cloudflare Workers + Hono (TypeScript)
-- **Backend**: Python 3.11 + Modal + librosa + Praat-Parselmouth
+- **Backend**: Python 3.11 + Modal + PyTorch 2.7 + HuBERT + AAI + scikit-learn
 
 ---
 
@@ -48,18 +48,12 @@
 
 ## File-Specific Rules
 
-- `LARYNX/frontend/src/stores/` — Extra scrutiny on state mutations, subscription patterns
+- `LARYNX/frontend/src/store/` — Extra scrutiny on state mutations, subscription patterns
 - `LARYNX/frontend/src/hooks/useAnalysisStream.ts` — SSE parsing, abort handling, error recovery
 - `LARYNX/frontend/src/hooks/useComparisonStream.ts` — Same as above
 - `LARYNX/worker/src/` — Input validation, CORS, rate limiting, D1 queries, R2 uploads
 - `LARYNX/backend/app.py` — SSE endpoint security, multipart handling
-- `LARYNX/backend/pipeline.py` — Numerical correctness in formant extraction
-- `LARYNX/backend/classifier.py` — Model loading, prediction bounds
-- `SYNAPSE/` — Archived. Skip entirely.
-- `competitive-intel/` — Not code. Skip.
-- `_intel/` — Not code. Skip.
-- `research/` — Not code. Skip.
-- `shared/` — Documentation only. Skip unless `.ts`/`.py` files appear.
+- `LARYNX/backend/gpu_inference.py` — Numerical correctness in articulatory feature extraction, GPU memory
 
 ---
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useLarynxStore } from '@/store/useLarynxStore'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import gsap from 'gsap'
@@ -73,13 +74,15 @@ export function HistoryPanel() {
             </h2>
             <p className="text-xs font-mono text-dim tracking-widest mt-1">FORENSIC RECORDS (D1)</p>
           </div>
-          <button 
+          <Button 
+            variant="ghost"
+            size="icon"
             onClick={toggleHistory}
-            className="text-cyan/60 hover:text-cyan font-mono text-2xl px-2 transition-colors focus:outline-none"
+            className="text-2xl"
             data-interactive
           >
             ×
-          </button>
+          </Button>
         </div>
 
         {/* Content */}

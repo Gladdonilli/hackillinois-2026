@@ -24,27 +24,39 @@ import modal
 # ---------------------------------------------------------------------------
 
 gpu_image = (
-    modal.Image.from_registry("nvidia/cuda:12.4.0-runtime-ubuntu22.04", add_python="3.11")
+    modal.Image.debian_slim(python_version="3.11")
     .apt_install("libsndfile1", "ffmpeg", "wget", "sox", "git")
     .pip_install(
-        "torch==2.5.1",
-        "torchaudio==2.5.1",
-        "numpy==2.1.3",
+        "torch==2.7.0+cu128",
+        "torchaudio==2.7.0+cu128",
+        "numpy>=2.0",
         "s3prl==0.4.18",
         "librosa==0.10.2.post1",
         "soundfile==0.12.1",
-        "gdown==5.2.0",
         "pyyaml",
-        "scipy==1.11.4",
-        "scikit-learn==1.5.2",
-        "articulatory @ git+https://github.com/tensorspeech/articulatory.git@a50eafd4",
+        "scipy>=1.12",
+        "scikit-learn>=1.5.2",
+        extra_index_url="https://download.pytorch.org/whl/cu128",
     )
-    # Force-downgrade scipy after articulatory install (AAI needs kaiser_best from 1.11.x)
-    .run_commands("pip install --no-cache-dir --no-deps scipy==1.11.4")
-    .env({"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"})
+    .run_commands(
+        # Install articulatory with --no-build-isolation (its setup.py does `import pip`
+        # which breaks in PEP 517 isolated builds)
+        "pip install --no-build-isolation 'articulatory @ git+https://github.com/articulatory/articulatory.git@a50eafd4fb8235643f1523bbbf9ac1d50bbf271b'",
+        # Patch scipy 1.12+ kaiser move: scipy.signal.kaiser -> scipy.signal.windows.kaiser
+        "sed -i 's/from scipy.signal import kaiser/from scipy.signal.windows import kaiser/g' $(python3 -c 'import articulatory.layers.pqmf; import inspect; print(inspect.getfile(articulatory.layers.pqmf))')",
+        # Verify kaiser patch applied
+        "python3 -c 'from articulatory.layers.pqmf import PQMF; print(\"kaiser patch OK\")'",
+        # Pre-download HuBERT into the image so cold starts don't need 1.18GB download
+        "python3 -c \"import s3prl.hub; s3prl.hub.hubert_large_ll60k(); print('HuBERT cached')\"",
+    )
+    .env({"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "LARYNX_BUILD": "v5-kaiser-fix"})
     .add_local_file(
-        "LARYNX/backend/training_data/ensemble_model.pkl",
+        "training_data/ensemble_model.pkl",
         "/root/ensemble_model.pkl",
+    )
+    .add_local_dir(
+        "aai_model",
+        "/root/aai",
     )
 )
 
@@ -78,7 +90,7 @@ HUBERT_KERNELS = [10, 3, 3, 3, 3, 2, 2]
 HUBERT_STRIDES = [5, 2, 2, 2, 2, 2, 2]
 
 # Default inference passes — can be overridden per request
-DEFAULT_INFERENCE_PASSES = 5
+DEFAULT_INFERENCE_PASSES = 3
 
 # TTA augmentation ranges (subtle — don't distort formants)
 TTA_GAIN_RANGE = (-0.05, 0.05)  # ±5% peak amplitude
@@ -110,7 +122,7 @@ def _hubert_output_len(input_len: int) -> int:
 )
 @modal.concurrent(max_inputs=2)
 class GpuInference:
-    """Loads HuBERT + AAI + classifier on B200, processes single audio samples.
+    """Loads HuBERT + AAI + classifier on A100, processes single audio samples.
 
     Supports multi-pass test-time augmentation (TTA): runs N slightly-augmented
     copies through the pipeline, averages classifier scores for more robust predictions.
@@ -120,36 +132,15 @@ class GpuInference:
     def setup(self) -> None:
         import os
         import pickle
-        import shutil
 
-        import gdown  # type: ignore[import-untyped]
         import torch
         import yaml
 
         self.device = torch.device("cuda:0")
         print(f"[GpuInference] Setting up on {torch.cuda.get_device_name(0)}")
-        print(f"[GpuInference] VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GiB")
+        print(f"[GpuInference] VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GiB")
 
-        # --- Copy AAI model to NVMe for faster I/O ---
-        aai_vol = "/model-cache/aai"
-        aai_local = "/tmp/aai"
-        if os.path.exists(aai_vol):
-            if not os.path.exists(aai_local):
-                print("[GpuInference] Copying AAI model to NVMe...")
-                shutil.copytree(aai_vol, aai_local)
-        else:
-            os.makedirs(aai_local, exist_ok=True)
-            print("[GpuInference] Downloading AAI model from GDrive...")
-            gdown.download_folder(
-                id="1O-1kX_ngHf1T8EN7HXWABCaEIJLNqxUI",
-                output=aai_local,
-                quiet=False,
-            )
-            model_cache.reload()
-            shutil.copytree(aai_local, aai_vol)
-            model_cache.commit()
-
-        # --- Load HuBERT ---
+        # --- Load HuBERT (pre-cached in image, no download needed) ---
         print("[GpuInference] Loading HuBERT Large...")
         import s3prl.hub  # type: ignore[import-untyped]
 
@@ -158,15 +149,23 @@ class GpuInference:
 
         # --- Load AAI ---
         print("[GpuInference] Loading AAI model...")
-        from articulatory import utils as aai_utils  # type: ignore[import-untyped]
-        from torch.nn.utils import remove_weight_norm
+        # --- Patch scipy.signal.kaiser at runtime (before articulatory import) ---
+        # articulatory/layers/pqmf.py does `from scipy.signal import kaiser`
+        # but scipy >= 1.12 moved kaiser to scipy.signal.windows
+        import scipy.signal
+        from scipy.signal.windows import kaiser as _kaiser
+        scipy.signal.kaiser = _kaiser
+        print("[GpuInference] scipy.signal.kaiser patched")
 
-        ckpt_path = os.path.join(aai_local, "hprc_h2", "best_mel_ckpt.pkl")
-        config_path = os.path.join(aai_local, "hprc_h2", "config.yml")
-        with open(config_path) as f:
+        from articulatory import utils as aai_utils  # type: ignore[import-untyped]
+
+        ckpt_path = "/root/aai/hprc_h2/best_mel_ckpt.pkl"
+        with open("/root/aai/hprc_h2/config.yml") as f:
             aai_config = yaml.safe_load(f)
+
         self.aai_model = aai_utils.load_model(ckpt_path, aai_config)
-        remove_weight_norm(self.aai_model)
+        # Weight norm removal is a training optimization — doesn't affect inference output.
+        # Skipping to avoid torch 2.7 old/new weight_norm API incompatibility on B200/A100.
         self.aai_model = self.aai_model.to(self.device).eval()
         print("[GpuInference] AAI loaded")
 

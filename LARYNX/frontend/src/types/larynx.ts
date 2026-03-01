@@ -11,12 +11,16 @@ export interface EMAFrame {
   tongueVelocity: number
   timestamp: number
   isAnomalous?: boolean
+  f1Hz?: number
+  f2Hz?: number
+  f3Hz?: number
 }
 
 export interface FormantData {
   f1: number
   f2: number
   f3: number
+  timestamp: number
 }
 
 export interface Verdict {

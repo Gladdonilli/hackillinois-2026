@@ -12,6 +12,7 @@ HackIllinois 2026
 | [LibriSpeech](https://www.openslr.org/12) | V. Panayotov, G. Chen, D. Povey, S. Khudanpur | CC-BY-4.0 | Real (genuine) voice samples — dev-clean, test-clean, train-clean-100 splits |
 | [deepfake-audio-detection](https://huggingface.co/datasets/garystafford/deepfake-audio-detection) | Gary Stafford | MIT | Multi-engine synthetic voice samples (ElevenLabs, Play.ht, AWS Polly, GCP TTS, Azure TTS) and matched real samples |
 | [elevenlabs_dataset](https://huggingface.co/datasets/skypro1111/elevenlabs_dataset) | skypro1111 | CC-BY-4.0 | ElevenLabs v1/v2 synthetic voice samples |
+| [WaveFake](https://zenodo.org/records/5642694) | Joel Frank, Lea Schönherr | CC-BY-4.0 | Multi-architecture synthetic voice samples (MelGAN, MB-MelGAN, FB-MelGAN, HiFi-GAN, WaveGlow, PWGAN) |
 
 ## Models & AI
 
@@ -22,6 +23,7 @@ HackIllinois 2026
 | [s3prl](https://github.com/s3prl/s3prl) | S3PRL Team, NTU | MIT | Self-supervised speech representation toolkit (HuBERT wrapper) |
 | [OpenAI TTS-1](https://platform.openai.com/docs/guides/text-to-speech) | OpenAI | Proprietary | Synthetic voice generation for test samples (alloy voice) |
 | [ElevenLabs](https://elevenlabs.io/) | ElevenLabs Inc. | Proprietary | Synthetic voice generation — Flash v2.5, Multilingual v2, v3 models |
+| [Google Gemini TTS](https://ai.google.dev/gemini-api/docs/text-generation) | Google DeepMind | Proprietary | Synthetic voice generation for test samples |
 
 ## Research & Scientific Foundations
 
@@ -43,7 +45,7 @@ HackIllinois 2026
 | [GSAP](https://gsap.com/) | 3.12.5 | GreenSock Standard | Animation engine — timeline sequencing, quickTo for real-time data |
 | [Tone.js](https://tonejs.github.io/) | 15.0.4 | MIT | Web Audio synthesis — IEC alarms, Geiger counter, oximeter sonification |
 | [Zustand](https://zustand-demo.pmnd.rs/) | 5.0.1 | MIT | State management (transient store for animation state) |
-| [Framer Motion](https://www.framer.com/motion/) | 12.34.3 | MIT | Layout animations and transitions |
+| [Motion (Framer Motion)](https://motion.dev/) | 11.11.17 | MIT | Layout animations and transitions |
 | [Tailwind CSS](https://tailwindcss.com/) | 3.4.16 | MIT | Utility-first CSS framework |
 | [shadcn/ui](https://ui.shadcn.com/) | — | MIT | UI component primitives |
 | [Lucide React](https://lucide.dev/) | 0.460.0 | ISC | Icon library |
@@ -54,12 +56,12 @@ HackIllinois 2026
 
 | Library | Version | License | Usage |
 |---------|---------|---------|-------|
-| [Praat / Parselmouth](https://github.com/YannickJadoul/Parselmouth) | 0.4.5 | GPL-3.0 | Formant extraction (Burg method) |
-| [librosa](https://librosa.org/) | 0.10.2.post1 | ISC | Audio loading, resampling, spectral analysis |
+| [Praat / Parselmouth](https://github.com/YannickJadoul/Parselmouth) | 0.4.5 | GPL-3.0 | Formant extraction (Burg method) — training pipeline only |
+| [librosa](https://librosa.org/) | 0.10.2.post1 | ISC | Audio loading, resampling — training pipeline only |
 | [scikit-learn](https://scikit-learn.org/) | 1.5.2 | BSD-3-Clause | Classifier training (HistGradientBoosting, RandomForest, ensemble) |
-| [NumPy](https://numpy.org/) | 2.1.3 | BSD-3-Clause | Numerical computation |
-| [SciPy](https://scipy.org/) | 1.14.1 | BSD-3-Clause | Signal processing, resampling |
-| [PyTorch](https://pytorch.org/) | — | BSD-3-Clause | Deep learning runtime (HuBERT, AAI model) |
+| [NumPy](https://numpy.org/) | ≥2.0 | BSD-3-Clause | Numerical computation |
+| [SciPy](https://scipy.org/) | ≥1.12 | BSD-3-Clause | Signal processing, resampling |
+| [PyTorch](https://pytorch.org/) | 2.7.0+cu128 | BSD-3-Clause | Deep learning runtime (HuBERT, AAI model) — CUDA 12.8 Blackwell build |
 | [FastAPI](https://fastapi.tiangolo.com/) | 0.115.6 | MIT | REST API framework |
 | [SSE-Starlette](https://github.com/sysid/sse-starlette) | 2.1.3 | MIT | Server-Sent Events streaming |
 | [soundfile](https://python-soundfile.readthedocs.io/) | — | BSD-3-Clause | Audio file I/O |
@@ -68,7 +70,7 @@ HackIllinois 2026
 
 | Service | Usage |
 |---------|-------|
-| [Modal Labs](https://modal.com/) | Serverless GPU compute — A100 inference for AAI pipeline |
+| [Modal Labs](https://modal.com/) | Serverless GPU compute — B200 inference for HuBERT + AAI pipeline |
 | [Cloudflare Workers](https://workers.cloudflare.com/) | Edge API proxy, rate limiting, CORS |
 | [Cloudflare R2](https://developers.cloudflare.com/r2/) | Audio file storage |
 | [Cloudflare D1](https://developers.cloudflare.com/d1/) | Analysis report persistence |
@@ -95,4 +97,4 @@ HackIllinois 2026
 
 ---
 
-*Built for HackIllinois 2026 — Modal: Best AI Inference track*
+*Built for HackIllinois 2026 — Modal track*

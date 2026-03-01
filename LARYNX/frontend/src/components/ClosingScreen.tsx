@@ -1,8 +1,10 @@
 import { useRef } from 'react'
 import { motion } from 'motion/react'
 import { SoundEngine } from '@/audio/SoundEngine'
-import { COLORS } from '@/constants'
+import { COLORS, TIMING } from '@/constants'
+import { Button } from '@/components/ui/button'
 
+const MotionButton = motion(Button)
 interface ClosingScreenProps {
   onReset: () => void;
   onShowHistory?: () => void;
@@ -55,7 +57,7 @@ export function ClosingScreen({ onReset, onShowHistory }: ClosingScreenProps) {
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#050510] overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 1 }}
+      transition={{ duration: TIMING.CLOSING_FADE_IN }}
     >
       {/* Scanline Overlay */}
       <div className="absolute inset-0 pointer-events-none scanline-overlay opacity-20" />
@@ -87,7 +89,7 @@ export function ClosingScreen({ onReset, onShowHistory }: ClosingScreenProps) {
           className="font-sans text-lg md:text-xl tracking-[0.2em] text-cyan/80 uppercase mb-16 text-center px-4"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2, duration: 0.8 }}
+          transition={{ delay: TIMING.CLOSING_SUBTITLE_DELAY, duration: 0.8 }}
         >
           {subtitle}
         </motion.p>
@@ -101,7 +103,7 @@ export function ClosingScreen({ onReset, onShowHistory }: ClosingScreenProps) {
             className="flex flex-col items-center p-4 border border-cyan/30 bg-black/40 backdrop-blur-sm hud-panel"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.8 + i * 0.2, duration: 0.5 }}
+            transition={{ delay: TIMING.CLOSING_SPONSOR_BASE_DELAY + i * TIMING.CLOSING_SPONSOR_STAGGER, duration: 0.5 }}
           >
             <span className="text-white font-mono text-lg tracking-widest mb-1 text-glow-cyan">{sponsor.name}</span>
             <span className="text-cyan/50 font-mono text-[10px] uppercase tracking-tighter text-center">{sponsor.track}</span>
@@ -114,37 +116,41 @@ export function ClosingScreen({ onReset, onShowHistory }: ClosingScreenProps) {
         className="mb-12 z-10 flex flex-col items-center gap-2"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 2.8, duration: 0.8 }}
+        transition={{ delay: TIMING.CLOSING_TEAM_DELAY, duration: 0.8 }}
       >
         <span className="font-mono text-sm tracking-[0.5em] text-cyan/80 uppercase text-center">Built by Gladdon (tianyi)</span>
         <span className="font-mono text-[10px] tracking-[0.5em] text-white/40 uppercase text-center">HackIllinois 2026</span>
       </motion.div>
 
       {/* CTA Button */}
-      <motion.button
+      <MotionButton
+        variant="outline"
+        size="lg"
         onClick={onReset}
-        className="px-10 py-4 border border-cyan/50 bg-cyan/5 hover:bg-cyan/20 text-cyan font-mono tracking-[0.3em] uppercase transition-all duration-300 group z-10 hover:shadow-[0_0_30px_rgba(56,189,248,0.2)]"
+        className="font-mono tracking-[0.3em] uppercase transition-all duration-300 group z-10"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 3.2, duration: 0.5 }}
+        transition={{ delay: TIMING.CLOSING_CTA_DELAY, duration: 0.5 }}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
         Try it yourself <span className="inline-block transition-transform group-hover:translate-x-2">→</span>
-      </motion.button>
+      </MotionButton>
 
       {/* Optional History Button */}
       {onShowHistory && (
-        <motion.button
+        <MotionButton
+          variant="ghost"
+          size="sm"
           onClick={onShowHistory}
-          className="px-8 py-3 mt-6 border border-cyan/30 rounded-sm hover:bg-cyan/10 text-cyan/80 font-mono tracking-widest text-xs transition-all duration-300 z-10"
+          className="mt-6 font-mono tracking-widest text-xs transition-all duration-300 z-10"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 3.5, duration: 0.5 }}
+          transition={{ delay: TIMING.CLOSING_HISTORY_DELAY, duration: 0.5 }}
           data-interactive
         >
           VIEW HISTORY ALBUM
-        </motion.button>
+        </MotionButton>
       )}
 
       {/* Decorative HUD corners — using .hud-panel pseudo-elements via a positioned container */}

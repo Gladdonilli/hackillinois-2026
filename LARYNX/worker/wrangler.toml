@@ -7,6 +7,9 @@ account_id = "1d71ce44882801d49fad2c5b02629d82"
 
 [vars]
 MODAL_API_URL = "https://gladdonilli--larynx-analyze.modal.run"
+MODAL_COMPARE_URL = "https://gladdonilli--larynx-compare.modal.run"
+MODAL_GENERATE_URL = "https://gladdonilli--larynx-generate-compare.modal.run"
+MODAL_TRANSCRIBE_URL = "https://gladdonilli--larynx-transcribe.modal.run"
 
 [[d1_databases]]
 binding = "DB"

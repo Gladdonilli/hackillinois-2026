@@ -1,6 +1,6 @@
 import { useRef, useEffect, Suspense, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { COLORS, SCENE, CAMERA } from '@/constants';
+import { COLORS, SCENE, CAMERA, THRESHOLDS } from '@/constants';
 import { useGLTF, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup';
@@ -119,7 +119,7 @@ const VelocityGraph = ({ isFake, frames }: { isFake: boolean; frames?: EMAFrame[
       const width = canvas.width;
       const height = canvas.height;
 
-      const thresholdY = height - (22 / maxY) * height;
+      const thresholdY = height - (THRESHOLDS.COMPARE_LINE / maxY) * height;
 
       ctx.beginPath();
       ctx.setLineDash([4, 4]);
@@ -313,6 +313,20 @@ export const CompareView = () => {
             </div>
           </>
         )}
+        <div className="flex gap-4 mt-4">
+          <button
+            className="px-6 py-2 border border-cyan/30 bg-black/40 text-cyan font-mono text-sm tracking-widest hover:bg-cyan/10 transition-colors"
+            onClick={() => useLarynxStore.getState().setStatus('complete')}
+          >
+            ← BACK TO VERDICT
+          </button>
+          <button
+            className="px-6 py-2 border border-cyan/30 bg-black/40 text-white/70 font-mono text-sm tracking-widest hover:bg-cyan/10 transition-colors"
+            onClick={() => useLarynxStore.getState().setStatus('idle')}
+          >
+            NEW ANALYSIS
+          </button>
+        </div>
       </div>
 
     </div>

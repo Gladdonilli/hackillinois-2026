@@ -42,8 +42,8 @@ export function CustomCursor() {
     let raf: number
     const animate = () => {
       // Outer ring follows with delay (spring)
-      pos.current.x += (target.current.x - pos.current.x) * 0.08
-      pos.current.y += (target.current.y - pos.current.y) * 0.08
+      pos.current.x += (target.current.x - pos.current.x) * 0.22
+      pos.current.y += (target.current.y - pos.current.y) * 0.22
       
       const targetScale = isClicking.current ? 2.0 : (hovering.current ? 1.5 : 1)
       pos.current.scale += (targetScale - pos.current.scale) * 0.15

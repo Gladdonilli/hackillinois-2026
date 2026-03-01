@@ -38,7 +38,7 @@ LARYNX/backend/training_data/aai_results.json
 LARYNX/backend/training_data/aai_results_checkpoint.json
 LARYNX/backend/training_data/ema_outputs/
 
-# ── Keep the trained model (small, <1MB) ──
+# ── Keep the trained model (~97MB, HistGradientBoosting ensemble) ──
 !LARYNX/backend/training_data/ensemble_model.pkl
 
 # ── Raw dataset downloads ──

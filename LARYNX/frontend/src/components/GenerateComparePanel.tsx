@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button } from './ui/button'
 import useLarynxStore from '@/store/useLarynxStore'
 import { useGenerateCompareStream } from '@/hooks/useGenerateCompareStream'
 import type { GeminiVoice, OpenAIVoice } from '@/types/larynx'
@@ -121,21 +122,23 @@ export default function GenerateComparePanel() {
       </div>
 
       <div className="flex items-center gap-2 mt-3">
-        <button
+        <Button
+          variant="outline"
           onClick={handleTranscribe}
           disabled={!audioFile || isTranscribing || isGenerating}
-          className="px-3 py-2 rounded-sm border border-cyan/40 bg-black/50 text-cyan/90 text-xs font-mono tracking-wider disabled:opacity-40"
+          className="font-mono tracking-wider"
         >
           {isTranscribing ? 'TRANSCRIBING...' : 'TRANSCRIBE REAL AUDIO'}
-        </button>
+        </Button>
 
-        <button
+        <Button
+          variant="destructive"
           onClick={handleGenerateCompare}
           disabled={!audioFile || !generatePromptText.trim() || isGenerating || isTranscribing}
-          className="px-3 py-2 rounded-sm border border-violation/40 bg-black/50 text-violation text-xs font-mono tracking-wider disabled:opacity-40"
+          className="font-mono tracking-wider"
         >
           {isGenerating ? 'GENERATING...' : 'GENERATE + COMPARE'}
-        </button>
+        </Button>
       </div>
 
       {error && <div className="text-xs font-mono text-warn mt-2">{error}</div>}

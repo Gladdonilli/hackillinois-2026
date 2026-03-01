@@ -50,7 +50,7 @@ function makeHyperbolicCurve(
   side: 'left' | 'right',
   origin: THREE.Vector3,
   time: number,               // elapsed time for animated jitter
-  volatility: number,         // 0 = calm, 1 = full spasmatic
+  _volatility: number,         // 0 = calm, 1 = full spasmatic
 ): THREE.CatmullRomCurve3 {
   const amplitude = HYPER_A * Math.exp(HYPER_K * lineIndex)
 
@@ -70,7 +70,7 @@ function makeHyperbolicCurve(
     // Spasmatic jitter — animated, scales with distance and volatility
     // Multiple sine frequencies with time-varying phase for organic motion
     const dist = Math.abs(x)
-    const jitterAmp = dist * dist * 0.003 * (1 + lineIndex * 0.15) * volatility
+    const jitterAmp = dist * dist * 0.003 * (1 + lineIndex * 0.15) * (0.3 + 0.7 * (lineIndex / (LINE_COUNT - 1)))
     const jitter = jitterAmp * (
       Math.sin(dist * JITTER_FREQ_1 + lineIndex * 11.3 + time * JITTER_TIME_SPEED_1) * 0.6 +
       Math.sin(dist * JITTER_FREQ_2 + lineIndex * 5.7 + sign * 2.1 + time * JITTER_TIME_SPEED_2) * 0.3 +
@@ -93,26 +93,48 @@ function makeHyperbolicCurve(
 }
 
 // ── Color helpers ───────────────────────────────────────────────────
-// Calm: cyan-dominant palette. Volatile: red-dominant palette.
-// volatility interpolates between them.
+// Per-vertex distance-based: near ring center = cyan, far = red.
 const CYAN = new THREE.Color(0.22, 0.74, 0.97)
 const MID_ORANGE = new THREE.Color(0.92, 0.34, 0.05)
 const DEEP_RED = new THREE.Color(0.86, 0.15, 0.15)
 
-function getLineColor(gradientT: number, volatility: number, out: THREE.Color): void {
-  // Calm color: all lines are cyan-ish
-  const calmColor = CYAN.clone()
+// Max distance for full red — beyond this is clamped
+const COLOR_RADIUS_MAX = 16
+const COLOR_RADIUS_MIN = 1.5  // inner dead zone stays pure cyan
 
-  // Volatile color: inner = cyan, mid = orange, outer = red
-  const volatileColor = new THREE.Color()
-  if (gradientT < 0.5) {
-    volatileColor.copy(CYAN).lerp(MID_ORANGE, gradientT * 2)
-  } else {
-    volatileColor.copy(MID_ORANGE).lerp(DEEP_RED, (gradientT - 0.5) * 2)
+const _tmpColor = new THREE.Color()
+const _tmpVec = new THREE.Vector3()
+
+function applyDistanceColors(
+  geo: THREE.TubeGeometry,
+  center: THREE.Vector3,
+  verticalMult: number = 1.5,
+): void {
+  const posAttr = geo.getAttribute('position')
+  const count = posAttr.count
+  const colors = new Float32Array(count * 3)
+
+  for (let i = 0; i < count; i++) {
+    _tmpVec.set(
+      posAttr.getX(i) - center.x,
+      (posAttr.getY(i) - center.y) * verticalMult,  // vertical multiplier
+      posAttr.getZ(i) - center.z,
+    )
+    const dist = _tmpVec.length()
+    const t = Math.max(0, Math.min(1, (dist - COLOR_RADIUS_MIN) / (COLOR_RADIUS_MAX - COLOR_RADIUS_MIN)))
+
+    if (t < 0.5) {
+      _tmpColor.copy(CYAN).lerp(MID_ORANGE, t * 2)
+    } else {
+      _tmpColor.copy(MID_ORANGE).lerp(DEEP_RED, (t - 0.5) * 2)
+    }
+
+    colors[i * 3] = _tmpColor.r
+    colors[i * 3 + 1] = _tmpColor.g
+    colors[i * 3 + 2] = _tmpColor.b
   }
 
-  // Blend calm→volatile based on volatility
-  out.copy(calmColor).lerp(volatileColor, volatility)
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 }
 
 // ── Single beam ─────────────────────────────────────────────────────
@@ -141,11 +163,8 @@ function HyperbolicBeam({
   const signBase = sign === 1 ? 0 : LINE_COUNT
   const globalIndex = sideBase + signBase + lineIndex
 
-  const gradientT = lineIndex / (LINE_COUNT - 1)
 
   // Working color objects (avoid allocation per frame)
-  const workColor = useRef(new THREE.Color())
-  const workEmissive = useRef(new THREE.Color())
 
   // Initial geometry
   const initialCurve = useMemo(
@@ -174,19 +193,14 @@ function HyperbolicBeam({
     const volatilePulse = 0.4 + Math.sin(t * 2.8) * 0.35
     matRef.current.opacity = THREE.MathUtils.lerp(basePulse, volatilePulse, vol)
 
-    // Update color based on volatility
-    getLineColor(gradientT, vol, workColor.current)
-    matRef.current.color.copy(workColor.current)
-
-    // Emissive: subtle in calm, slightly brighter when volatile
-    workEmissive.current.copy(workColor.current).multiplyScalar(THREE.MathUtils.lerp(0.2, 0.5, vol))
-    matRef.current.emissive.copy(workEmissive.current)
-    matRef.current.emissiveIntensity = THREE.MathUtils.lerp(0.3, 0.6, vol)
+    // Apply per-vertex distance-based colors
+    // (will be applied after geometry rebuild below)
 
     // Rebuild curve every frame with time-animated jitter
     const curve = makeHyperbolicCurve(lineIndex, sign, side, targetRef.current, time, vol)
     onCurveReady(globalIndex, curve)
     const next = new THREE.TubeGeometry(curve, CURVE_POINTS, TUBE_RADIUS, 6, false)
+    applyDistanceColors(next, targetRef.current, 1.5)
 
     const prev = meshRef.current.geometry
     meshRef.current.geometry = next
@@ -197,7 +211,7 @@ function HyperbolicBeam({
     <mesh ref={meshRef} geometry={geo} frustumCulled={false} renderOrder={1}>
       <meshStandardMaterial
         ref={matRef}
-        color={CYAN}
+        vertexColors
         emissive={CYAN}
         emissiveIntensity={0.3}
         transparent
@@ -252,12 +266,12 @@ function HoppingParticles({
     const jumpChance = THREE.MathUtils.lerp(0.01, 0.06, vol)
 
     particles.current.forEach((p, i) => {
-      p.progress += clampedDelta * p.speed * speedMult
+      p.progress -= clampedDelta * p.speed * speedMult
       p.jumpCooldown -= clampedDelta
 
       // At end of line, jump to neighbor
-      if (p.progress >= 1) {
-        p.progress -= 1
+      if (p.progress <= 0) {
+        p.progress += 1
         const dir = Math.random() > 0.5 ? 1 : -1
         p.line = Math.max(0, Math.min(curves.length - 1, p.line + dir))
         p.jumpCooldown = 0.15 + Math.random() * 0.25

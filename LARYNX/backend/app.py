@@ -33,6 +33,7 @@ cpu_image = (
         "soundfile",
         "librosa",
     )
+    .add_local_python_source("gpu_inference")
 )
 
 # ---------------------------------------------------------------------------
@@ -426,7 +427,7 @@ async def transcribe(request: Request, file: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "error": {"code": "TRANSCRIBE_ERROR", "message": str(e)}}, headers=actual_cors)
 
-@app.function(image=cpu_image, cpu=0.25, memory=256, timeout=30)
+@app.function(image=cpu_image, cpu=0.25, memory=256, timeout=30, min_containers=1)
 @modal.concurrent(max_inputs=100)
 @modal.fastapi_endpoint(method="GET", label="larynx-health")
 async def health():

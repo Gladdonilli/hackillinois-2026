@@ -5,11 +5,12 @@ import { VELOCITY_THRESHOLDS } from '@/types/larynx';
 import { cn } from '@/lib/utils';
 import { useUIEarcons } from '@/hooks/useUIEarcons';
 import { FrameCorners } from '@/components/ui/FrameCorners';
+import { SpeedGauge } from '@/components/SpeedGauge';
 
 interface SensorData {
-  label: string;
-  velocity: number | null;
-  threshold: number;
+label: string;
+velocity: number | null;
+threshold: number;
 }
 
 export function VelocityHUD() {
@@ -106,9 +107,10 @@ export function VelocityHUD() {
       if (!sensor || !prev) return null;
       const dx = sensor.x - prev.x;
       const dy = sensor.y - prev.y;
-      return Math.sqrt(dx * dx + dy * dy) * 30; // ~cm/s at 30fps
+      // Use frame timestamp delta for framerate-independent velocity
+      const dt = (frame.timestamp && prevFrame.timestamp) ? Math.max(0.001, frame.timestamp - prevFrame.timestamp) : (1 / 30);
+      return Math.sqrt(dx * dx + dy * dy) / dt;
     };
-
     const newSensors = [
       { label: 'T1', velocity: getSensorVelocity('T1'), threshold: tTongue },
       { label: 'T2', velocity: getSensorVelocity('T2'), threshold: tTongue },
@@ -192,13 +194,13 @@ export function VelocityHUD() {
             <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse-glow" />
             <div ref={headerTextRef} className="text-[10px] tracking-[0.3em] uppercase text-dim font-mono animate-flicker transition-colors">VELOCITY SENSORS</div>
           </div>
-          <div className="flex justify-center py-2 bg-black/25 rounded-sm border border-white/10">
-            <span ref={maxVelRef} className="text-[24px] font-mono tabular-nums tracking-tighter text-cyan text-glow-cyan" data-testid="velocity-hud-max">
+          <div className="flex flex-col items-center justify-center py-2 bg-black/25 rounded-sm border border-white/10 relative overflow-visible">
+            <SpeedGauge value={maxTongueVel} maxValue={120} className="w-full" />
+            <span ref={maxVelRef} className="hidden" data-testid="velocity-hud-max">
               MAX: 0.0 cm/s
             </span>
           </div>
         </div>
-        
         <div className="grid grid-cols-2 gap-3">
         {/* Tongue Group */}
         <div className="flex flex-col gap-2">

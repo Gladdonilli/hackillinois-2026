@@ -9,11 +9,6 @@ auto_test = false
 [review]
 focus_only_on_problems = true
 ignore_patterns = [
-    "SYNAPSE/**",
-    "competitive-intel/**",
-    "_intel/**",
-    "research/**",
-    "shared/**/*.md",
     "**/*.test.ts",
     "**/*.spec.ts",
     "**/package-lock.json",

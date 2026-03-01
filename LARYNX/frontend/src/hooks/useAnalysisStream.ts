@@ -1,14 +1,16 @@
 import { useCallback, useRef } from 'react'
-import { STREAM } from '@/constants'
+import { DEMO_MODE_ENABLED, STREAM } from '@/constants'
 import { useLarynxStore } from '@/store/useLarynxStore'
+import { isDemoFake } from '@/demo/demoRouting'
+import { runDemoStream } from '@/demo/demoAnalysisStream'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://larynx-api.tianyi35.workers.dev'
 const BACKEND_URL = `${API_BASE.replace(/\/$/, '')}/api/analyze`
 
-function normalizeProgressPercent(progress: unknown): number {
-  if (typeof progress !== 'number' || !Number.isFinite(progress)) return 0
-  const scaled = progress <= 1 ? progress * 100 : progress
-  return Math.max(0, Math.min(100, Math.round(scaled)))
+/** Clamp backend progress to 0-100 range */
+function normalizeProgressPercent(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v) || 0
+  return Math.max(0, Math.min(100, n))
 }
 
 export function useAnalysisStream() {
@@ -20,10 +22,25 @@ export function useAnalysisStream() {
 
     // Cancel any existing stream
     abortRef.current?.abort()
-      const controller = new AbortController()
-      abortRef.current = controller
-      // Register with store so reset() can abort us (C3 fix)
-      useLarynxStore.getState()._setStreamAbort(controller)
+    const controller = new AbortController()
+    abortRef.current = controller
+    store._setStreamAbort(controller)
+
+    // Demo mode — fake data, no backend
+    if (DEMO_MODE_ENABLED) {
+      const fake = isDemoFake(store.audioFile.name)
+      try {
+        await runDemoStream(fake, controller.signal)
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
+        store.setStatus('error')
+        store.setProgress({ message: 'Demo failed', percent: 0 })
+      } finally {
+        store._setStreamAbort(null)
+      }
+      return
+    }
+
 
     // Prepare upload
     const formData = new FormData()
@@ -108,11 +125,30 @@ export function useAnalysisStream() {
 
               case 'frame':
                 hasReceivedEvent = true
+                
+                // Extract sensors and calculate formants
+                const sensors = parsed.sensors || {}
+                const jVel = (sensors.JAW?.velocity) || 0
+                const tBodyVel = (sensors.T2?.velocity) || 0
+                const lVel = (sensors.LL?.velocity) || 0
+
+                // Synthesize formants based on architecture mapping if not provided
+                const f1 = parsed.f1Hz || Math.max(300, Math.min(900, 300 + (jVel / 20) * 600))
+                const f2 = parsed.f2Hz || Math.max(800, Math.min(2400, 800 + (tBodyVel / 30) * 1600))
+                const f3 = parsed.f3Hz || Math.max(2200, Math.min(3000, 2200 + (lVel / 25) * 800))
+
                 store.addFrame({
                   sensors: parsed.sensors,
                   tongueVelocity: parsed.tongueVelocity,
                   timestamp: parsed.timestamp,
                   isAnomalous: parsed.isAnomalous,
+                })
+
+                store.addFormant({
+                  f1,
+                  f2,
+                  f3,
+                  timestamp: parsed.timestamp
                 })
                 break
 

@@ -58,6 +58,8 @@ interface LarynxState {
   setProgress: (progress: AnalysisProgress) => void
   addFrame: (frame: { sensors: Record<string, { x: number; y: number; velocity?: number }>; tongueVelocity: number; timestamp: number; isAnomalous?: boolean }) => void
   setVerdict: (verdict: Verdict) => void
+  addFormant: (formant: FormantData) => void
+
 
   resetComparison: () => void
   addComparisonFrame: (channel: 0 | 1 | 2, frame: EMAFrame) => void
@@ -156,15 +158,23 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
       frames: newFrames,
       currentFrame,
       tongueVelocity: frame.tongueVelocity,
-      tongueT1: t1 ? { x: t1.x, y: t1.y } : state.tongueT1,
+      tongueT1: t1 && isFinite(t1.x) && isFinite(t1.y) ? { x: t1.x, y: t1.y } : state.tongueT1,
       formants: state.formants,
     })
   },
 
   setVerdict: (verdict) => set({ verdict }),
 
-  startAnalysis: () => {
-  },
+  startAnalysis: () => set({ 
+    status: 'uploading', 
+    frames: [], 
+    formants: [], 
+    currentFrame: 0, 
+    progress: { message: 'Initializing...', percent: 0 }, 
+    verdict: null, 
+    tongueVelocity: 0 
+  }),
+
 
   reset: () => {
     const state = get()
@@ -275,6 +285,12 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
       isTranscribing: false,
       transcribedText: null,
     }),
+
+  addFormant: (formant) => {
+    set((state) => ({
+      formants: [...state.formants, formant]
+    }))
+  },
 }))
 
 export { useLarynxStore }

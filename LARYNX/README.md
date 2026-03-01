@@ -2,33 +2,36 @@
 
 > Deepfake voice forensics that proves synthetic speech violates the physical laws of the human vocal tract.
 
+**[Live Demo →](https://voxlarynx.tech)** · **[Devpost →](https://devpost.com/software/larynx)**
+
+---
+
 ## The Problem
 
 Deepfake voice cloning is indistinguishable to human ears. Current detectors are black-box classifiers that output a confidence score — "87% likely fake" — with no explanation. Judges, journalists, and forensic analysts can't act on a number. They need **evidence**.
 
-LARYNX makes the physics visible. Instead of asking "is this fake?", we ask "is this **physically possible**?"
+LARYNX makes the physics visible. Instead of asking "is this fake?", it asks "is this **physically possible**?"
 
 ## How It Works
 
 ```
 Audio (16kHz WAV)
-  → F1/F2 Formant Extraction (parselmouth, 100fps)
-    → Articulatory Parameter Mapping
-      F1 → jaw openness (300Hz=closed, 900Hz=wide open)
-      F2 → tongue position (800Hz=back, 2400Hz=front)
-      F3 → lip rounding (proxy)
-      pitch → voicing
-    → Velocity Calculation (|ΔF/Δt| per articulator per frame)
-    → Threshold Check (tongue tip max ~15-20 cm/s in humans)
+  → HuBERT Large (Meta, self-supervised speech features)
+    → Acoustic-to-Articulatory Inversion (Peter Wu, UC Berkeley)
+      → 12D EMA trajectories at 200Hz (tongue tip, tongue body, tongue dorsum,
+         jaw, upper lip, lower lip — x/y positions)
+      → Articulatory Velocity (|Δposition/Δt| per articulator per frame)
+        → 108 kinematic features (velocity, acceleration, jerk, cross-correlations)
+        → HistGradientBoosting classifier (89.2% accuracy, 73 TTS architectures)
     → 3D Visualization (React Three Fiber)
       Real speech: smooth tongue animation, green velocity gauges
-      Deepfake: tongue at 184 cm/s → clips through skull → screen glitches red
+      Deepfake: tongue at 40+ cm/s → clips through skull → screen glitches red
 ```
 
 ## The Demo Moment
 
-1. Upload a real voice recording → skull materializes in x-ray glass → tongue moves smoothly inside mouth → velocity gauges stay green (8-12 cm/s) → "This is how a human tongue moves."
-2. Generate a deepfake LIVE using OpenAI TTS API with the same text → upload result → tongue ACCELERATES → velocity spikes to 184 cm/s → tongue PUNCHES through the nasal cavity → screen glitches red → bloom spikes → bass drop → **"Your tongue would need to move at 184 centimeters per second. That's faster than a rattlesnake strike. The physics are impossible."**
+1. Upload a real voice recording → skull materializes in x-ray glass → tongue moves smoothly inside mouth → velocity gauges stay green (3-5 cm/s) → "This is how a human tongue moves."
+2. Generate a deepfake LIVE using OpenAI TTS API with the same text → upload result → tongue ACCELERATES → velocity spikes to 40+ cm/s → tongue PUNCHES through the nasal cavity → screen glitches red → bloom spikes → bass drop → **"Your tongue would need to move at 40 centimeters per second. The physics are impossible."**
 
 ## Academic Basis
 
@@ -36,31 +39,72 @@ Audio (16kHz WAV)
 
 Core insight: speech synthesis models optimize for acoustic plausibility (sounds right) but do NOT model articulatory physics (how the mouth actually moves). The kinematic constraints of the human vocal tract — mass, inertia, muscle speed limits — are a forensic invariant that synthetic speech cannot satisfy.
 
-## Hybrid Approach: Formants + AAI
+## Pipeline
 
-**Primary path (demo-ready):** F1/F2 formant tracking via parselmouth/Praat is the gold standard in phonetics research. F1 inversely correlates with tongue height, F2 with tongue advancement. Runs on CPU, processes 5s of audio in ~300ms, zero model loading. Same physics, same demo impact.
+**HuBERT + AAI (primary):** Audio → HuBERT Large (facebook/hubert-large-ll60k) extracts self-supervised speech features → Acoustic-to-Articulatory Inversion model (Peter Wu, UC Berkeley, Interspeech 2022 / ICASSP 2023) maps features to 12-dimensional EMA sensor positions (tongue tip, tongue body, tongue dorsum, jaw, upper/lower lip) at 200Hz → decimated to 100fps → velocity/acceleration/jerk computation → 108 kinematic features → HistGradientBoosting classifier.
 
-**Enhancement path (in progress):** The [articulatory/articulatory](https://github.com/articulatory/articulatory) repo (Peter Wu, UC Berkeley, Interspeech 2022 / ICASSP 2023) provides pre-trained Wav2Vec2-based weights that map audio directly to 12-dimensional EMA sensor positions (tongue tip, tongue body, tongue dorsum, jaw, upper/lower lip). This gives physically-grounded articulatory coordinates rather than formant-derived approximations.
+**Training data:** 5,800+ samples across 73 TTS architectures (LibriSpeech real + deepfake-audio-detection + WaveFake + ElevenLabs dataset). StratifiedGroupKFold cross-validation to prevent speaker leakage.
 
-Earlier AAI repos we checked (`haoyunlf/aai`, `sarthaxxxxx/AAI-ALS`) have training scripts only with no usable weights. The Peter Wu model is the exception: real pre-trained inference, 200Hz native output, decimated to 100fps to match our pipeline.
+## Tech Stack
 
-**Why formants first:** For a 3-minute hackathon demo, formant extraction is the right call. It's fast, deterministic, needs no GPU for the extraction step, and the velocity gap between real and fake speech is just as visible. AAI integration runs in parallel as an accuracy upgrade, feeding the same 3D visualization pipeline.
-
-**DO NOT USE** forced phoneme alignment (MFA/WhisperX) — it quantizes into discrete phonemes, forcing smooth interpolation that destroys the deepfake signal.
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 18 · React Three Fiber · Three.js · Zustand · GSAP · Tone.js · Tailwind CSS · Vite |
+| **Worker** | Cloudflare Workers · Hono · D1 · R2 · Vectorize · AI |
+| **Backend** | Python 3.11 · Modal (B200 GPU) · PyTorch 2.7 · HuBERT · AAI · scikit-learn |
+| **TTS Engines** | OpenAI TTS-1 · Google Gemini TTS |
+| **Hosting** | Cloudflare Pages (frontend) · Cloudflare Workers (API proxy) · Modal (GPU inference) |
 
 ## Sponsor Mapping
 
 | Sponsor | Integration |
-|---------|------------|
-| **Modal** | A100 GPU inference — formant extraction + analysis pipeline |
-| **Cloudflare** | Pages (frontend), Workers (API proxy), D1 (analysis history), R2 (audio storage) |
-| **OpenAI** | Generate deepfake samples LIVE during demo via TTS API |
-| **Supermemory** | Voice analysis history graph — forensic case journal |
+|---------|-----------|
+| **Modal** | B200 GPU inference — HuBERT + AAI articulatory inversion pipeline, real-time SSE streaming |
+| **Cloudflare** | Pages (frontend hosting), Workers (SSE API proxy + routing), D1 (analysis history), R2 (audio storage), Vectorize (voice signature similarity), AI Gateway |
+| **OpenAI** | Generate deepfake samples LIVE during demo via TTS-1 API |
 
 ## Track
 
-**Modal** — self-hosted PyTorch on A100. Every component runs on Modal GPU.
+**Modal** — self-hosted PyTorch on B200 GPU. HuBERT feature extraction + articulatory inversion + classifier inference.
 
-## Confidence
+## Accuracy
 
-**~75%** — Primary risk is formant instability on noisy/compressed audio producing false positives. Mitigated by noise gating, voiced-frame filtering, and temporal smoothing. Demo uses clean pre-recorded samples as backup.
+**89.2%** — HistGradientBoosting ensemble trained on 108 articulatory kinematic features across 73 TTS architectures. Validated with StratifiedGroupKFold (no speaker leakage).
+
+## Repo Structure
+
+```
+LARYNX/
+├── frontend/           React 18 + R3F + Tone.js frontend
+│   └── src/
+│       ├── components/ UI + 3D visualization (LandingScene, AnalysisView, CompareView)
+│       ├── hooks/      useAnalysisStream (SSE), useComparisonStream
+│       ├── store/      Zustand state (analysis frames, verdicts, UI state)
+│       └── audio/      SoundEngine (IEC alarms, Geiger counter, sonification)
+├── worker/             Cloudflare Worker (Hono SSE proxy → Modal)
+│   └── src/index.ts    Routes: /api/analyze, /api/compare, /api/generate-and-compare, /api/transcribe
+├── backend/            Modal serverless GPU inference
+│   ├── app.py          FastAPI endpoints on Modal
+│   ├── gpu_inference.py HuBERT → AAI → 108-feature classifier (B200 GPU)
+│   ├── tts_clients.py  OpenAI + Gemini TTS generation
+│   └── training_data/  ensemble_model.pkl (HistGradientBoosting, 89.2%)
+├── CREDITS.md          Full attribution table
+└── DEMO-SCRIPT.md      3-minute demo walkthrough
+```
+
+## Development Tools & AI Disclosure
+
+I used AI-assisted development tools throughout this project to accelerate iteration and handle boilerplate:
+
+- **OpenCode** — AI-powered development environment with customly refined plugins and tooling not available to the public. Used for rapid full-stack iteration, debugging, deployment automation, and documentation.
+- **GitHub Copilot** — Inline code completion during development.
+
+**What the tools helped with:** Scaffolding React components, writing Cloudflare Worker routing, CSS animation tuning, deployment scripting, documentation.
+
+**What I built:** The core scientific approach (articulatory physics for deepfake detection), the HuBERT→AAI→classifier pipeline architecture, the 108-feature kinematic feature set, the training data curation across 73 TTS architectures, the 3D vocal tract visualization concept, the IEC-compliant medical alarm sonification design, and all research and experimental decisions.
+
+The tools made me faster. The ideas, the science, and the system design are mine.
+
+## Team
+
+Solo project. Built at HackIllinois 2026.

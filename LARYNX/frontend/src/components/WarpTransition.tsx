@@ -30,7 +30,7 @@ export function WarpTransition({ isActive, onComplete }: WarpTransitionProps) {
       })
       .to(overlayRef.current, {
         opacity: 1,
-        duration: 0.1,
+        duration: TIMING.WARP_FLASH,
         ease: 'power1.out'
       }, "-=0.05")
       .to(overlayRef.current, {
@@ -40,7 +40,7 @@ export function WarpTransition({ isActive, onComplete }: WarpTransitionProps) {
       })
       .to(tunnelRef.current, {
         opacity: 0,
-        duration: 0.2
+        duration: TIMING.WARP_TUNNEL_FADE
       }, "-=0.8")
     }
 

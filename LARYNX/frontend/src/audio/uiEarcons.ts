@@ -15,66 +15,71 @@ let transitionNoise: Tone.NoiseSynth | null = null
 let transitionChirp: Tone.Synth | null = null
 let earconGain: Tone.Gain | null = null
 
+let connectedToMaster = false
+
 function ensureInit() {
-  if (earconGain) return
-  
-  // Route through master compressor if initialized, else destination
-  const master = SoundEngine.masterCompressorNode?.()
-  earconGain = new Tone.Gain(1)
-  if (master) {
-    earconGain.connect(master)
-  } else {
-    earconGain.toDestination()
+  if (!earconGain) {
+    earconGain = new Tone.Gain(1).toDestination()
+
+    hoverSynth = new Tone.Synth({
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.001, decay: 0.02, sustain: 0, release: 0.01 },
+      volume: -22,
+    }).connect(earconGain)
+
+    clickSynth = new Tone.Synth({
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
+      volume: -18,
+    }).connect(earconGain)
+
+    swooshFilter = new Tone.Filter({ type: 'bandpass', frequency: 2000, Q: 2 }).connect(earconGain)
+    swooshNoise = new Tone.NoiseSynth({
+      noise: { type: 'white' },
+      envelope: { attack: 0.01, decay: 0.15, sustain: 0, release: 0.05 },
+      volume: -20,
+    }).connect(swooshFilter)
+
+    errorSynth = new Tone.Synth({
+      oscillator: { type: 'square' },
+      envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.01 },
+      volume: -18,
+    }).connect(earconGain)
+
+    successSynth = new Tone.Synth({
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.01, decay: 0.06, sustain: 0, release: 0.01 },
+      volume: -20,
+    }).connect(earconGain)
+
+    dropHoverSynth = new Tone.Synth({
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.01, decay: 0.08, sustain: 0, release: 0.01 },
+      volume: -22,
+    }).connect(earconGain)
+
+    transitionNoise = new Tone.NoiseSynth({
+      noise: { type: 'pink' },
+      envelope: { attack: 0.05, decay: 0.15, sustain: 0, release: 0.05 },
+      volume: -20,
+    }).connect(earconGain)
+
+    transitionChirp = new Tone.Synth({
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.05, decay: 0.15, sustain: 0, release: 0.05 },
+      volume: -20,
+    }).connect(earconGain)
   }
 
-  hoverSynth = new Tone.Synth({
-    oscillator: { type: 'sine' },
-    envelope: { attack: 0.001, decay: 0.02, sustain: 0, release: 0.01 },
-    volume: -25,
-  }).connect(earconGain)
-
-  clickSynth = new Tone.Synth({
-    oscillator: { type: 'triangle' },
-    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
-    volume: -15,
-  }).connect(earconGain)
-
-  swooshFilter = new Tone.Filter({ type: 'bandpass', frequency: 2000, Q: 2 }).connect(earconGain)
-  swooshNoise = new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.01, decay: 0.15, sustain: 0, release: 0.05 },
-    volume: -20,
-  }).connect(swooshFilter)
-
-  errorSynth = new Tone.Synth({
-    oscillator: { type: 'square' },
-    envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.01 },
-    volume: -15,
-  }).connect(earconGain)
-
-  successSynth = new Tone.Synth({
-    oscillator: { type: 'sine' },
-    envelope: { attack: 0.01, decay: 0.06, sustain: 0, release: 0.01 },
-    volume: -18,
-  }).connect(earconGain)
-
-  dropHoverSynth = new Tone.Synth({
-    oscillator: { type: 'sine' },
-    envelope: { attack: 0.01, decay: 0.08, sustain: 0, release: 0.01 },
-    volume: -22,
-  }).connect(earconGain)
-
-  transitionNoise = new Tone.NoiseSynth({
-    noise: { type: 'pink' },
-    envelope: { attack: 0.05, decay: 0.15, sustain: 0, release: 0.05 },
-    volume: -20,
-  }).connect(earconGain)
-  
-  transitionChirp = new Tone.Synth({
-    oscillator: { type: 'sine' },
-    envelope: { attack: 0.05, decay: 0.15, sustain: 0, release: 0.05 },
-    volume: -20,
-  }).connect(earconGain)
+  // Reconnect to master bus when SoundEngine becomes available
+  if (!connectedToMaster && earconGain) {
+    const master = SoundEngine.masterCompressorNode?.()
+    if (master) {
+      earconGain.disconnect()
+      earconGain.connect(master)
+      connectedToMaster = true
+    }
+  }
 }
 
 export function playHover(): void {

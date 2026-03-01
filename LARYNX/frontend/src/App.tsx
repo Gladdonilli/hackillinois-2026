@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { useLarynxStore } from '@/store/useLarynxStore'
-import UploadPanel from '@/components/UploadPanel'
+import { FloatingIdleControls } from '@/components/FloatingIdleControls'
+import { useAnalysisStream } from '@/hooks/useAnalysisStream'
 import { AnalysisView } from '@/components/AnalysisView'
 import { VelocityHUD } from '@/components/VelocityHUD'
 import { VerdictPanel } from '@/components/VerdictPanel'
@@ -12,6 +13,8 @@ import { LandingScene } from '@/components/LandingScene'
 import { CustomCursor } from '@/components/CustomCursor'
 import { WarpTransition } from '@/components/WarpTransition'
 import { HistoryPanel } from '@/components/HistoryPanel'
+import { THRESHOLDS } from '@/constants'
+import { Button } from '@/components/ui/button'
 const CompareView = lazy(() => import('@/components/CompareView').then(m => ({ default: m.CompareView })))
 const TechnicalDetailPanel = lazy(() => import('@/components/TechnicalDetailPanel').then(m => ({ default: m.TechnicalDetailPanel })))
 const ClosingScreen = lazy(() => import('@/components/ClosingScreen').then(m => ({ default: m.ClosingScreen })))
@@ -30,6 +33,16 @@ export default function App() {
   const initRef = useRef(false)
   const prevStatusRef = useRef(status)
 
+  // Analyze trigger for mouth aura
+  const audioFile = useLarynxStore((state) => state.audioFile)
+  const { startStream } = useAnalysisStream()
+  const canAnalyze = Boolean(audioFile) && status === 'idle' && portalState === 'idle'
+  const handleAnalyze = useCallback(() => {
+    if (canAnalyze) {
+      startStream()
+    }
+  }, [canAnalyze, startStream])
+
   // Preload demo panels when analysis starts
   useEffect(() => {
     if (status === 'analyzing') {
@@ -45,12 +58,8 @@ export default function App() {
   useEffect(() => {
     if (showIntro) return
 
-    if ((status === 'uploading' || status === 'analyzing') && portalState === 'idle') {
-      setPortalState('entering')
-      return
-    }
-
-    if ((status === 'idle' || status === 'error') && (portalState === 'entering' || portalState === 'warping')) {
+    // Reset portal state when returning to idle
+    if ((status === 'idle' || status === 'error') && portalState !== 'idle') {
       setPortalState('idle')
     }
   }, [portalState, setPortalState, showIntro, status])
@@ -61,6 +70,7 @@ export default function App() {
       if (!initRef.current) {
         SoundEngine.init().catch(() => { /* AudioContext init may fail silently */ }).then(() => {
           SoundEngine.startBackgroundLayer()
+          SoundEngine.startSoundtrack('idle')
         })
         initRef.current = true
       }
@@ -97,10 +107,12 @@ export default function App() {
       case 'uploading':
         SoundEngine.playUploadThunk()
         SoundEngine.playBeep()
+        SoundEngine.setSoundtrackMode('idle')
         break
       case 'analyzing':
         SoundEngine.startDrone()
         SoundEngine.startTicking()
+        SoundEngine.setSoundtrackMode('analyzing')
         break
       case 'complete': {
         SoundEngine.stopTicking()
@@ -123,12 +135,14 @@ export default function App() {
       case 'closing':
         SoundEngine.stopTicking()
         SoundEngine.stopDrone()
+        SoundEngine.setSoundtrackMode('demoflow')
         break
       case 'error':
       case 'idle':
         SoundEngine.stopTicking()
         SoundEngine.stopDrone()
         SoundEngine.stopBackgroundLayer()
+        SoundEngine.stopSoundtrack()
         break
     }
   }, [status, showIntro])
@@ -144,11 +158,11 @@ export default function App() {
         prevVelocity = state.tongueVelocity
         SoundEngine.updateVelocity(state.tongueVelocity)
 
-        // Start IEC alarm at skull-clip threshold
-        if (state.tongueVelocity > 80 && !alarmActive) {
+        // Start IEC alarm at breach threshold
+        if (state.tongueVelocity > THRESHOLDS.IEC_ALARM && !alarmActive) {
           SoundEngine.startIECAlarm()
           alarmActive = true
-        } else if (state.tongueVelocity <= 80 && alarmActive) {
+        } else if (state.tongueVelocity <= THRESHOLDS.IEC_ALARM && alarmActive) {
           SoundEngine.stopIECAlarm()
           alarmActive = false
         }
@@ -182,32 +196,23 @@ export default function App() {
         <IntroSequence key="intro" onComplete={() => setShowIntro(false)} />
       )}
       
-      {(appState === 'idle' || isPortalTransition) && (
+      {appState === 'idle' && (
         <div
-          className="relative z-10 flex items-center justify-center h-screen transition-opacity duration-500"
+          className="relative z-10 flex items-center justify-center h-screen transition-opacity duration-500 grid-bg"
         >
-          <LandingScene />
+          <LandingScene canAnalyze={canAnalyze} onAnalyze={handleAnalyze} />
           {/* LARYNX title overlay */}
           <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none">
-            <h1 className="text-5xl font-mono tracking-[0.5em] text-white/90 text-glow-cyan glitch-text">LARYNX</h1>
-            <p className="text-xs font-mono tracking-[0.3em] text-dim mt-2">DEEPFAKE VOICE DETECTION</p>
+            <h1 className="text-5xl font-mono text-white text-glow-cyan glitch-text" style={{ letterSpacing: '0.5em', textIndent: '0.5em' }} data-text="LARYNX">LARYNX</h1>
+            <p className="text-xs font-mono text-white/70 mt-2" style={{ letterSpacing: '0.3em', textIndent: '0.3em' }}>DEEPFAKE VOICE DETECTION</p>
           </div>
-          {/* Hide upload panel during portal transition to focus on mouth opening */}
-          {!isPortalTransition && <UploadPanel />}
-          {/* History Button Overlay in Idle */}
-          {!isPortalTransition && (
-            <button
-              className="absolute bottom-8 z-30 px-6 py-2 border border-cyan/30 rounded-sm bg-black/60 backdrop-blur-sm text-cyan/80 font-mono tracking-widest text-xs hover:bg-cyan/10 hover:border-cyan/50 hover:text-cyan transition-all"
-              onClick={() => useLarynxStore.getState().toggleHistory()}
-              data-interactive
-            >
-              VIEW DATABASE
-            </button>
-          )}
         </div>
       )}
+
+      {/* Floating controls rendered OUTSIDE idle div so they sit above the position:fixed Canvas */}
+      {appState === 'idle' && <FloatingIdleControls />}
       
-      {(appState === 'uploading' || appState === 'analyzing' || appState === 'complete') && !isPortalTransition && (
+      {(appState === 'uploading' || appState === 'analyzing' || appState === 'complete') && (
         <div
           className={appState === 'complete'
             ? 'absolute inset-0 z-10 animate-[fadeIn_0.8s_ease-out]'
@@ -247,13 +252,14 @@ export default function App() {
                 </div>
               </div>
 
-              <button
-                className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all animate-[fadeIn_0.5s_ease-out_1.5s_both]"
+              <Button
+                variant="outline"
+                className="absolute bottom-8 right-8 z-30 font-mono text-sm tracking-wider animate-[fadeIn_0.5s_ease-out_1.5s_both]"
                 onClick={() => useLarynxStore.getState().setStatus('comparing')}
                 data-interactive
               >
                 COMPARE ANALYSIS →
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -271,13 +277,14 @@ export default function App() {
             <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
               <CompareView />
             </Suspense>
-            <button
-              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
+            <Button
+              variant="outline"
+              className="absolute bottom-8 right-8 z-30 font-mono text-sm tracking-wider"
               onClick={() => useLarynxStore.getState().setStatus('technical')}
               data-interactive
             >
               TECHNICAL DETAILS →
-            </button>
+            </Button>
           </div>
 
           <div className={appState === 'technical'
@@ -286,18 +293,19 @@ export default function App() {
             <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
               <TechnicalDetailPanel />
             </Suspense>
-            <button
-              className="absolute bottom-8 right-8 z-30 px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all"
+            <Button
+              variant="outline"
+              className="absolute bottom-8 right-8 z-30 font-mono text-sm tracking-wider"
               onClick={() => useLarynxStore.getState().setStatus('closing')}
               data-interactive
             >
               CLOSING →
-            </button>
+            </Button>
           </div>
 
           <div className={appState === 'closing'
-            ? 'absolute inset-0 opacity-100 transition-opacity duration-600'
-            : 'absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-600'}>
+            ? 'absolute inset-0 opacity-100 transition-opacity duration-500'
+            : 'absolute inset-0 opacity-0 pointer-events-none transition-opacity duration-500'}>
             <Suspense fallback={<div className="hud-panel p-8 text-cyan font-mono animate-pulse">Loading...</div>}>
               <ClosingScreen
                 onReset={() => useLarynxStore.getState().reset()}
@@ -314,17 +322,18 @@ export default function App() {
         >
           <div className="hud-panel p-12 max-w-md text-center flex flex-col items-center gap-6">
             <div className="text-warn text-6xl font-mono">⚠</div>
-            <h2 className="text-2xl font-mono tracking-[0.2em] text-white/90">ANALYSIS FAILED</h2>
+            <h2 className="text-2xl font-mono text-white/90" style={{ letterSpacing: '0.2em', textIndent: '0.2em' }}>ANALYSIS FAILED</h2>
             <p className="text-sm font-mono text-dim leading-relaxed">
               Pipeline encountered an error during processing. This may be due to audio format incompatibility or a backend timeout.
             </p>
-            <button
-              className="px-6 py-3 border border-warn/40 bg-black/60 backdrop-blur-sm text-warn font-mono text-sm tracking-wider hover:bg-warn/10 hover:border-warn/60 transition-all rounded-sm"
+            <Button
+              variant="destructive"
+              className="font-mono text-sm tracking-wider"
               onClick={() => useLarynxStore.getState().reset()}
               data-interactive
             >
               TRY AGAIN
-            </button>
+            </Button>
           </div>
         </div>
       )}

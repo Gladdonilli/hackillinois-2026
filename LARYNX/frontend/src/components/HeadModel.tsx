@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
@@ -14,12 +14,15 @@ type FacecapGLTF = GLTF & {
 export function HeadModel() {
   const groupRef = useRef<THREE.Group>(null);
   const headMeshRef = useRef<THREE.Mesh>(null);
+  const wireMeshRef = useRef<THREE.Mesh>(null);
+  const tongueMeshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const tongueMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
   const breachIntensity = useRef(0);
-  const baseColor = useMemo(() => new THREE.Color('#c7ecff'), []);
+  const baseColor = useMemo(() => new THREE.Color('#38BDF8'), []);
   const breachColor = useMemo(() => new THREE.Color('#ff3366'), []);
   const baseEmissive = useMemo(() => new THREE.Color('#38BDF8'), []);
-  const breachEmissive = useMemo(() => new THREE.Color('#800020'), []);
+  const breachEmissive = useMemo(() => new THREE.Color('#ff3366'), []);
   const lerpedColor = useMemo(() => new THREE.Color(), []);
   const lerpedEmissive = useMemo(() => new THREE.Color(), []);
   const { gl } = useThree();
@@ -32,14 +35,7 @@ export function HeadModel() {
     }
   ) as unknown as FacecapGLTF;
 
-  useEffect(() => {
-    gl.localClippingEnabled = true;
-  }, [gl]);
 
-  const clippingPlanes = useMemo(
-    () => [new THREE.Plane(new THREE.Vector3(1, 0, 0), 0)],
-    []
-  );
 
   useFrame(({ clock }) => {
     const { status, frames, currentFrame, tongueVelocity } = useLarynxStore.getState();
@@ -70,6 +66,23 @@ export function HeadModel() {
       }
     }
 
+    // Sync wireframe + tongue morph targets with solid mesh
+    if (headMeshRef.current) {
+      const srcInfluences = headMeshRef.current.morphTargetInfluences;
+      if (srcInfluences) {
+        if (wireMeshRef.current?.morphTargetInfluences) {
+          for (let i = 0; i < srcInfluences.length; i++) {
+            wireMeshRef.current.morphTargetInfluences[i] = srcInfluences[i];
+          }
+        }
+        if (tongueMeshRef.current?.morphTargetInfluences) {
+          for (let i = 0; i < srcInfluences.length; i++) {
+            tongueMeshRef.current.morphTargetInfluences[i] = srcInfluences[i];
+          }
+        }
+      }
+    }
+
     // Pink Trombone breach effects: color shift + jitter
     const threshold = 20;
     const rawIntensity = tongueVelocity > threshold ? Math.min((tongueVelocity - threshold) / 60, 1) : 0;
@@ -82,20 +95,36 @@ export function HeadModel() {
       lerpedEmissive.copy(baseEmissive).lerp(breachEmissive, breachIntensity.current);
       materialRef.current.emissive.copy(lerpedEmissive);
 
-      materialRef.current.emissiveIntensity = 0.18 + breachIntensity.current * 0.6;
-      materialRef.current.opacity = 0.36 + breachIntensity.current * 0.25;
+      materialRef.current.emissiveIntensity = 0.5 + breachIntensity.current * 0.8;
+      materialRef.current.opacity = 0.25 + breachIntensity.current * 0.35;
+    }
+
+    // Tongue material: more visible, stronger velocity color response
+    if (tongueMaterialRef.current) {
+      const tongueBreachT = Math.min(1, breachIntensity.current * 1.5);
+      lerpedColor.copy(baseColor).lerp(breachColor, tongueBreachT);
+      tongueMaterialRef.current.color.copy(lerpedColor);
+      tongueMaterialRef.current.emissive.copy(lerpedColor);
+      tongueMaterialRef.current.emissiveIntensity = 1.0 + tongueBreachT * 2.0;
+      tongueMaterialRef.current.opacity = 0.5 + tongueBreachT * 0.3;
     }
 
     // Vertex jitter on breach
-    if (headMeshRef.current && breachIntensity.current > 0.05) {
+    if (wireMeshRef.current && breachIntensity.current > 0.05) {
       const jitterAmp = breachIntensity.current * 0.3;
       const t = clock.elapsedTime;
-      headMeshRef.current.position.x = -10.903 + Math.sin(t * 47) * jitterAmp;
-      headMeshRef.current.position.y = -18.028 + Math.sin(t * 53) * jitterAmp * 0.7;
-      headMeshRef.current.position.z = -18.131 + Math.cos(t * 41) * jitterAmp * 0.5;
-    } else if (headMeshRef.current) {
-      headMeshRef.current.position.set(-10.903, -18.028, -18.131);
+      const jx = -10.903 + Math.sin(t * 47) * jitterAmp;
+      const jy = -18.028 + Math.sin(t * 53) * jitterAmp * 0.7;
+      const jz = -18.131 + Math.cos(t * 41) * jitterAmp * 0.5;
+      wireMeshRef.current.position.set(jx, jy, jz);
+      if (headMeshRef.current) headMeshRef.current.position.set(jx, jy, jz);
+      if (tongueMeshRef.current) tongueMeshRef.current.position.set(jx, jy, jz);
+    } else if (wireMeshRef.current) {
+      wireMeshRef.current.position.set(-10.903, -18.028, -18.131);
+      if (headMeshRef.current) headMeshRef.current.position.set(-10.903, -18.028, -18.131);
+      if (tongueMeshRef.current) tongueMeshRef.current.position.set(-10.903, -18.028, -18.131);
     }
+
   });
 
   // Render the core head mesh with the exact transforms from gltfjsx
@@ -112,19 +141,52 @@ export function HeadModel() {
               morphTargetInfluences={nodes.mesh_2.morphTargetInfluences}
               position={[-10.903, -18.028, -18.131]}
               scale={0.002}
+              visible={false}
+            >
+              <meshStandardMaterial transparent opacity={0} />
+            </mesh>
+            {/* Wireframe overlay */}
+            <mesh
+              name="head-wire"
+              ref={wireMeshRef}
+              geometry={nodes.mesh_2.geometry}
+              morphTargetDictionary={nodes.mesh_2.morphTargetDictionary}
+              morphTargetInfluences={[...(nodes.mesh_2.morphTargetInfluences || [])]}
+              position={[-10.903, -18.028, -18.131]}
+              scale={0.002}
             >
               <meshStandardMaterial
                 ref={materialRef}
-                color="#c7ecff"
+                color="#38BDF8"
                 emissive="#38BDF8"
-                emissiveIntensity={0.18}
+                emissiveIntensity={0.5}
                 transparent
-                opacity={0.36}
-                roughness={0.45}
-                metalness={0.02}
+                opacity={0.25}
+                wireframe
                 depthWrite={false}
-                clippingPlanes={clippingPlanes}
-                clipShadows={false}
+              />
+            </mesh>
+            {/* Tongue inner mesh — visible solid with velocity glow */}
+            <mesh
+              name="tongue-inner"
+              ref={tongueMeshRef}
+              geometry={nodes.mesh_2.geometry}
+              morphTargetDictionary={nodes.mesh_2.morphTargetDictionary}
+              morphTargetInfluences={[...(nodes.mesh_2.morphTargetInfluences || [])]}
+              position={[-10.903, -18.028, -18.131]}
+              scale={0.002}
+              renderOrder={1}
+            >
+              <meshStandardMaterial
+                ref={tongueMaterialRef}
+                color="#38BDF8"
+                emissive="#38BDF8"
+                emissiveIntensity={1.0}
+                transparent
+                opacity={0.5}
+                depthWrite={false}
+                side={THREE.FrontSide}
+                toneMapped={false}
               />
             </mesh>
           </group>

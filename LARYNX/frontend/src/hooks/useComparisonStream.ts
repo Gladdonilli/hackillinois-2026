@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import { STREAM } from '@/constants'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import type { SensorName, EMASensor, Verdict } from '@/types/larynx'
@@ -188,6 +188,13 @@ export function useComparisonStream() {
   const cancelComparison = useCallback(() => {
     abortRef.current?.abort()
     useLarynxStore.getState().reset()
+  }, [])
+
+  // Cleanup: abort any active stream on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
   }, [])
 
   return { startComparison, cancelComparison }

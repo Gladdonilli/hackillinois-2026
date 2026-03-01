@@ -69,7 +69,7 @@ describe('SoundEngine', () => {
       const state = SoundEngine.getDebugState()
       expect(state.geigerActive).toBe(false)
       expect(state.revealSequenceActive).toBe(false)
-      expect(state.hasGeigerTimer).toBe(false)
+      expect(state.hasGeigerLoop).toBe(false)
       expect(state.hasTickJitterTimer).toBe(false)
     })
   })
@@ -85,7 +85,7 @@ describe('SoundEngine', () => {
       expect(state).toHaveProperty('soundtrackActive')
       expect(state).toHaveProperty('revealSequenceActive')
       expect(state).toHaveProperty('pendingTimers')
-      expect(state).toHaveProperty('hasGeigerTimer')
+      expect(state).toHaveProperty('hasGeigerLoop')
       expect(state).toHaveProperty('hasTickJitterTimer')
     })
   })
@@ -107,14 +107,14 @@ describe('SoundEngine', () => {
     it('updateVelocity(90) triggers geiger timer and sets active state', () => {
       SoundEngine.updateVelocity(90)
       expect(SoundEngine.getDebugState().geigerActive).toBe(true)
-      expect(SoundEngine.getDebugState().hasGeigerTimer).toBe(true)
+      expect(SoundEngine.getDebugState().hasGeigerLoop).toBe(true)
     })
     
     it('updateVelocity(0) stops geiger timer', () => {
       SoundEngine.updateVelocity(90)
       SoundEngine.updateVelocity(0)
       expect(SoundEngine.getDebugState().geigerActive).toBe(false)
-      expect(SoundEngine.getDebugState().hasGeigerTimer).toBe(false)
+      expect(SoundEngine.getDebugState().hasGeigerLoop).toBe(false)
     })
   })
 
@@ -187,8 +187,8 @@ describe('SoundEngine', () => {
       expect(() => SoundEngine.playUploadThunk()).not.toThrow()
     })
 
-    it('playDataPoint executes without error', () => {
-      expect(() => SoundEngine.playDataPoint(50)).not.toThrow()
+    it('playScanSweep executes without error', () => {
+      expect(() => SoundEngine.playScanSweep()).not.toThrow()
     })
   })
 })

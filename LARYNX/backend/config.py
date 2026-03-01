@@ -29,7 +29,6 @@ TONGUE_FRONT_MM = 20.0
 # Velocity computation
 # DO NOT CLAMP articulatory values — deepfake values > 1.0 cause skull clip
 # which is the visual "smoking gun" evidence
-VELOCITY_SCALE = 1.5  # Scaling factor for articulatory → cm/s
 
 # Anomaly detection thresholds (cm/s)
 # Human physiological limits from Ladefoged/Stevens research

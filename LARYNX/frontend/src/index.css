@@ -376,6 +376,11 @@
 
 .glitch-text {
   position: relative;
+  display: inline-block;
+  isolation: isolate;
+  text-shadow:
+    0 0 8px rgba(var(--cyan-glow), 0.35),
+    0 0 28px rgba(var(--cyan-glow), 0.14);
 }
 
 .glitch-text::before,
@@ -386,20 +391,23 @@
   left: 0;
   width: 100%;
   height: 100%;
+  pointer-events: none;
 }
 
 .glitch-text::before {
   color: var(--warn);
   animation: glitch-1 3s ease-in-out infinite;
-  z-index: -1;
-  opacity: 0.4;
+  z-index: 1;
+  opacity: 0.7;
+  text-shadow: 0 0 10px rgba(var(--warn-glow), 0.55);
 }
 
 .glitch-text::after {
   color: var(--cyan);
   animation: glitch-2 2.5s ease-in-out infinite reverse;
-  z-index: -1;
-  opacity: 0.4;
+  z-index: 1;
+  opacity: 0.75;
+  text-shadow: 0 0 14px rgba(var(--cyan-glow), 0.7);
 }
 
 /* ============================================
@@ -662,4 +670,165 @@ button:focus-visible, input:focus-visible, [data-interactive]:focus-visible {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* ============================================
+   FLOATING WAVE CONTROLS (idle state)
+   ============================================ */
+
+@keyframes wave-drift-1 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(4px, -8px) rotate(0.3deg); }
+  50% { transform: translate(-3px, -14px) rotate(-0.2deg); }
+  75% { transform: translate(6px, -6px) rotate(0.4deg); }
+}
+
+@keyframes wave-drift-2 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(-6px, -10px) rotate(-0.4deg); }
+  66% { transform: translate(5px, -16px) rotate(0.3deg); }
+}
+
+@keyframes wave-drift-3 {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  20% { transform: translate(3px, -12px) rotate(0.2deg); }
+  60% { transform: translate(-5px, -8px) rotate(-0.3deg); }
+  80% { transform: translate(7px, -5px) rotate(0.5deg); }
+}
+
+@keyframes label-glow-pulse {
+  0%, 100% { text-shadow: 0 0 8px rgba(var(--cyan-glow), 0.2), 0 0 20px rgba(var(--cyan-glow), 0.05); }
+  50% { text-shadow: 0 0 12px rgba(var(--cyan-glow), 0.35), 0 0 30px rgba(var(--cyan-glow), 0.12); }
+}
+
+.floating-wave-label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 20px 36px;
+  cursor: none;
+  transition: transform 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
+  animation: label-glow-pulse 4s ease-in-out infinite;
+}
+
+.floating-wave-label::after {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(var(--cyan-glow), 0.2) 0%, rgba(var(--cyan-glow), 0.08) 40%, transparent 75%);
+  opacity: 0.55;
+  filter: blur(10px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.floating-wave-label:hover {
+  transform: scale(1.1) translateY(-5px);
+  filter: brightness(1.2);
+}
+
+.floating-wave-label:hover::after {
+  opacity: 0.9;
+  transform: scale(1.08);
+}
+
+.floating-wave-label:hover .floating-label-text {
+  text-shadow: 0 0 18px rgba(var(--cyan-glow), 0.8), 0 0 46px rgba(var(--cyan-glow), 0.28);
+  color: var(--cyan);
+}
+
+.floating-wave-label:active .floating-label-text {
+  transform: scale(0.95);
+}
+
+.floating-label-text {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
+  color: rgba(56, 189, 248, 0.95);
+  text-shadow: 0 0 12px rgba(var(--cyan-glow), 0.45), 0 0 24px rgba(var(--cyan-glow), 0.22);
+  transition: color 0.3s ease, text-shadow 0.3s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+
+.floating-label-sub {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: rgba(125, 211, 252, 0.8);
+  transition: color 0.3s ease;
+}
+
+.floating-wave-label:hover .floating-label-sub {
+  color: rgba(var(--cyan-glow), 0.4);
+}
+
+/* Scattered positions along wave convergence paths */
+.floating-wave-label--upload {
+  left: 14%;
+  top: 52%;
+  animation: wave-drift-1 7s ease-in-out infinite, label-glow-pulse 4s ease-in-out infinite;
+}
+
+.floating-wave-label--synthesize {
+  left: 36%;
+  top: 62%;
+  animation: wave-drift-2 9s ease-in-out infinite, label-glow-pulse 4s ease-in-out infinite 1.3s;
+}
+
+.floating-wave-label--database {
+  right: 14%;
+  top: 55%;
+  animation: wave-drift-3 8s ease-in-out infinite, label-glow-pulse 4s ease-in-out infinite 2.6s;
+}
+
+.floating-wave-label--file {
+  animation: wave-drift-2 6s ease-in-out infinite, label-glow-pulse 3s ease-in-out infinite;
+}
+
+/* -- File indicator chip -- */
+.floating-wave-label--file-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+  animation: label-glow-pulse 3s ease-in-out infinite;
+  cursor: default;
+}
+
+.floating-label-file-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: rgba(56, 189, 248, 0.95);
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.floating-label-clear {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  transition: color 0.2s;
+}
+
+.floating-label-clear:hover {
+  color: #DC2626;
 }

@@ -1,12 +1,11 @@
-# LARYNX Backend Dependencies — pinned from STACK.md
-# Install: pip install -r requirements.txt
-librosa==0.10.2.post1
-praat-parselmouth==0.4.5
-numpy==2.1.3
-scipy==1.14.1
+# LARYNX Backend Dependencies
+# Note: Live inference runs on Modal (deps defined in gpu_inference.py image).
+# This file is for local dev/testing only.
+numpy>=2.0
+scipy>=1.12
 fastapi==0.115.6
 uvicorn==0.32.1
 sse-starlette==2.1.3
 python-multipart==0.0.12
 pydantic==2.10.3
-modal==1.3.4
+modal>=1.3.4

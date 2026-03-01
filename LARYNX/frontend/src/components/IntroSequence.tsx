@@ -27,7 +27,7 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
     const timer = setTimeout(() => {
       setComplete(true);
       setTimeout(onComplete, TIMING.INTRO_FADE_DELAY_MS);
-    }, 5500);
+    }, TIMING.INTRO_DURATION_MS);
 
     // H10 fix: allow click/key to skip intro
     window.addEventListener('click', skipIntro);
@@ -111,7 +111,8 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
             transition={{ delay: 1.5, duration: 0.2, ease: "linear" }}
           >
             <motion.div 
-              className="font-mono text-5xl tracking-[0.3em] uppercase text-white glitch-text"
+              className="font-mono text-5xl uppercase text-white glitch-text"
+              style={{ letterSpacing: '0.3em', textIndent: '0.3em' }}
               variants={containerVariants}
               initial="hidden"
               animate="visible"
@@ -129,7 +130,7 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
             </motion.div>
           </motion.div>
 
-          <div className="font-sans text-sm tracking-[0.2em] text-dim uppercase relative mb-8 flex flex-col items-center">
+          <div className="font-sans text-sm text-dim uppercase relative mb-8 flex flex-col items-center" style={{ letterSpacing: '0.2em', textIndent: '0.2em' }}>
             <div className="flex items-center">
               {subtitleTxt.split('').map((char, i) => (
                 <motion.span
@@ -160,7 +161,7 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
           </div>
 
           {/* Data Readout */}
-          <div className="flex flex-col items-start gap-1 font-mono text-[10px] tracking-widest text-cyan mt-2 w-[320px]">
+          <div className="flex flex-col items-center gap-1 font-mono text-[10px] tracking-widest text-cyan mt-2">
             {readoutLines.map((line, i) => (
               <motion.div
                 key={i}

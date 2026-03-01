@@ -6,6 +6,7 @@ import useLarynxStore from "@/store/useLarynxStore"
 import { useAnalysisStream } from '@/hooks/useAnalysisStream'
 import { useUIEarcons } from '@/hooks/useUIEarcons'
 import GenerateComparePanel from '@/components/GenerateComparePanel'
+import { Button } from "./ui/button"
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_TYPES = ["audio/wav", "audio/mpeg", "audio/ogg", "audio/flac", "audio/x-m4a"]
@@ -52,16 +53,18 @@ function FileCard({
               </p>
             </div>
           </div>
-          <button 
+          <Button 
+            variant="ghost"
+            size="icon"
             onClick={(e) => {
               e.stopPropagation()
               clearFile()
             }}
-            className="p-1 rounded-full text-dim hover:text-[var(--warn)] hover:bg-[var(--warn)]/10 transition-colors shrink-0 pointer-events-auto"
+            className="shrink-0 pointer-events-auto"
             aria-label="Remove file"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
     </motion.div>
@@ -206,12 +209,13 @@ export default function UploadPanel() {
 
       {audioFile && !error && (
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 pointer-events-auto z-30 flex flex-col items-center gap-3">
-          <button
+          <Button
+            variant="default"
             onClick={handleAnalyze}
-            className="px-6 py-2 rounded-sm border border-cyan/40 bg-black/60 text-cyan/90 font-mono tracking-wider text-xs hover:bg-cyan/10 hover:border-cyan/60 transition-all"
+            className="font-mono tracking-wider text-xs"
           >
             ANALYZE REAL AUDIO
-          </button>
+          </Button>
           <GenerateComparePanel />
         </div>
       )}

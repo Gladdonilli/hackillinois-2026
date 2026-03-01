@@ -280,7 +280,7 @@ export function WaveformDisplay() {
 
       // Update DOM values directly to avoid React state re-renders
       if (formantsData && currentFrame > 0 && currentFrame < formantsData.length) {
-         const frameData: any = formantsData[currentFrame];
+         const frameData = formantsData[currentFrame] as FormantData | undefined;
          if (frameData) {
             if(f1ValRef.current) f1ValRef.current.textContent = `F1: ${Math.round(frameData.f1 || 0)} Hz`;
             if(f2ValRef.current) f2ValRef.current.textContent = `F2: ${Math.round(frameData.f2 || 0)} Hz`;

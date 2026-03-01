@@ -11,7 +11,7 @@ const CAMERA_PRESETS: Record<
 > = {
   idle: { position: [0, 0, 5], target: [0, 0, 0] },
   uploading: { position: [2, 1, 4], target: [0, 0, 0] },
-  analyzing: { position: [1.6, 0.2, 2.85], target: [0, -0.25, 0] },
+  analyzing: { position: [3.2, 0.0, 0.0], target: [0, -0.25, 0] },
   complete: { position: [0, 0.5, 4], target: [0, -0.5, 0] },
   comparing: { position: [2, 1, 5], target: [0, 0, 0] },
   technical: { position: [0, 0, 3], target: [0, 0, 0] },
@@ -223,9 +223,9 @@ export function CameraController() {
         currentTarget.current.set(0, -0.5, 0.3)
         
         gsap.to(camera.position, {
-          x: 0.8,
+          x: 2.0,
           y: 0,
-          z: 1.5,
+          z: 0.3,
           duration: 0.4,
           ease: "power3.out",
           onComplete: () => {
@@ -258,9 +258,9 @@ export function CameraController() {
 
       if (!isCameraOverride.current) {
         const base = CAMERA_PRESETS.analyzing.position
-        const targetX = base[0] + pointerRef.current.x * 0.08
+        const targetX = base[0]
         const targetY = base[1] + pointerRef.current.y * 0.05 + Math.sin(clock.elapsedTime * 1.2) * 0.03
-        const targetZ = base[2]
+        const targetZ = base[2] + pointerRef.current.x * 0.08
 
         if (xTo.current) xTo.current(targetX)
         if (yTo.current) yTo.current(targetY)

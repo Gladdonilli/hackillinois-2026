@@ -3,6 +3,8 @@ import { motion } from 'motion/react';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import NumberFlow from '@number-flow/react';
+import { useLarynxStore } from '@/store/useLarynxStore';
+import { TIMING } from '@/constants';
 
 // Reusing same CSS classes as other components
 // Requires motion, gsap, NumberFlow as requested
@@ -29,47 +31,58 @@ export const TechnicalDetailPanel: React.FC = () => {
     conf: 0
   });
 
+  const verdict = useLarynxStore((s) => s.verdict);
+  const formants = useLarynxStore((s) => s.formants);
+  const frames = useLarynxStore((s) => s.frames);
+
+  // Derive real values from store, with sensible demo fallbacks
+  const peakVelocity = verdict?.peakVelocity ?? 184;
+  const confidence = verdict?.confidence != null ? verdict.confidence * 100 : 99.9;
+  const totalFrames = frames.length || 100;
+  const analysisRate = Math.min(totalFrames, 100);
+  const sensorDOF = 12; // Fixed: 6 sensors × 2 axes
+  const humanLimit = 22; // Fixed: known human physiological limit
+
   useGSAP(() => {
-    // Animate the stats up sequentially or together
     gsap.to(fpsRef.current, {
-      value: 100,
-      duration: 1.5,
+      value: analysisRate,
+      duration: TIMING.STATS_DURATION_SHORT,
       ease: "power2.out",
       onUpdate: () => setStats(prev => ({ ...prev, fps: Math.round(fpsRef.current.value) }))
     });
     
     gsap.to(dofRef.current, {
-      value: 12,
-      duration: 1.5,
+      value: sensorDOF,
+      duration: TIMING.STATS_DURATION_SHORT,
       delay: 0.2,
       ease: "power2.out",
       onUpdate: () => setStats(prev => ({ ...prev, dof: Math.round(dofRef.current.value) }))
     });
 
     gsap.to(humanVelRef.current, {
-      value: 22,
-      duration: 1.5,
-      delay: 0.4,
+      value: humanLimit,
+      duration: TIMING.STATS_DURATION_SHORT,
+      delay: TIMING.STATS_STAGGER_DELAY * 2,
       ease: "power2.out",
       onUpdate: () => setStats(prev => ({ ...prev, humanVel: Math.round(humanVelRef.current.value) }))
     });
 
     gsap.to(fakeVelRef.current, {
-      value: 184,
-      duration: 2.0,
-      delay: 0.6,
+      value: peakVelocity,
+      duration: TIMING.STATS_DURATION_LONG,
+      delay: TIMING.STATS_STAGGER_DELAY * 3,
       ease: "power4.out",
       onUpdate: () => setStats(prev => ({ ...prev, fakeVel: Math.round(fakeVelRef.current.value) }))
     });
 
     gsap.to(confRef.current, {
-      value: 99.9,
-      duration: 2.0,
-      delay: 0.8,
+      value: confidence,
+      duration: TIMING.STATS_DURATION_LONG,
+      delay: TIMING.STATS_STAGGER_DELAY * 4,
       ease: "power2.out",
       onUpdate: () => setStats(prev => ({ ...prev, conf: Number(confRef.current.value.toFixed(1)) }))
     });
-  }, []);
+  }, [peakVelocity, confidence, analysisRate]);
 
   // Formant drawing effect
   useEffect(() => {
@@ -79,7 +92,6 @@ export const TechnicalDetailPanel: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Handle high DPI displays
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
@@ -89,16 +101,13 @@ export const TechnicalDetailPanel: React.FC = () => {
     const width = rect.width;
     const height = rect.height;
 
-    // Animation state
     let animationFrameId: number;
     const startTime = Date.now();
-    const duration = 2000; // 2 seconds to draw
+    const duration = 2000;
 
     const draw = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      
-      // Easing function for progress (power2.out)
       const easeProgress = 1 - Math.pow(1 - progress, 2);
 
       ctx.clearRect(0, 0, width, height);
@@ -106,79 +115,65 @@ export const TechnicalDetailPanel: React.FC = () => {
       // Draw grid
       ctx.lineWidth = 1;
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
-      
-      // Horizontal lines
       for (let i = 0; i < 5; i++) {
         const y = i * (height / 4);
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
       }
-      
-      // Vertical lines
       for (let i = 0; i < 10; i++) {
         const x = i * (width / 9);
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
       }
 
-      // Draw active width based on progress
       const currentWidth = width * easeProgress;
+      const hasFormantData = formants.length > 0;
 
-      // Draw Formant 1 (Cyan - Lowest frequency)
-      ctx.beginPath();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#38BDF8'; // cyan
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#38BDF8';
-      
-      for (let x = 0; x < currentWidth; x++) {
-        // Base y is near the bottom (high value = lower physically on canvas)
-        const baseY = height * 0.75;
-        // Wavy line with some noise
-        const y = baseY + Math.sin(x * 0.05) * 15 + Math.sin(x * 0.01) * 30;
+      // Helper: draw a formant line from real data or fallback sine wave
+      const drawFormantLine = (
+        color: string,
+        formantKey: 'f1' | 'f2' | 'f3',
+        baseY: number,
+        fallbackFreq: number,
+        fallbackAmp: number,
+        fallbackPhase: number
+      ) => {
+        ctx.beginPath();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = color;
         
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
+        for (let px = 0; px < currentWidth; px++) {
+          let y: number;
+          if (hasFormantData) {
+            // Map pixel X to formant frame index
+            const frameIdx = Math.floor((px / width) * formants.length);
+            const frame = formants[Math.min(frameIdx, formants.length - 1)];
+            if (frame && frame[formantKey] != null) {
+              // Normalize formant frequency to canvas Y (higher freq = higher on canvas)
+              // F1: 300-900, F2: 800-2400, F3: 2000-3500
+              const ranges: Record<string, [number, number]> = {
+                f1: [300, 900], f2: [800, 2400], f3: [2000, 3500]
+              };
+              const [lo, hi] = ranges[formantKey];
+              const norm = Math.max(0, Math.min(1, (frame[formantKey] - lo) / (hi - lo)));
+              y = height * (1 - norm * 0.8 - 0.1);
+            } else {
+              y = baseY + Math.sin(px * fallbackFreq + fallbackPhase) * fallbackAmp;
+            }
+          } else {
+            y = baseY + Math.sin(px * fallbackFreq + fallbackPhase) * fallbackAmp + Math.sin(px * fallbackFreq * 0.2) * fallbackAmp * 2;
+          }
+          if (px === 0) ctx.moveTo(px, y);
+          else ctx.lineTo(px, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      };
 
-      // Draw Formant 2 (Green - Mid frequency)
-      ctx.beginPath();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#2DD4BF'; // green
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#2DD4BF';
-      
-      for (let x = 0; x < currentWidth; x++) {
-        // Higher up
-        const baseY = height * 0.45;
-        // Different frequency wave
-        const y = baseY + Math.sin(x * 0.06 + 1) * 20 + Math.sin(x * 0.02) * 25;
-        
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      // Draw Formant 3 (Yellow - High frequency)
-      ctx.beginPath();
-      ctx.strokeStyle = '#FFFF00'; // yellow
-      ctx.lineWidth = 3;
-      ctx.shadowColor = '#FFFF00';
-      ctx.shadowBlur = 10;
-      
-      for (let x = 0; x < currentWidth; x++) {
-        const baseY = height * 0.2;
-        const y = baseY + Math.sin(x * 0.08 + 2) * 10 + Math.sin(x * 0.03) * 15;
-        
-        if (x === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
+      // F1 (Cyan - low), F2 (Green - mid), F3 (Yellow - high)
+      drawFormantLine('#38BDF8', 'f1', height * 0.75, 0.05, 15, 0);
+      drawFormantLine('#2DD4BF', 'f2', height * 0.45, 0.06, 20, 1);
+      drawFormantLine('#FFFF00', 'f3', height * 0.2, 0.08, 10, 2);
 
       if (progress < 1) {
         animationFrameId = requestAnimationFrame(draw);
@@ -190,7 +185,7 @@ export const TechnicalDetailPanel: React.FC = () => {
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, []);
+  }, [formants]);
 
   // Stagger variants
   const containerVariants = {

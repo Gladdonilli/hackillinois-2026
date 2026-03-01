@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
 
 interface Props {
   children: ReactNode
@@ -42,13 +43,15 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm font-mono text-dim leading-relaxed">
               {this.state.error?.message || 'An unexpected error occurred in the rendering pipeline.'}
             </p>
-            <button
-              className="px-6 py-3 border border-cyan/40 bg-black/60 backdrop-blur-sm text-cyan font-mono text-sm tracking-wider hover:bg-cyan/10 hover:border-cyan/60 transition-all rounded-sm"
+            <Button
+              variant="default"
+              size="lg"
+              className="font-mono text-sm tracking-wider"
               onClick={this.handleReset}
               data-interactive
             >
               RESTART
-            </button>
+            </Button>
           </div>
         </div>
       )

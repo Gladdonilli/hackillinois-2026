@@ -3,6 +3,8 @@ import { SoundEngine } from '@/audio/SoundEngine';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLarynxStore } from '@/store/useLarynxStore';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { useGSAP } from '@gsap/react';
 import gsap from 'gsap';
 import { cn } from '@/lib/utils';
@@ -80,7 +82,7 @@ export function VerdictPanel() {
           const chars = GLITCH.CHARS;
           const interval = window.setInterval(() => {
             if (badgeTextRef.current) {
-              const glitched = Array.from("DEEPFAKE")
+              const glitched = Array.from(verdict.isGenuine ? "GENUINE" : "DEEPFAKE")
                 .map(c => Math.random() > 0.4 ? chars[Math.floor(Math.random() * chars.length)] : c)
                 .join('');
               badgeTextRef.current.innerText = glitched;
@@ -90,8 +92,8 @@ export function VerdictPanel() {
             if (cycles >= GLITCH.CYCLES) {
               window.clearInterval(interval);
               if (badgeTextRef.current) {
-                badgeTextRef.current.innerText = "DEEPFAKE";
-                badgeTextRef.current.setAttribute('data-text', "DEEPFAKE");
+                badgeTextRef.current.innerText = verdict.isGenuine ? "GENUINE" : "DEEPFAKE";
+                badgeTextRef.current.setAttribute('data-text', verdict.isGenuine ? "GENUINE" : "DEEPFAKE");
               }
             }
           }, GLITCH.INTERVAL_MS);
@@ -219,12 +221,7 @@ export function VerdictPanel() {
               <div className="text-[10px] font-mono text-dim tracking-[0.3em] uppercase mb-1">
                 {progress.message || "ANALYZING..."}
               </div>
-              <div className="w-48 gauge-track h-1 relative">
-                <div 
-                  className="gauge-fill absolute top-0 left-0" 
-                  style={{ width: `${progress.percent}%`, transition: 'width 0.1s linear' }} 
-                />
-              </div>
+              <Progress value={progress.percent} className="w-48 h-1" />
             </motion.div>
           )}
 
@@ -281,9 +278,35 @@ export function VerdictPanel() {
                   <span className={cn(
                       "text-dim",
                       !verdict.isGenuine && "text-warn"
-                  )}>  <span className={cn("text-white/90", !verdict.isGenuine && "text-warn")}>{Math.round((1 - (verdict.confidence ?? 0)) * 120)}</span>/120</span>
+                  )}>  <span className={cn("text-white/90", !verdict.isGenuine && "text-warn")}>{verdict.anomalousFrameCount ?? 0}</span>/{verdict.totalFrameCount ?? 0}</span>
+                </div>
+
+                {/* Physics Violations Subject */}
+                <div className="text-zinc-500 font-mono text-[10px] tracking-widest uppercase mt-2 mb-1">
+                  <span>Physics Violations</span>
+                </div>
+
+                {!verdict.isGenuine && (
+                  <div className="flex items-start gap-2 font-mono text-xs text-violation bg-violation/10 p-2 rounded">
+                    <span>⚠</span>
+                    <span>Peak velocity {(verdict.peakVelocity ?? 0).toFixed(1)} cm/s exceeds human limit of {(verdict.threshold ?? 0).toFixed(1)} cm/s</span>
+                  </div>
+                )}
+
+                <div className={cn("flex items-start gap-2 font-mono text-xs p-2 rounded", verdict.isGenuine ? "text-genuine bg-genuine/10" : "text-violation bg-violation/10")}>
+                  <span>{verdict.isGenuine ? "✓" : "⚠"}</span>
+                  <span>Anomalous frames: {verdict.anomalousFrameCount ?? 0}/{verdict.totalFrameCount ?? 0} ({Math.round((verdict.anomalyRatio ?? 0) * 100)}%)</span>
+                </div>
+
+                <div className={cn("flex items-start gap-2 font-mono text-xs p-2 rounded", verdict.isGenuine ? "text-genuine bg-genuine/10" : "text-violation bg-violation/10")}>
+                  <span>{verdict.isGenuine ? "✓" : "⚠"}</span>
+                  <span>{Math.round((verdict.confidence ?? 0) * 100)}% probability of synthetic generation</span>
                 </div>
               </div>
+
+              <Button variant="outline" className="w-full mt-4 font-mono tracking-widest text-xs" onClick={() => useLarynxStore.getState().setStatus('comparing')}>
+                COMPARE ANALYSIS &rarr;
+              </Button>
             </motion.div>
           )}
         </AnimatePresence>

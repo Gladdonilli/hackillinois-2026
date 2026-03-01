@@ -4,14 +4,17 @@ import { OrbitControls, Environment, Sparkles, Float, ContactShadows } from '@re
 import * as THREE from 'three';
 
 import { HeadModel } from '@/components/HeadModel';
-import { TongueModel } from '@/components/TongueModel';
+
 import { EMAMarkers } from '@/components/EMAMarkers';
 import { VelocityRibbons } from '@/components/VelocityRibbons';
 import { PostProcessingEffects } from '@/components/PostProcessingEffects';
 import { CameraController } from '@/components/CameraController';
+import { VelocityHistogram } from '@/components/VelocityHistogram';
 import { ParticleField } from '@/components/ParticleField';
 import { SkullClipEffect } from '@/components/SkullClipEffect';
 import { CAMERA } from '@/constants';
+import useLarynxStore from '@/store/useLarynxStore';
+
 function ScannerLoader() {
   return (
     <div className="fixed inset-0 z-20 flex flex-col items-center justify-center bg-black">
@@ -97,8 +100,10 @@ function LightCone() {
 }
 
 export function AnalysisView() {
+  const status = useLarynxStore((s) => s.status);
+
   return (
-    <div className="w-full h-full absolute inset-0 bg-black">
+    <div className="relative w-full h-full">
       <Suspense fallback={<ScannerLoader />}>
         <Canvas
           camera={{ position: [0, 0, 5], fov: CAMERA.DEFAULT_FOV, near: 0.1, far: 100 }}
@@ -106,7 +111,7 @@ export function AnalysisView() {
           dpr={[1, 1.5]}
           style={{ background: 'transparent' }}
         >
-          <Suspense fallback={null}> {/* Loader is outside Canvas */}
+          <Suspense fallback={null}> {/* Inner suspense for async 3D assets — outer ScannerLoader handles visual feedback */}
             <fogExp2 attach="fog" args={['#050510', 0.15]} />
             
             {/* Lighting */}
@@ -124,7 +129,7 @@ export function AnalysisView() {
             <Float speed={0.8} rotationIntensity={0.02} floatIntensity={0.05}>
               <HeadModel />
             </Float>
-            <TongueModel />
+
             <EMAMarkers />
             <VelocityRibbons />
             <ParticleField />
@@ -150,6 +155,11 @@ export function AnalysisView() {
           </Suspense>
         </Canvas>
       </Suspense>
+
+      {/* Interactive HTML Overlays */}
+      {(status === 'analyzing' || status === 'complete' || status === 'comparing') && (
+        <VelocityHistogram />
+      )}
     </div>
   );
 }
