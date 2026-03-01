@@ -14,6 +14,8 @@ interface SensorData {
 export function VelocityHUD() {
   const frames = useLarynxStore((state) => state.frames);
   const currentFrame = useLarynxStore((state) => state.currentFrame);
+  const tongueVelocity = useLarynxStore((state) => state.tongueVelocity);
+  const { playError } = useUIEarcons();
   const [sensors, setSensors] = useState<SensorData[]>([
     { label: 'T1', velocity: null, threshold: 20 },
     { label: 'T2', velocity: null, threshold: 20 },
@@ -32,8 +34,8 @@ export function VelocityHUD() {
   const maxDisplay = useRef({ vel: 0 });
 
   useEffect(() => {
-    maxTargets.current.vel = Math.max(0, ...sensors.map(s => s.velocity || 0));
-  }, [sensors]);
+    maxTargets.current.vel = Math.max(0, tongueVelocity || 0, ...sensors.map(s => s.velocity || 0));
+  }, [sensors, tongueVelocity]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -120,6 +122,7 @@ export function VelocityHUD() {
     // Threshold breach flash
     const hasBreach = newSensors.some(s => s.velocity !== null && s.velocity > s.threshold);
     if (hasBreach && !wasBreaching.current) {
+      playError();
       if (panelRef.current && !flashData.current.isFlashing) {
         flashData.current.isFlashing = true;
         panelRef.current.style.setProperty('border-color', 'rgba(220, 38, 38, 0.8)', 'important');
@@ -139,7 +142,7 @@ export function VelocityHUD() {
       }
     }
     wasBreaching.current = hasBreach;
-  }, [frames, currentFrame]);
+  }, [frames, currentFrame, playError]);
 
   // Reactive border color
   const maxTongueVel = Math.max(0, ...(sensors.slice(0, 3).map(s => s.velocity || 0)));
@@ -180,15 +183,15 @@ export function VelocityHUD() {
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.3 }}
-        className="fixed top-4 right-4 w-72 z-50 hud-panel p-4 text-[#E4E4E7] transition-colors duration-200 border"
+        className="fixed top-4 right-4 w-72 z-50 p-4 text-[#E4E4E7] transition-colors duration-200 border border-white/10 bg-black/35 backdrop-blur-sm"
       >
         <div className="flex flex-col gap-2 mb-4">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse-glow" />
             <div ref={headerTextRef} className="text-[10px] tracking-[0.3em] uppercase text-dim font-mono animate-flicker transition-colors">VELOCITY SENSORS</div>
           </div>
-          <div className="flex justify-center py-2 bg-surface/40 rounded-sm border border-surface-elevated">
-            <span ref={maxVelRef} className="text-[24px] font-mono tracking-tighter text-cyan text-glow-cyan">
+          <div className="flex justify-center py-2 bg-black/25 rounded-sm border border-white/10">
+            <span ref={maxVelRef} className="text-[24px] font-mono tabular-nums tracking-tighter text-cyan text-glow-cyan" data-testid="velocity-hud-max">
               MAX: 0.0 cm/s
             </span>
           </div>

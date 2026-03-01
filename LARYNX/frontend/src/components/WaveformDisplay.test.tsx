@@ -63,6 +63,14 @@ describe('WaveformDisplay', () => {
     expect(screen.getByText('AUDIO WAVEFORM')).toBeInTheDocument();
   });
 
+  it('uses neutral container styling instead of hud corner frame classes', () => {
+    render(<WaveformDisplay />);
+    const title = screen.getByText('AUDIO WAVEFORM');
+    const panel = title.closest('div')?.parentElement;
+    expect(panel?.className).not.toContain('hud-panel');
+    expect(panel?.className).not.toContain('hud-sweep');
+  });
+
   it('renders canvas element', () => {
     render(<WaveformDisplay />);
     const canvas = document.querySelector('canvas');

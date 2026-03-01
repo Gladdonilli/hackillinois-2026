@@ -1,14 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import '@testing-library/jest-dom'
+import { render } from '@testing-library/react'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import { mockStoreState, createMockState } from '@/test-utils/mockStore'
 
 vi.mock('@/store/useLarynxStore')
+const convergenceLinesSpy = vi.hoisted(() => vi.fn(() => null))
 
 // LandingScene is fully R3F (Canvas, mesh, pointLight, useFrame, useGLTF, etc.)
 // Cannot render in jsdom. Test module-level behavior only.
 vi.mock('@react-three/fiber', () => ({
-  Canvas: vi.fn(({ children: _children }: { children: React.ReactNode }) => null),
+  Canvas: vi.fn(({ children }: { children: React.ReactNode }) => children),
   useFrame: vi.fn(),
   useThree: vi.fn(() => ({ camera: { position: { set: vi.fn() }, lookAt: vi.fn() }, gl: {} })),
   extend: vi.fn(),
@@ -48,7 +50,7 @@ vi.mock('three', () => ({
   LinearSRGBColorSpace: 'srgb-linear',
 }))
 
-vi.mock('@/components/ConvergenceLines', () => ({ ConvergenceLines: () => null }))
+vi.mock('@/components/ConvergenceLines', () => ({ ConvergenceLines: convergenceLinesSpy }))
 
 describe('LandingScene', () => {
   beforeEach(() => {
@@ -80,4 +82,13 @@ describe('LandingScene', () => {
     const result = mockImpl((s: { setPortalState: unknown }) => s.setPortalState) as ReturnType<typeof vi.fn>
     expect(result).toBe(setPortalState)
   })
-})
+
+  it('passes anchorRef to convergence lines', async () => {
+    const mod = await import('./LandingScene')
+    render(<mod.LandingScene />)
+    expect(convergenceLinesSpy).toHaveBeenCalled()
+    const props = (convergenceLinesSpy.mock.calls as unknown[][])[0]?.[0] as Record<string, unknown> | undefined
+    expect(props).toBeDefined()
+    expect(props!.anchorRef).toBeDefined()
+  })
+});

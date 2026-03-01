@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { MeshTransmissionMaterial, useGLTF } from '@react-three/drei';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useLarynxStore } from '@/store/useLarynxStore';
 import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup';
@@ -79,18 +79,17 @@ export function HeadModel() {
               position={[-10.903, -18.028, -18.131]}
               scale={0.002}
             >
-              <MeshTransmissionMaterial
-                transmission={0.92}
-                thickness={2.5}
-                roughness={0.1}
-                chromaticAberration={0.5}
-                anisotropy={0.3}
-                color="#a8d8ea"
-                backside={true}
-                samples={2}
-                resolution={512}
+              <meshStandardMaterial
+                color="#c7ecff"
+                emissive="#38BDF8"
+                emissiveIntensity={0.18}
+                transparent
+                opacity={0.36}
+                roughness={0.45}
+                metalness={0.02}
+                depthWrite={false}
                 clippingPlanes={clippingPlanes}
-                clipShadows={true}
+                clipShadows={false}
               />
             </mesh>
           </group>

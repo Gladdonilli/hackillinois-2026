@@ -130,8 +130,8 @@ export function WaveformDisplay() {
         // Draw active segment highlight
         if (analyzing && totalFrames > 0 && currentFrame > 0) {
             const playheadX = (currentFrame / totalFrames) * width;
-            ctx.fillRect(Math.max(0, playheadX - 12), 0, 24, height);
             ctx.fillStyle = 'rgba(56, 189, 248, 0.1)';
+            ctx.fillRect(Math.max(0, playheadX - 12), 0, 24, height);
         }
 
         const isViolent = tongueVelocity > 50;
@@ -246,6 +246,7 @@ export function WaveformDisplay() {
       if (totalFrames > 0 && currentFrame > 0) {
         let playheadX = (currentFrame / totalFrames) * width;
         if (playheadX > width) playheadX = width;
+        if (playheadX < 2) playheadX = 2;
 
         ctx.beginPath();
         ctx.lineWidth = 4;
@@ -344,7 +345,7 @@ export function WaveformDisplay() {
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="fixed top-4 left-4 w-96 hud-panel hud-sweep !bg-black/80 backdrop-blur-md p-3 z-50 pointer-events-none transition-all duration-300 border border-border/30"
+      className="fixed top-4 left-4 w-96 z-50 pointer-events-none p-3 transition-all duration-300 bg-black/35 backdrop-blur-sm border border-white/10"
     >
       <div className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-1.5">

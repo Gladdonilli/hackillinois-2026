@@ -10,6 +10,7 @@ import { mockStoreState, createMockState } from '@/test-utils/mockStore';
 import { AnalysisView } from './AnalysisView';
 
 vi.mock('@/store/useLarynxStore');
+const orbitControlsSpy = vi.hoisted(() => vi.fn(() => null));
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid="r3f-canvas">{children}</div>,
@@ -23,7 +24,7 @@ vi.mock('@react-three/drei', () => ({
   Environment: () => <div data-testid="drei-environment" />,
   Html: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-  OrbitControls: () => null,
+  OrbitControls: orbitControlsSpy,
   Sparkles: () => <div data-testid="sparkles" />,
   Float: ({ children }: { children: React.ReactNode }) => <div data-testid="float">{children}</div>,
   ContactShadows: () => <div data-testid="contact-shadows" />,
@@ -96,5 +97,15 @@ describe('AnalysisView', () => {
   it('loads data particles', () => {
     const { container } = render(<AnalysisView />);
     expect(container).toBeTruthy();
+  });
+
+  it('constrains orbit controls to side-view envelope', () => {
+    render(<AnalysisView />);
+    expect(orbitControlsSpy).toHaveBeenCalled();
+    const firstCallProps = (orbitControlsSpy.mock.calls as unknown[][])[0]?.[0] as Record<string, unknown> | undefined;
+    expect(firstCallProps).toBeDefined();
+    expect(firstCallProps!.enableZoom).toBe(false);
+    expect(firstCallProps!.minAzimuthAngle).toBeCloseTo(-0.18);
+    expect(firstCallProps!.maxAzimuthAngle).toBeCloseTo(0.18);
   });
 });

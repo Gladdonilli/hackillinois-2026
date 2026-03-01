@@ -47,7 +47,7 @@ function MeasurementGrid() {
 
   return (
     <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.5, 0]}>
-      <ringGeometry args={[0.5, 3, 64, 1]} />
+      <ringGeometry args={[0.02, 3, 64, 1]} />
       <meshBasicMaterial wireframe color="#38BDF8" transparent opacity={0.08} />
     </mesh>
   );
@@ -122,7 +122,7 @@ export function AnalysisView() {
             <pointLight position={[2, 0, -3]} intensity={0.8} color="#FF003C" />
             
             {/* Environment Upgrades */}
-            <Sparkles count={200} scale={8} size={1.5} speed={0.2} opacity={0.4} color="#38BDF8" />
+            <Sparkles count={80} scale={6} size={1.2} speed={0.08} opacity={0.15} color="#9BD5F5" />
             <ContactShadows position={[0, -2.5, 0]} opacity={0.2} scale={10} blur={2} far={4} color="#38BDF8" />
             
             {/* Scene */}
@@ -140,7 +140,17 @@ export function AnalysisView() {
             {/* Effects */}
             <PostProcessingEffects />
             <CameraController />
-            <OrbitControls enablePan={false} enableZoom={true} minDistance={2} maxDistance={10} />
+            <OrbitControls
+              enablePan={false}
+              enableZoom={false}
+              rotateSpeed={0.2}
+              enableDamping
+              dampingFactor={0.08}
+              minAzimuthAngle={-0.18}
+              maxAzimuthAngle={0.18}
+              minPolarAngle={Math.PI / 2 - 0.12}
+              maxPolarAngle={Math.PI / 2 + 0.12}
+            />
             <Environment preset="city" />
           </Suspense>
         </Canvas>

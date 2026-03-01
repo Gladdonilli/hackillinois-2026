@@ -6,9 +6,11 @@ import { useLarynxStore } from '@/store/useLarynxStore';
 import { mockStoreState, createMockState } from '@/test-utils/mockStore';
 
 vi.mock('@/store/useLarynxStore');
+const playErrorMock = vi.fn();
 vi.mock('@/hooks/useUIEarcons', () => ({
   useUIEarcons: () => ({
     playHover: vi.fn(),
+    playError: playErrorMock,
   })
 }));
 vi.mock('motion/react', () => {
@@ -49,6 +51,33 @@ describe('VelocityHUD', () => {
   it('shows velocity readout with correct units (cm/s)', () => {
     render(<VelocityHUD />);
     expect(screen.getByText(/MAX: 0\.0 cm\/s/i)).toBeInTheDocument();
+    expect(screen.getByTestId('velocity-hud-max')).toBeInTheDocument();
+  });
+
+  it('plays alert earcon when threshold is breached', () => {
+    mockStoreState(vi.mocked(useLarynxStore), createMockState({
+      frames: [{
+        sensors: {
+          T1: { x: 0, y: 0, velocity: 120 },
+          T2: { x: 0, y: 0, velocity: 20 },
+          T3: { x: 0, y: 0, velocity: 10 },
+          JAW: { x: 0, y: 0, velocity: 15 },
+          UL: { x: 0, y: 0, velocity: 8 },
+          LL: { x: 0, y: 0, velocity: 8 },
+        },
+        tongueVelocity: 120,
+        timestamp: 0,
+      }],
+      currentFrame: 0,
+      tongueVelocity: 120,
+    } as any));
+
+    render(<VelocityHUD />);
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(playErrorMock).toHaveBeenCalled();
   });
 
   it('shows sensor labels (T1, T2, T3, etc.)', () => {

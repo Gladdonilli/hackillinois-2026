@@ -177,7 +177,7 @@ Once JJ snapshots a file, it's in git objects — removing requires `jj file unt
 - **Identity**: Gladdonilli / tianyi35@illinois.edu
 - **Strategy**: Modal track. LARYNX is fundamentally GPU inference (AAI model) — perfect fit for sponsor track
 - **Primary threat**: Aryan Keluskar (3x Modal track winner), Krish Golcha (HackPrinceton Overall Winner)
-- **Model accuracy**: 76.75% CV (HistGradientBoostingClassifier, 108 features, trained on 43,210 balanced samples)
+- **Model accuracy**: 89.238% CV (HistGradientBoostingClassifier, 108 features, 73 TTS architectures, StratifiedGroupKFold, MLAAD-tiny expanded dataset)
 - **Visual polish**: convergence lines, mouth glow, teeth hiding, fog — exist on `visual-polish-isolated` branch (tkzuptzw), NOT yet merged to main
 
 ## TRAINING DATASET
