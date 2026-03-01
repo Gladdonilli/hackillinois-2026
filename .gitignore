@@ -42,3 +42,17 @@ LARYNX/backend/training_data/ema_outputs/
 *.zip
 *.tar.gz
 *.tar.bz2
+
+# ── Old/superseded artifacts ──
+LARYNX/backend/classifier_model.pkl
+LARYNX/backend/csis_phase2_results.json
+*.npy
+bun.lock
+
+# ── Internal tooling (AI agent state) ──
+.opencode/
+.sisyphus/
+
+# ── Abandoned deployment configs ──
+Dockerfile
+nixpacks.toml

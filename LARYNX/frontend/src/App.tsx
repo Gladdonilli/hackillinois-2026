@@ -157,7 +157,6 @@ export default function App() {
           const state = useLarynxStore.getState()
           if (state.portalState === 'warping') {
             state.setPortalState('done')
-            state.setStatus('uploading')
           }
         }}
       />

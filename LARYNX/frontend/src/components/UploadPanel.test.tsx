@@ -141,6 +141,11 @@ describe('UploadPanel', () => {
     await waitFor(() => {
       expect(mockSetAudioFile).toHaveBeenCalled();
     });
+
+    await waitFor(() => {
+      expect(mockSetPortalState).toHaveBeenCalledWith('entering')
+      expect(mockStartStream).toHaveBeenCalled()
+    })
   });
 
   it('does not process when dragging file but no drop', () => {

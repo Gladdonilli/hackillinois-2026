@@ -101,7 +101,7 @@ MERGED_REAL_DIR = Path("/home/li859/datasets/larynx-5k/real")
 MERGED_FAKE_DIR = Path("/home/li859/datasets/larynx-5k/fake")
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
-INFERENCE_PASSES = 5
+INFERENCE_PASSES = 15
 
 # Phonetically diverse sentences for TTS generation
 SENTENCES = [
@@ -704,9 +704,10 @@ def main():
         # wf_WF1_NNNN.wav .. wf_WF7_NNNN.wav → "wf_WF1" .. "wf_WF7" (WaveFake vocoders)
         fn = r["filename"]
         if fn.startswith("libri_"):
-            # Use sample index as pseudo-speaker (251 speakers mapped by seed)
-            idx = fn.replace("libri_", "").replace(".wav", "")
-            speaker = f"libri_{int(idx) % 251}"
+            # libri_train-clean-100_SPEAKER_CHAPTER.wav → use actual speaker ID
+            parts = fn.replace(".wav", "").split("_")
+            # parts: ['libri', 'train-clean-100', 'SPEAKER', 'CHAPTER']
+            speaker = f"libri_{parts[-2]}" if len(parts) >= 4 else f"libri_{parts[-1]}"
         elif fn.startswith("elkey1_"):
             speaker = "elkey1"
         elif fn.startswith("elkey2_"):

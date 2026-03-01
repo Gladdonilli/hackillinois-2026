@@ -106,11 +106,8 @@ export default function UploadPanel() {
       
       playSuccess()
       setAudioFile(file)
-      
-      // Immediately trigger portal process after setting file
-      setTimeout(() => {
-        handleAnalyze()
-      }, 400) // Small delay so the user sees the file card briefly
+
+      handleAnalyze()
     } catch (err) {
       console.error("Failed to decode audio", err)
       setError("Failed to decode audio file.")
