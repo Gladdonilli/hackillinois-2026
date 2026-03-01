@@ -56,3 +56,6 @@ bun.lock
 # ── Abandoned deployment configs ──
 Dockerfile
 nixpacks.toml
+
+# ── Plugin identity ──
+.supermemory-id
