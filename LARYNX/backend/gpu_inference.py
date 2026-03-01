@@ -63,6 +63,10 @@ gpu_image = (
         "training_data/ensemble_model.pkl",
         "/root/ensemble_model.pkl",
     )
+    .add_local_file(
+        "tts_clients.py",
+        "/root/tts_clients.py",
+    )
     .add_local_dir(
         "aai_model",
         "/root/aai",
@@ -163,7 +167,7 @@ class GpuInference:
         # but scipy >= 1.12 moved kaiser to scipy.signal.windows
         import scipy.signal
         from scipy.signal.windows import kaiser as _kaiser
-        scipy.signal.kaiser = _kaiser
+        setattr(scipy.signal, "kaiser", _kaiser)
         print("[GpuInference] scipy.signal.kaiser patched")
 
         from articulatory import utils as aai_utils  # type: ignore[import-untyped]

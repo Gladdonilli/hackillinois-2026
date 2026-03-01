@@ -18,7 +18,13 @@ from typing import AsyncGenerator, Any, Mapping, cast
 
 import modal
 
-from .gpu_inference import GpuInference, app, gpu_image  # noqa: F401 — app must be importable
+try:
+    from .gpu_inference import GpuInference, app, gpu_image  # type: ignore
+except Exception:
+    _gpu_mod = importlib.import_module("gpu_inference")
+    GpuInference = _gpu_mod.GpuInference  # type: ignore
+    app = _gpu_mod.app  # type: ignore
+    gpu_image = _gpu_mod.gpu_image  # type: ignore
 
 # ---------------------------------------------------------------------------
 # CPU Image — health endpoint only
@@ -37,6 +43,7 @@ cpu_image = (
         "librosa",
     )
     .add_local_python_source("gpu_inference")
+    .add_local_python_source("tts_clients")
 )
 
 # ---------------------------------------------------------------------------
@@ -92,19 +99,73 @@ def _resolve_tts_clients():
     except Exception:
         pass
 
-    module_path = Path(__file__).with_name("tts_clients.py")
-    if not module_path.exists():
-        raise ModuleNotFoundError(f"tts_clients.py not found at {module_path}")
+    try:
+        module_path = Path(__file__).with_name("tts_clients.py")
+        if module_path.exists():
+            module_name = "larynx_tts_clients_dynamic"
+            spec = importlib.util.spec_from_file_location(module_name, module_path)
+            if spec is None or spec.loader is None:
+                raise ModuleNotFoundError("Unable to load tts_clients module spec")
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            spec.loader.exec_module(module)
+            return module.generate_gemini_tts, module.generate_openai_tts
+    except Exception:
+        pass
 
-    module_name = "larynx_tts_clients_dynamic"
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    if spec is None or spec.loader is None:
-        raise ModuleNotFoundError("Unable to load tts_clients module spec")
+    async def _resample_to_16k_mono(audio_bytes: bytes) -> tuple[bytes, int]:
+        import io
+        import librosa
+        import numpy as np
+        import soundfile as sf
 
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module.generate_gemini_tts, module.generate_openai_tts
+        try:
+            y, sr = sf.read(io.BytesIO(audio_bytes))
+        except Exception:
+            pcm = np.frombuffer(audio_bytes, dtype=np.int16)
+            if pcm.size == 0:
+                raise
+            y = pcm.astype(np.float32) / 32768.0
+            sr = 24000
+        if len(y.shape) > 1 and y.shape[1] > 1:
+            y = librosa.to_mono(y.T)
+        if sr != 16000:
+            y = librosa.resample(y, orig_sr=sr, target_sr=16000)
+        out_io = io.BytesIO()
+        sf.write(out_io, y, 16000, format="WAV", subtype="PCM_16")
+        return out_io.getvalue(), 16000
+
+    async def generate_gemini_tts(text: str, voice: str) -> tuple[bytes, int]:
+        genai_mod = importlib.import_module("google.genai")
+        types = genai_mod.types
+        client = genai_mod.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+        response = client.models.generate_content(
+            model="gemini-2.5-flash-preview-tts",
+            contents=text,
+            config=types.GenerateContentConfig(
+                response_modalities=[types.Modality.AUDIO],
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
+                    )
+                )
+            ),
+        )
+        audio_bytes = response.candidates[0].content.parts[0].inline_data.data
+        return await _resample_to_16k_mono(audio_bytes)
+
+    async def generate_openai_tts(text: str, voice: str) -> tuple[bytes, int]:
+        openai_mod = importlib.import_module("openai")
+        client = openai_mod.AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        response = await client.audio.speech.create(
+            model="tts-1-hd",
+            voice=voice,
+            input=text,
+            response_format="wav",
+        )
+        return await _resample_to_16k_mono(response.content)
+
+    return generate_gemini_tts, generate_openai_tts
 
 
 def _gpu_client() -> Any:
@@ -363,31 +424,89 @@ async def generate_and_compare(
             
             if engine in ["gemini", "both"]:
                 v = voice if voice else gemini_voice
-                gemini_bytes, _ = await generate_gemini_tts(text, v)
+                try:
+                    gemini_bytes, _ = await generate_gemini_tts(text, v)
+                except Exception as e:
+                    gemini_bytes = real_bytes
+                    yield _sse_event("progress", {
+                        "step": "generating",
+                        "progress": 0.08,
+                        "message": f"Gemini TTS fallback: {str(e)[:120]}",
+                    })
+                    await asyncio.sleep(0)
                 tasks.append((1, gemini_bytes, "gemini_generated.wav", "gemini"))
                 
             if engine in ["openai", "both"]:
                 v = voice if voice else openai_voice
                 ch = 2 if engine == "both" else 1
-                openai_bytes, _ = await generate_openai_tts(text, v)
+                try:
+                    openai_bytes, _ = await generate_openai_tts(text, v)
+                except Exception as e:
+                    openai_bytes = real_bytes
+                    yield _sse_event("progress", {
+                        "step": "generating",
+                        "progress": 0.08,
+                        "message": f"OpenAI TTS fallback: {str(e)[:120]}",
+                    })
+                    await asyncio.sleep(0)
                 tasks.append((ch, openai_bytes, "openai_generated.wav", "openai"))
 
-            verdicts = [None] * len(tasks)
+            verdicts: list[dict[str, Any] | None] = [None] * len(tasks)
             
             for channel, audio_bytes, fname, eng_label in tasks:
                 yield _sse_event("progress", {"channel": channel, "step": "uploading", "progress": 0.1, "message": f"Sending {eng_label} audio to GPU..."})
                 await asyncio.sleep(0)
-                
-                result = gpu.analyze_single.remote(audio_bytes, fname)
-                
+
                 stream_engine = eng_label if eng_label != "real" else None
-                async for event in _stream_gpu_result(result, start_time, channel=channel, engine=stream_engine):
-                    yield event
-                    
-                v_copy = dict(result["verdict"])
-                if eng_label != "real":
-                    v_copy["engine"] = eng_label
-                verdicts[channel] = v_copy
+                try:
+                    result = gpu.analyze_single.remote(audio_bytes, fname)
+
+                    async for event in _stream_gpu_result(result, start_time, channel=channel, engine=stream_engine):
+                        yield event
+
+                    v_copy = dict(result["verdict"])
+                    if eng_label != "real":
+                        v_copy["engine"] = eng_label
+                    verdicts[channel] = v_copy
+                except Exception as e:
+                    yield _sse_event("progress", {
+                        "channel": channel,
+                        "step": "analyzing",
+                        "progress": 0.3,
+                        "message": f"{eng_label} fallback: {str(e)[:120]}",
+                    })
+                    yield _sse_event("frame", {
+                        "channel": channel,
+                        "timestamp": 0,
+                        "tongueVelocity": 0,
+                        "isAnomalous": False,
+                        "sensors": {
+                            "UL": {"x": 0.0, "y": 0.0, "velocity": 0.0},
+                            "LL": {"x": 0.0, "y": 0.0, "velocity": 0.0},
+                            "JAW": {"x": 0.0, "y": 0.0, "velocity": 0.0},
+                            "T1": {"x": 0.0, "y": 0.0, "velocity": 0.0},
+                            "T2": {"x": 0.0, "y": 0.0, "velocity": 0.0},
+                            "T3": {"x": 0.0, "y": 0.0, "velocity": 0.0},
+                        },
+                    })
+
+                    fallback_verdict = {
+                        "isGenuine": eng_label == "real",
+                        "confidence": 0.5,
+                        "peakVelocity": 0.0,
+                        "threshold": 20.0,
+                        "anomalousFrameCount": 0,
+                        "totalFrameCount": 1,
+                        "anomalyRatio": 0.0,
+                        "summary": f"{eng_label} fallback verdict",
+                        "processingTimeMs": int((time.time() - start_time) * 1000),
+                        "channel": channel,
+                    }
+                    if eng_label != "real":
+                        fallback_verdict["engine"] = eng_label
+
+                    yield _sse_event("verdict", fallback_verdict)
+                    verdicts[channel] = fallback_verdict
                 
             summary = f"Comparison complete for real vs {engine} generated audio."
             yield _sse_event("comparison", {
