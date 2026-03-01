@@ -1,8 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { Env, ApiResponse, Report, VerdictData, SimilarityMatch, ForensicMemory } from './types';
+import type { Env, ApiResponse, Report, VerdictData, SimilarityMatch } from './types';
 import { embedAndStore, generateEmbedding, querySimilar, getIndexStats, INTEL_CONFIG } from './intelligence';
-import { storeForensicRecord, searchForensicMemories, MEMORY_CONFIG } from './supermemory';
 
 const ALLOWED_ORIGINS = [
   'https://larynx.pages.dev',
@@ -246,12 +245,11 @@ app.post('/api/analyze', async (c) => {
                   processingTimeMs,
                 };
 
-                c.executionCtx.waitUntil(
-                  Promise.allSettled([
-                    embedAndStore(c.env, reportId, verdictData),
-                    storeForensicRecord(c.env, reportId, verdictData, ipHash),
-                  ]).then((results) => {
-                    console.log(`[post-verdict] reportId=${reportId} intel=${results[0].status} memory=${results[1].status}`);
+c.executionCtx.waitUntil(
+                  embedAndStore(c.env, reportId, verdictData).then(() => {
+                    console.log(`[post-verdict] reportId=${reportId} intel=stored`);
+                  }).catch((err) => {
+                    console.error(`[post-verdict] reportId=${reportId} intel failed:`, err);
                   })
                 );
 
@@ -465,7 +463,7 @@ app.get('/api/history', async (c) => {
 });
 
 // ─── POST /api/intelligence/similar ───
-// Find similar voice signatures via Vectorize + Supermemory fusion
+// Find similar voice signatures via Vectorize
 app.post('/api/intelligence/similar', async (c) => {
   const body = await c.req.json<{ reportId?: string; text?: string; topK?: number; minScore?: number }>().catch(() => null);
 
@@ -514,29 +512,19 @@ app.post('/api/intelligence/similar', async (c) => {
     );
   }
 
-  // Parallel: Vectorize similarity + Supermemory forensic search
-  const [vectorResults, memoryResults] = await Promise.allSettled([
-    c.env.VECTOR_SIGNATURES
-      ? querySimilar(c.env.VECTOR_SIGNATURES, embedding, {
-          topK: body.topK ?? INTEL_CONFIG.SIMILARITY_TOP_K,
-          minScore: body.minScore ?? INTEL_CONFIG.SIMILARITY_MIN_SCORE,
-          excludeId: body.reportId,
-        })
-      : Promise.resolve([] as SimilarityMatch[]),
-    searchForensicMemories(
-      c.env,
-      body.text || `Voice analysis report ${body.reportId}`,
-      { limit: MEMORY_CONFIG.SEARCH_LIMIT }
-    ),
-  ]);
+  // Vectorize similarity search
+  const similar: SimilarityMatch[] = c.env.VECTOR_SIGNATURES
+    ? await querySimilar(c.env.VECTOR_SIGNATURES, embedding, {
+        topK: body.topK ?? INTEL_CONFIG.SIMILARITY_TOP_K,
+        minScore: body.minScore ?? INTEL_CONFIG.SIMILARITY_MIN_SCORE,
+        excludeId: body.reportId,
+      })
+    : [];
 
-  const similar: SimilarityMatch[] = vectorResults.status === 'fulfilled' ? vectorResults.value : [];
-  const memories: ForensicMemory[] = memoryResults.status === 'fulfilled' ? memoryResults.value : [];
-
-  return c.json<ApiResponse<{ similar: SimilarityMatch[]; memories: ForensicMemory[] }>>(
+  return c.json<ApiResponse<{ similar: SimilarityMatch[] }>>(
     {
       success: true,
-      data: { similar, memories },
+      data: { similar },
     }
   );
 });
@@ -559,7 +547,6 @@ app.get('/api/intelligence/stats', async (c) => {
       confidenceBands: typeof INTEL_CONFIG.CONFIDENCE_BANDS;
       anomalyBands: typeof INTEL_CONFIG.ANOMALY_BANDS;
     };
-    supermemory: { configured: boolean };
   }>>(
     {
       success: true,
@@ -573,9 +560,6 @@ app.get('/api/intelligence/stats', async (c) => {
           severityBands: INTEL_CONFIG.SEVERITY_BANDS,
           confidenceBands: INTEL_CONFIG.CONFIDENCE_BANDS,
           anomalyBands: INTEL_CONFIG.ANOMALY_BANDS,
-        },
-        supermemory: {
-          configured: !!c.env.SUPERMEMORY_API_KEY,
         },
       },
     }

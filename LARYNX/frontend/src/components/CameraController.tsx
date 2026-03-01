@@ -11,7 +11,7 @@ const CAMERA_PRESETS: Record<
 > = {
   idle: { position: [0, 0, 5], target: [0, 0, 0] },
   uploading: { position: [2, 1, 4], target: [0, 0, 0] },
-  analyzing: { position: [1.5, 0.5, 3], target: [0, -0.3, 0] },
+  analyzing: { position: [1.6, 0.2, 2.85], target: [0, -0.25, 0] },
   complete: { position: [0, 0.5, 4], target: [0, -0.5, 0] },
   comparing: { position: [2, 1, 5], target: [0, 0, 0] },
   technical: { position: [0, 0, 3], target: [0, 0, 0] },
@@ -23,10 +23,9 @@ export function CameraController() {
   const { camera } = useThree()
   const statusRef = useRef<AnalysisStatus>("idle")
   
-  const orbitAngle = useRef(0)
-  const zoomLevel = useRef(3.354)
   const skullClipTriggered = useRef(false)
   const isCameraOverride = useRef(false)
+  const pointerRef = useRef({ x: 0, y: 0 })
   
   const lookAtTarget = useRef(new THREE.Vector3(0, 0, 0))
   const currentTarget = useRef(new THREE.Vector3(0, 0, 0))
@@ -45,6 +44,12 @@ export function CameraController() {
   }, [camera.position])
 
   useEffect(() => {
+    const onMouseMove = (event: MouseEvent) => {
+      pointerRef.current.x = (event.clientX / window.innerWidth - 0.5) * 2
+      pointerRef.current.y = -(event.clientY / window.innerHeight - 0.5) * 2
+    }
+    window.addEventListener("mousemove", onMouseMove)
+
     const unsub = useLarynxStore.subscribe((state) => {
       const status = state.status
       const oldStatus = statusRef.current
@@ -172,8 +177,6 @@ export function CameraController() {
       } else if (status === "analyzing") {
         skullClipTriggered.current = false
         isCameraOverride.current = false
-        orbitAngle.current = Math.atan2(1.5, 3)
-        zoomLevel.current = Math.hypot(1.5, 3)
         currentTarget.current.set(...CAMERA_PRESETS.analyzing.target)
         camera.position.set(...CAMERA_PRESETS.analyzing.position)
         if ('fov' in camera) {
@@ -205,6 +208,7 @@ export function CameraController() {
       if (skullClipReturnTimeoutRef.current !== null) {
         window.clearTimeout(skullClipReturnTimeoutRef.current)
       }
+      window.removeEventListener("mousemove", onMouseMove)
       unsub()
     }
   }, [camera])
@@ -227,16 +231,12 @@ export function CameraController() {
           onComplete: () => {
             skullClipReturnTimeoutRef.current = window.setTimeout(() => {
               if (statusRef.current !== "analyzing") return
-              currentTarget.current.set(0, -0.3, 0)
-              
-              const frames = 48
-              const futureAngle = orbitAngle.current + 0.02 * frames
-              const futureZoom = 2.5 + (zoomLevel.current - 2.5) * Math.pow(0.995, frames)
-              const futureTime = clock.elapsedTime + 0.8
-              
-              const returnX = Math.sin(futureAngle) * futureZoom
-              const returnY = 0.5 + Math.sin(futureTime * 2.094) * 0.15
-              const returnZ = Math.cos(futureAngle) * futureZoom
+              currentTarget.current.set(...CAMERA_PRESETS.analyzing.target)
+
+              const base = CAMERA_PRESETS.analyzing.position
+              const returnX = base[0] + pointerRef.current.x * 0.08
+              const returnY = base[1] + pointerRef.current.y * 0.05
+              const returnZ = base[2]
               
               gsap.to(camera.position, {
                 x: returnX,
@@ -246,8 +246,6 @@ export function CameraController() {
                 ease: "power2.inOut",
                 onComplete: () => {
                   if (statusRef.current === "analyzing") {
-                    orbitAngle.current = futureAngle
-                    zoomLevel.current = futureZoom
                     isCameraOverride.current = false
                   }
                 },
@@ -259,13 +257,10 @@ export function CameraController() {
       }
 
       if (!isCameraOverride.current) {
-        orbitAngle.current += 0.02
-        zoomLevel.current = THREE.MathUtils.lerp(zoomLevel.current, 2.5, 0.005)
-        
-        const r = zoomLevel.current
-        const targetX = Math.sin(orbitAngle.current) * r
-        const targetY = 0.5 + Math.sin(clock.elapsedTime * 2.094) * 0.15
-        const targetZ = Math.cos(orbitAngle.current) * r
+        const base = CAMERA_PRESETS.analyzing.position
+        const targetX = base[0] + pointerRef.current.x * 0.08
+        const targetY = base[1] + pointerRef.current.y * 0.05 + Math.sin(clock.elapsedTime * 1.2) * 0.03
+        const targetZ = base[2]
 
         if (xTo.current) xTo.current(targetX)
         if (yTo.current) yTo.current(targetY)

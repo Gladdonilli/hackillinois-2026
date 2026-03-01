@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useMemo, type MutableRefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { EffectComposer, Vignette, Noise } from '@react-three/postprocessing'
@@ -12,7 +12,13 @@ import { ConvergenceLines } from './ConvergenceLines'
 import gsap from 'gsap'
 
 
-function MouthGlow({ portalState }: { portalState: string }) {
+function MouthGlow({
+  portalState,
+  anchorRef,
+}: {
+  portalState: string
+  anchorRef: MutableRefObject<THREE.Vector3>
+}) {
   const groupRef = useRef<THREE.Group>(null)
   const ringRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.PointLight>(null)
@@ -21,22 +27,14 @@ function MouthGlow({ portalState }: { portalState: string }) {
     const t = clock.elapsedTime
     if (!groupRef.current) return
 
-    const driftX = Math.sin(t * 1.3) * 0.02 + Math.sin(t * 4.7) * 0.005
-    const driftY = Math.sin(t * 0.8) * 0.03 + Math.sin(t * 3.6) * 0.004
-    const driftZ = Math.sin(t * 1.7) * 0.006
+    groupRef.current.position.lerp(anchorRef.current, 0.42)
 
-    groupRef.current.position.x = SCENE.MOUTH_BEACON_POSITION[0] + driftX
-    groupRef.current.position.y = SCENE.MOUTH_BEACON_POSITION[1] + driftY
-    groupRef.current.position.z = SCENE.MOUTH_BEACON_POSITION[2] + driftZ
-
-    // Ring rotation + pulse
     if (ringRef.current) {
       ringRef.current.rotation.z += 0.0035
       const pulse = 1 + Math.sin(t * 2.8) * 0.1 + Math.sin(t * 5.1) * 0.06
       ringRef.current.scale.setScalar(pulse)
     }
 
-    // Glow intensity pulse
     if (glowRef.current) {
       glowRef.current.intensity = 2.8 + Math.sin(t * 2.5) * 0.75
     }
@@ -143,7 +141,13 @@ function PortalCameraController({
   return null
 }
 
-function FaceModel({ portalState }: { portalState: string }) {
+function FaceModel({
+  portalState,
+  anchorRef,
+}: {
+  portalState: string
+  anchorRef: MutableRefObject<THREE.Vector3>
+}) {
   const { gl } = useThree()
   const { scene } = useGLTF(
     '/models/facecap.glb',
@@ -268,6 +272,14 @@ function FaceModel({ portalState }: { portalState: string }) {
 
   const portalTimeRef = useRef(0)
   const lastTimeRef = useRef(0)
+  const mouthLocalPoint = useMemo(() => {
+    const [mx, my, mz] = SCENE.MOUTH_BEACON_POSITION
+    const [fx, fy, fz] = SCENE.FACE_MODEL_POSITION
+    const scale = SCENE.FACE_MODEL_SCALE
+    return new THREE.Vector3((mx - fx) / scale, (my - fy) / scale, (mz - fz) / scale)
+  }, [])
+  const mouthRotatedRef = useRef(new THREE.Vector3())
+  const mouthWorldRef = useRef(new THREE.Vector3())
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -278,6 +290,13 @@ function FaceModel({ portalState }: { portalState: string }) {
       const targetRotY = mousePos.current.x * SCENE.PARALLAX_RANGE
       solidRef.current.rotation.x += (targetRotX - solidRef.current.rotation.x) * SCENE.PARALLAX_LERP
       solidRef.current.rotation.y += (targetRotY - solidRef.current.rotation.y) * SCENE.PARALLAX_LERP
+
+      mouthRotatedRef.current
+        .copy(mouthLocalPoint)
+        .multiplyScalar(SCENE.FACE_MODEL_SCALE)
+        .applyEuler(solidRef.current.rotation)
+      mouthWorldRef.current.copy(solidRef.current.position).add(mouthRotatedRef.current)
+      anchorRef.current.lerp(mouthWorldRef.current, 0.4)
     }
 
     // Morph targets — use elapsedTime diff instead of getDelta() (already consumed by R3F)
@@ -351,6 +370,7 @@ export function LandingScene() {
   const portalState = useLarynxStore((state) => state.portalState)
   const setPortalState = useLarynxStore((state) => state.setPortalState)
   const lastPortalStateRef = useRef(portalState)
+  const mouthAnchorRef = useRef(new THREE.Vector3(...SCENE.MOUTH_BEACON_POSITION))
 
   useEffect(() => {
     if (!SoundEngine.isInitialized()) {
@@ -393,11 +413,11 @@ export function LandingScene() {
       <pointLight position={[-3, -2, 4]} intensity={0.4} color="#4488FF" />
       <spotLight position={[0, 3, 8]} angle={0.5} penumbra={0.8} intensity={0.6} color="#FFFFFF" />
 
-      <FaceModel portalState={portalState} />
-      <MouthGlow portalState={portalState} />
+      <FaceModel portalState={portalState} anchorRef={mouthAnchorRef} />
+      <MouthGlow portalState={portalState} anchorRef={mouthAnchorRef} />
       <ConvergenceLines
         visible={portalState !== 'entering' && portalState !== 'warping'}
-        cursorInfluence={0.92}
+        anchorRef={mouthAnchorRef}
       />
 
       {/* Landing-specific postprocessing */}

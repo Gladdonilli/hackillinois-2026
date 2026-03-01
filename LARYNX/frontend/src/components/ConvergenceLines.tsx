@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { SCENE } from '@/constants'
@@ -7,13 +7,13 @@ interface ConvergenceLinesProps {
   visible?: boolean
   boost?: boolean
   target?: [number, number, number]
-  cursorInfluence?: number
+  anchorRef?: MutableRefObject<THREE.Vector3>
 }
 
 const CURVE_RESOLUTION = 56
-const RADIUS_INNER = 0.0022
-const RADIUS_OUTER = 0.0068
-const HOPPING_PARTICLE_COUNT = 56
+const RADIUS_INNER = 0.003
+const RADIUS_OUTER = 0.0088
+const HOPPING_PARTICLE_COUNT = 28
 
 type BeamConfig = {
   start: [number, number, number]
@@ -26,11 +26,12 @@ const LINE_CONFIGS: BeamConfig[] = (() => {
 
   const left = Array.from({ length: countPerSide }, (_, i) => {
     const p = i / (countPerSide - 1)
+    const spread = Math.abs(p - 0.5) * 2
     const y = THREE.MathUtils.lerp(6.9, -6.9, p)
 
     return {
-      start: [-20 + Math.sin(i * 0.42) * 1.0, y, -1.8 + Math.cos(i * 0.33) * 0.9] as [number, number, number],
-      curvature: 0.34 + (i % 4) * 0.06,
+      start: [-20.5 + Math.sin(i * 0.35) * 0.5, y, -1.9 + Math.cos(i * 0.4) * 0.6] as [number, number, number],
+      curvature: 0.12 + spread * 0.1 + (i % 3) * 0.015,
       speedOffset: 0.08 + i * 0.075,
     }
   })
@@ -38,29 +39,32 @@ const LINE_CONFIGS: BeamConfig[] = (() => {
   const right = left.map((beam, i) => ({
     start: [-beam.start[0], beam.start[1], beam.start[2]] as [number, number, number],
     curvature: beam.curvature,
-    speedOffset: beam.speedOffset + (i % 3) * 0.05,
+    speedOffset: beam.speedOffset + (i % 4) * 0.04,
   }))
 
   return [...left, ...right]
 })()
 
-function generateArcCurve(start: THREE.Vector3, end: THREE.Vector3, curvature: number): THREE.CubicBezierCurve3 {
-  const fromStart = new THREE.Vector3().lerpVectors(start, end, 0.28)
-  const nearCenter = new THREE.Vector3().lerpVectors(start, end, 0.72)
-  const sideSign = start.x < end.x ? 1 : -1
-  const fanSign = Math.sign(start.y || 1)
+function generateArcCurve(start: THREE.Vector3, end: THREE.Vector3, curvature: number): THREE.Curve<THREE.Vector3> {
+  const fanSign = Math.sign(start.y - end.y || 1)
+  const points: THREE.Vector3[] = []
+  const steps = 14
+  const exponential = 4.35
+  const denom = Math.exp(exponential) - 1
 
-  const control1 = fromStart.clone()
-  control1.x += sideSign * curvature * 2.6
-  control1.y += fanSign * curvature * 5.8
-  control1.z += curvature * 1.8
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps
+    const spread = (Math.exp(exponential * t) - 1) / denom
+    const x = THREE.MathUtils.lerp(end.x, start.x, t)
+    const yBase = THREE.MathUtils.lerp(end.y, start.y, spread)
+    const y = yBase + fanSign * curvature * Math.pow(spread, 2.4) * 3.4
+    const zBase = THREE.MathUtils.lerp(end.z, start.z, t)
+    const z = zBase + curvature * Math.pow(spread, 2.1) * 1.1
+    points.push(new THREE.Vector3(x, y, z))
+  }
 
-  const control2 = nearCenter.clone()
-  control2.x += sideSign * curvature * 0.8
-  control2.y += fanSign * curvature * 2.5
-  control2.z += curvature * 0.55
-
-  return new THREE.CubicBezierCurve3(start.clone(), control1, control2, end.clone())
+  points.reverse()
+  return new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.3)
 }
 
 function GlowingBeam({
@@ -75,7 +79,7 @@ function GlowingBeam({
 }: {
   index: number
   start: THREE.Vector3
-  targetRef: React.MutableRefObject<THREE.Vector3>
+  targetRef: MutableRefObject<THREE.Vector3>
   curvature: number
   baseOpacity: number
   boost: boolean
@@ -91,11 +95,7 @@ function GlowingBeam({
   const lastEndRef = useRef(targetRef.current.clone())
   const lastRebuildTimeRef = useRef(0)
 
-  const initialCurve = useMemo(
-    () => generateArcCurve(start, targetRef.current, curvature),
-    [start, targetRef, curvature]
-  )
-  const curveRef = useRef<THREE.Curve<THREE.Vector3>>(initialCurve)
+  const initialCurve = useMemo(() => generateArcCurve(start, targetRef.current, curvature), [start, targetRef, curvature])
 
   const geoOuter = useMemo(
     () => new THREE.TubeGeometry(initialCurve, CURVE_RESOLUTION, RADIUS_OUTER, 8, false),
@@ -114,7 +114,7 @@ function GlowingBeam({
     if (!matRefOuter.current || !matRefInner.current) return
 
     const t = clock.elapsedTime * (1 + speedOffset * 0.42) + speedOffset * 9
-    const pulse = (Math.sin(t * 1.8) * 0.5 + 0.5) * 0.4 + 0.62
+    const pulse = (Math.sin(t * 1.6) * 0.5 + 0.5) * 0.35 + 0.65
 
     const targetOuter = boost ? 0.62 : baseOpacity * 0.45 * pulse
     const targetInner = boost ? 0.98 : baseOpacity * pulse
@@ -127,11 +127,10 @@ function GlowingBeam({
 
     const now = clock.elapsedTime
     const dist = lastEndRef.current.distanceTo(targetRef.current)
-    if (dist < 0.03) return
-    if (now - lastRebuildTimeRef.current < Math.max(0.025, Math.min(delta * 6, 0.085))) return
+    if (dist < 0.012) return
+    if (now - lastRebuildTimeRef.current < Math.max(0.03, Math.min(delta * 6, 0.09))) return
 
     const updatedCurve = generateArcCurve(start, targetRef.current, curvature)
-    curveRef.current = updatedCurve
     onCurveChange(index, updatedCurve)
 
     const nextOuter = new THREE.TubeGeometry(updatedCurve, CURVE_RESOLUTION, RADIUS_OUTER, 8, false)
@@ -160,7 +159,7 @@ function GlowingBeam({
           ref={matRefOuter}
           color={[0.42, 1.98, 2.28]}
           emissive={[0.42, 1.98, 2.28]}
-          emissiveIntensity={1.1}
+          emissiveIntensity={1.15}
           transparent
           blending={THREE.AdditiveBlending}
           depthWrite={false}
@@ -168,12 +167,13 @@ function GlowingBeam({
           toneMapped={false}
         />
       </mesh>
+
       <mesh ref={meshInnerRef} geometry={geoInner} frustumCulled={false} renderOrder={2}>
         <meshStandardMaterial
           ref={matRefInner}
           color={[0.9, 2.45, 2.85]}
           emissive={[0.9, 2.45, 2.85]}
-          emissiveIntensity={2.0}
+          emissiveIntensity={2.05}
           transparent
           blending={THREE.AdditiveBlending}
           depthWrite={false}
@@ -203,7 +203,7 @@ function HoppingLineParticles({
   visible,
   boost,
 }: {
-  curveRefs: React.MutableRefObject<Array<THREE.Curve<THREE.Vector3> | null>>
+  curveRefs: MutableRefObject<Array<THREE.Curve<THREE.Vector3> | null>>
   visible: boolean
   boost: boolean
 }) {
@@ -214,48 +214,45 @@ function HoppingLineParticles({
     Array.from({ length: HOPPING_PARTICLE_COUNT }, (_, i) => ({
       line: i % LINE_CONFIGS.length,
       progress: (i * 0.17) % 1,
-      speed: 0.2 + (i % 9) * 0.03,
-      jumpTimer: 0.08 + (i % 7) * 0.04,
+      speed: 0.18 + (i % 7) * 0.03,
+      jumpTimer: 0.1 + (i % 6) * 0.05,
       previous: new THREE.Vector3(),
     }))
   )
 
-  useFrame(({ clock, pointer }, delta) => {
+  useFrame(({ clock }, delta) => {
     if (!visible) return
 
     const curves = curveRefs.current
     const available = curves.filter(Boolean).length
     if (available === 0) return
 
-    const pointerEnergy = Math.min(1, Math.hypot(pointer.x, pointer.y))
-
     particles.current.forEach((state, idx) => {
       if (state.line >= curves.length || !curves[state.line]) {
         state.line = idx % Math.max(1, curves.length)
       }
 
-      state.progress += delta * state.speed * (boost ? 1.3 : 1)
+      state.progress += delta * state.speed * (boost ? 1.25 : 1)
       state.jumpTimer -= delta
 
       if (state.progress >= 1) {
         state.progress -= 1
         const dir = Math.random() > 0.5 ? 1 : -1
-        const spread = Math.random() > 0.72 ? 2 : 1
-        state.line = clampLine(state.line + dir * spread, curves.length)
-        state.jumpTimer = 0.08 + Math.random() * 0.25
+        state.line = clampLine(state.line + dir, curves.length)
+        state.jumpTimer = 0.08 + Math.random() * 0.22
       }
 
       const shouldHopMidline =
         state.jumpTimer <= 0 &&
         state.progress > 0.14 &&
         state.progress < 0.92 &&
-        Math.random() < 0.03 + pointerEnergy * 0.04
+        Math.random() < 0.032
 
       if (shouldHopMidline) {
         const dir = Math.random() > 0.5 ? 1 : -1
         const spread = Math.random() > 0.8 ? 2 : 1
         state.line = clampLine(state.line + dir * spread, curves.length)
-        state.jumpTimer = 0.12 + Math.random() * 0.35
+        state.jumpTimer = 0.12 + Math.random() * 0.32
       }
 
       const curve = curves[state.line]
@@ -272,9 +269,9 @@ function HoppingLineParticles({
       trail.position.copy(state.previous)
 
       const pulse = 0.5 + (Math.sin(clock.elapsedTime * (6 + (idx % 5)) + idx * 0.7) * 0.5 + 0.5) * 0.95
-      const size = (boost ? 0.022 : 0.016) * pulse
+      const size = (boost ? 0.02 : 0.015) * pulse
       head.scale.setScalar(size)
-      trail.scale.setScalar(size * 1.85)
+      trail.scale.setScalar(size * 1.3)
     })
   })
 
@@ -314,9 +311,9 @@ function HoppingLineParticles({
             <meshStandardMaterial
               color={[0.85, 2.3, 2.6]}
               emissive={[0.85, 2.3, 2.6]}
-              emissiveIntensity={1.1}
+              emissiveIntensity={1.05}
               transparent
-              opacity={0.22}
+              opacity={0.2}
               blending={THREE.AdditiveBlending}
               depthWrite={false}
               depthTest={false}
@@ -333,7 +330,7 @@ export function ConvergenceLines({
   visible = true,
   boost = false,
   target,
-  cursorInfluence = 0.75,
+  anchorRef,
 }: ConvergenceLinesProps) {
   const baseTarget = useMemo(() => {
     const pos = target ?? (SCENE.MOUTH_BEACON_POSITION as [number, number, number])
@@ -348,14 +345,14 @@ export function ConvergenceLines({
     curveRefs.current[index] = curve
   }
 
-  useFrame(({ pointer }, delta) => {
-    desiredRef.current.set(
-      baseTarget.x + pointer.x * cursorInfluence,
-      baseTarget.y + pointer.y * cursorInfluence * 0.58,
-      baseTarget.z
-    )
+  useFrame((_, delta) => {
+    if (anchorRef) {
+      desiredRef.current.copy(anchorRef.current)
+    } else {
+      desiredRef.current.copy(baseTarget)
+    }
 
-    const alpha = Math.max(0.035, Math.min(delta * 8.5, 0.34))
+    const alpha = Math.max(0.06, Math.min(delta * 9, 0.4))
     targetRef.current.lerp(desiredRef.current, alpha)
   })
 
@@ -363,7 +360,7 @@ export function ConvergenceLines({
     return LINE_CONFIGS.map((config, i) => ({
       start: new THREE.Vector3(...config.start),
       curvature: config.curvature,
-      baseOpacity: 0.56 + (i % 5) * 0.09,
+      baseOpacity: 0.58 + (i % 5) * 0.08,
       speedOffset: config.speedOffset,
     }))
   }, [])

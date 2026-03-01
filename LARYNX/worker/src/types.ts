@@ -9,8 +9,6 @@ export interface Env {
   // Intelligence layer (Workers AI + Vectorize)
   AI?: Ai;
   VECTOR_SIGNATURES?: VectorizeIndex;
-  // Supermemory forensic memory
-  SUPERMEMORY_API_KEY?: string;
 }
 
 export interface ApiResponse<T> {
@@ -66,9 +64,3 @@ export interface SimilarityMatch {
   timestamp: string;
 }
 
-export interface ForensicMemory {
-  id: string;
-  content: string;
-  score: number;
-  createdAt: string;
-}
