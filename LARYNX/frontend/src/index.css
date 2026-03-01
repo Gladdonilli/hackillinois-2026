@@ -295,6 +295,46 @@
   50% { left: 100%; }
 }
 
+/* Arwes-inspired clipped corner frame */
+.hud-frame {
+  position: relative;
+  background: rgba(0, 10, 20, 0.8);
+  backdrop-filter: blur(12px);
+  clip-path: polygon(0 16px, 16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+  border: none; /* clip-path clips borders, use inner technique */
+}
+
+/* Inner border via pseudo-element with same clip */
+.hud-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(0 16px, 16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.4), rgba(56, 189, 248, 0.1) 40%, rgba(56, 189, 248, 0.1) 60%, rgba(56, 189, 248, 0.4));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Outer glow on hud-frame */
+.hud-frame::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  clip-path: polygon(0 16px, 16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+  background: transparent;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.08), 0 0 24px rgba(56, 189, 248, 0.04);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Danger state override for hud-frame */
+.hud-frame.danger-mode-panel::before {
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.6), rgba(220, 38, 38, 0.2) 40%, rgba(220, 38, 38, 0.2) 60%, rgba(220, 38, 38, 0.6));
+}
+
 /* ============================================
    LAYOUT HELPERS
    ============================================ */

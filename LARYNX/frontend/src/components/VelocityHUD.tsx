@@ -4,6 +4,7 @@ import { useLarynxStore } from '@/store/useLarynxStore';
 import { VELOCITY_THRESHOLDS } from '@/types/larynx';
 import { cn } from '@/lib/utils';
 import { useUIEarcons } from '@/hooks/useUIEarcons';
+import { FrameCorners } from '@/components/ui/FrameCorners';
 
 interface SensorData {
   label: string;
@@ -183,8 +184,9 @@ export function VelocityHUD() {
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.3 }}
-        className="fixed top-4 right-4 w-72 z-50 p-4 text-[#E4E4E7] transition-colors duration-200 border border-white/10 bg-black/35 backdrop-blur-sm"
+        className="fixed top-4 right-4 w-72 z-50 p-4 text-[#E4E4E7] transition-colors duration-200 hud-frame"
       >
+        <FrameCorners />
         <div className="flex flex-col gap-2 mb-4">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-cyan animate-pulse-glow" />
