@@ -22,6 +22,8 @@ function MouthGlow({
   const groupRef = useRef<THREE.Group>(null)
   const ringRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.PointLight>(null)
+  const ringMaterialRef = useRef<THREE.MeshStandardMaterial>(null)
+  const breachGlow = useRef(0)
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -29,14 +31,34 @@ function MouthGlow({
 
     groupRef.current.position.lerp(anchorRef.current, 0.42)
 
+    // Breach intensity from tongue velocity
+    const tongueVelocity = useLarynxStore.getState().tongueVelocity
+    const rawBreach = tongueVelocity > 20 ? Math.min((tongueVelocity - 20) / 60, 1) : 0
+    breachGlow.current += (rawBreach - breachGlow.current) * 0.08
+
     if (ringRef.current) {
-      ringRef.current.rotation.z += 0.0035
-      const pulse = 1 + Math.sin(t * 2.8) * 0.1 + Math.sin(t * 5.1) * 0.06
-      ringRef.current.scale.setScalar(pulse)
+      ringRef.current.rotation.z += 0.0035 + breachGlow.current * 0.012
+      const basePulse = 1 + Math.sin(t * 2.8) * 0.1 + Math.sin(t * 5.1) * 0.06
+      const breachPulse = breachGlow.current * (Math.sin(t * 18) * 0.15 + 0.2)
+      ringRef.current.scale.setScalar(basePulse + breachPulse)
     }
 
+    // Gold → hot pink color shift on breach
+    if (ringMaterialRef.current) {
+      const r = 3.2 + breachGlow.current * 1.8
+      const g = 2.85 - breachGlow.current * 2.0
+      const b = 1.75 - breachGlow.current * 1.2
+      ringMaterialRef.current.color.setRGB(r, g, b)
+      ringMaterialRef.current.emissive.setRGB(r, g, b)
+      ringMaterialRef.current.emissiveIntensity = 2.4 + breachGlow.current * 2.0
+    }
+
+    // Point light intensity + color shift on breach
     if (glowRef.current) {
-      glowRef.current.intensity = 2.8 + Math.sin(t * 2.5) * 0.75
+      glowRef.current.intensity = 2.8 + Math.sin(t * 2.5) * 0.75 + breachGlow.current * 3.0
+      const lg = 0.91 - breachGlow.current * 0.5
+      const lb = 0.7 - breachGlow.current * 0.4
+      glowRef.current.color.setRGB(1.0, lg, lb)
     }
   })
 
@@ -47,6 +69,7 @@ function MouthGlow({
       <mesh ref={ringRef} renderOrder={10}>
         <torusGeometry args={[0.34, 0.045, 18, 80]} />
         <meshStandardMaterial
+          ref={ringMaterialRef}
           color={[3.2, 2.85, 1.75]}
           emissive={[3.2, 2.85, 1.75]}
           emissiveIntensity={2.4}
