@@ -30,6 +30,9 @@ export function CameraController() {
   
   const lookAtTarget = useRef(new THREE.Vector3(0, 0, 0))
   const currentTarget = useRef(new THREE.Vector3(0, 0, 0))
+  const shakeIntervalRef = useRef<number | null>(null)
+  const shakeSettleTimeoutRef = useRef<number | null>(null)
+  const skullClipReturnTimeoutRef = useRef<number | null>(null)
 
   const xTo = useRef<gsap.QuickToFunc>(null!)
   const yTo = useRef<gsap.QuickToFunc>(null!)
@@ -47,6 +50,19 @@ export function CameraController() {
       const oldStatus = statusRef.current
       if (status === oldStatus) return
       statusRef.current = status
+
+      if (shakeIntervalRef.current !== null) {
+        window.clearInterval(shakeIntervalRef.current)
+        shakeIntervalRef.current = null
+      }
+      if (shakeSettleTimeoutRef.current !== null) {
+        window.clearTimeout(shakeSettleTimeoutRef.current)
+        shakeSettleTimeoutRef.current = null
+      }
+      if (skullClipReturnTimeoutRef.current !== null) {
+        window.clearTimeout(skullClipReturnTimeoutRef.current)
+        skullClipReturnTimeoutRef.current = null
+      }
 
       // Kill any active tweens on camera to prevent jumpiness on rapid transitions
       gsap.killTweensOf(camera)
@@ -74,13 +90,16 @@ export function CameraController() {
           const initialX = CAMERA_PRESETS.analyzing.position[0] * CAMERA.ZOOM_FACTOR // Approximate the camera position when zooming in
           const initialY = CAMERA_PRESETS.analyzing.position[1] * CAMERA.ZOOM_FACTOR
           
-          const shakeIntervalId = window.setInterval(() => {
+          shakeIntervalRef.current = window.setInterval(() => {
             camera.position.x = initialX + (Math.random() - 0.5) * 0.1
             camera.position.y = initialY + (Math.random() - 0.5) * 0.1
-          }, 30)
+          }, CAMERA.SHAKE_JITTER_INTERVAL_MS)
 
-          setTimeout(() => {
-            window.clearInterval(shakeIntervalId)
+          shakeSettleTimeoutRef.current = window.setTimeout(() => {
+            if (shakeIntervalRef.current !== null) {
+              window.clearInterval(shakeIntervalRef.current)
+              shakeIntervalRef.current = null
+            }
             const shakeTl = gsap.timeline({
               onUpdate: () => camera.updateProjectionMatrix(),
             })
@@ -92,7 +111,8 @@ export function CameraController() {
               duration: 1.2,
               ease: "power2.out",
             }, 0)
-          }, 300)
+            shakeSettleTimeoutRef.current = null
+          }, CAMERA.SHAKE_SETTLE_DELAY_S * 1000)
         }
       } else if (oldStatus === "complete" && status === "comparing") {
         isCameraOverride.current = true
@@ -175,7 +195,18 @@ export function CameraController() {
         }, 0)
       }
     })
-    return unsub
+    return () => {
+      if (shakeIntervalRef.current !== null) {
+        window.clearInterval(shakeIntervalRef.current)
+      }
+      if (shakeSettleTimeoutRef.current !== null) {
+        window.clearTimeout(shakeSettleTimeoutRef.current)
+      }
+      if (skullClipReturnTimeoutRef.current !== null) {
+        window.clearTimeout(skullClipReturnTimeoutRef.current)
+      }
+      unsub()
+    }
   }, [camera])
 
   useFrame(({ clock }) => {
@@ -194,7 +225,7 @@ export function CameraController() {
           duration: 0.4,
           ease: "power3.out",
           onComplete: () => {
-            setTimeout(() => {
+            skullClipReturnTimeoutRef.current = window.setTimeout(() => {
               if (statusRef.current !== "analyzing") return
               currentTarget.current.set(0, -0.3, 0)
               
@@ -221,7 +252,8 @@ export function CameraController() {
                   }
                 },
               })
-            }, 500)
+              skullClipReturnTimeoutRef.current = null
+            }, CAMERA.SKULL_CLIP_RETURN_DELAY_S * 1000)
           },
         })
       }

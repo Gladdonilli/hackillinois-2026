@@ -158,7 +158,7 @@ describe('useComparisonStream', () => {
     await startComparison(file, file)
 
     const state = useLarynxStore.getState()
-    expect(state.status).toBe('complete')
+    expect(state.status).toBe('comparing')
     expect(state.comparison.comparisonSummary).toBe('Distinct difference found')
     expect(state.progress.message).toBe('Comparison complete')
   })

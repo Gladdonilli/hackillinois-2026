@@ -12,6 +12,7 @@ export function AnalysisOverlay() {
   
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const startedAtRef = useRef<number>(0)
   const playedStepsRef = useRef<Set<number>>(new Set())
   const [frameBlink, setFrameBlink] = useState(false)
 
@@ -20,11 +21,13 @@ export function AnalysisOverlay() {
   // Timer effect
   useEffect(() => {
     if (isVisible) {
+      startedAtRef.current = Date.now()
       setElapsed(0)
       playedStepsRef.current.clear()
       timerRef.current = setInterval(() => {
-        setElapsed((prev) => prev + 1)
-      }, 1000)
+        const elapsedSeconds = Math.floor((Date.now() - startedAtRef.current) / 1000)
+        setElapsed(elapsedSeconds)
+      }, 250)
     } else {
       if (timerRef.current) {
         clearInterval(timerRef.current)

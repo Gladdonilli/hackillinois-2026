@@ -4,7 +4,7 @@ import { Sparkles, Stars, useGLTF } from '@react-three/drei'
 import { EffectComposer, Vignette, Noise } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
-import { SCENE } from '@/constants'
+import { SCENE, TIMING } from '@/constants'
 import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import { ConvergenceLines } from './ConvergenceLines'
@@ -97,7 +97,13 @@ function MouthGlow({ portalState }: { portalState: string }) {
   )
 }
 
-function PortalCameraController({ portalState, setPortalState }: { portalState: string, setPortalState: (s: any) => void }) {
+function PortalCameraController({
+  portalState,
+  setPortalState,
+}: {
+  portalState: string
+  setPortalState: (s: 'idle' | 'entering' | 'warping' | 'done') => void
+}) {
   const { camera } = useThree()
   const tlRef = useRef<gsap.core.Timeline | null>(null)
   
@@ -118,13 +124,30 @@ function PortalCameraController({ portalState, setPortalState }: { portalState: 
         x: 0,
         y: -0.2,
         z: 1.8, // Don't go too close — prevents WebGL context loss
-        duration: 2.0,
+        duration: TIMING.PORTAL_ENTER_DURATION,
         ease: 'power3.inOut',
       }, 0).to(c, {
         fov: 90, // Moderate warp FOV — less extreme
-        duration: 2.0,
+        duration: TIMING.PORTAL_ENTER_DURATION,
         ease: 'power2.inOut',
         onUpdate: () => c.updateProjectionMatrix()
+      }, 0)
+    } else if (portalState === 'idle') {
+      if (tlRef.current) tlRef.current.kill()
+      const c = camera as THREE.PerspectiveCamera
+      tlRef.current = gsap.timeline({
+        onUpdate: () => c.updateProjectionMatrix(),
+      })
+      tlRef.current.to(c.position, {
+        x: 0,
+        y: 0,
+        z: 8,
+        duration: 0.4,
+        ease: 'power2.out',
+      }, 0).to(c, {
+        fov: 60,
+        duration: 0.4,
+        ease: 'power2.out',
       }, 0)
     }
     

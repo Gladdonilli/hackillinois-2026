@@ -1,8 +1,15 @@
 import { useCallback, useRef } from 'react'
+import { STREAM } from '@/constants'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import type { SensorName, EMASensor, Verdict } from '@/types/larynx'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://larynx-api.tianyi35.workers.dev'
+
+function normalizeProgressPercent(progress: unknown): number {
+  if (typeof progress !== 'number' || !Number.isFinite(progress)) return 0
+  const scaled = progress <= 1 ? progress * 100 : progress
+  return Math.max(0, Math.min(100, Math.round(scaled)))
+}
 
 interface ChannelFrameData {
   channel: 0 | 1
@@ -53,18 +60,22 @@ export function useComparisonStream() {
         throw new Error('No response body for streaming')
       }
 
-      store.setStatus('comparing')
-
       // Parse SSE stream
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
-      const STREAM_TIMEOUT_MS = 60_000
+      let hasReceivedEvent = false
+      let terminalEventSeen = false
 
       while (true) {
         const readPromise = reader.read()
         const timeoutPromise = new Promise<never>((_, reject) => {
-          const id = setTimeout(() => reject(new Error('Stream timeout: no data for 60s')), STREAM_TIMEOUT_MS)
+          const timeoutMs = terminalEventSeen
+            ? STREAM.WATCHDOG_TERMINAL_MS
+            : hasReceivedEvent
+              ? STREAM.WATCHDOG_ACTIVE_MS
+              : STREAM.WATCHDOG_INITIAL_MS
+          const id = setTimeout(() => reject(new Error(`Stream timeout: no data for ${timeoutMs}ms`)), timeoutMs)
           readPromise.then(() => clearTimeout(id), () => clearTimeout(id))
         })
 
@@ -97,15 +108,17 @@ export function useComparisonStream() {
 
             switch (eventType) {
               case 'progress': {
+                hasReceivedEvent = true
                 const channel = parsed.channel as 0 | 1 | undefined
                 store.setProgress({
                   message: `[${channel === 1 ? 'File B' : 'File A'}] ${parsed.message}`,
-                  percent: Math.round(parsed.progress * 100),
+                  percent: normalizeProgressPercent(parsed.progress),
                 })
                 break
               }
 
               case 'frame': {
+                hasReceivedEvent = true
                 const frameData: ChannelFrameData = {
                   channel: parsed.channel ?? 0,
                   sensors: parsed.sensors,
@@ -122,6 +135,7 @@ export function useComparisonStream() {
               }
 
               case 'verdict': {
+                hasReceivedEvent = true
                 const channelVerdict: ChannelVerdict = {
                   channel: parsed.channel ?? 0,
                   isGenuine: parsed.isGenuine,
@@ -139,13 +153,16 @@ export function useComparisonStream() {
               }
 
               case 'comparison': {
+                hasReceivedEvent = true
+                terminalEventSeen = true
                 store.setComparisonSummary(parsed.summary || '')
-                store.setStatus('complete')
                 store.setProgress({ message: 'Comparison complete', percent: 100 })
                 break
               }
 
               case 'error': {
+                hasReceivedEvent = true
+                terminalEventSeen = true
                 store.setStatus('error')
                 store.setProgress({ message: parsed.message || 'Comparison failed', percent: 0 })
                 break
