@@ -14,6 +14,14 @@ type FacecapGLTF = GLTF & {
 export function HeadModel() {
   const groupRef = useRef<THREE.Group>(null);
   const headMeshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const breachIntensity = useRef(0);
+  const baseColor = useMemo(() => new THREE.Color('#c7ecff'), []);
+  const breachColor = useMemo(() => new THREE.Color('#ff3366'), []);
+  const baseEmissive = useMemo(() => new THREE.Color('#38BDF8'), []);
+  const breachEmissive = useMemo(() => new THREE.Color('#800020'), []);
+  const lerpedColor = useMemo(() => new THREE.Color(), []);
+  const lerpedEmissive = useMemo(() => new THREE.Color(), []);
   const { gl } = useThree();
   const { nodes } = useGLTF(
     '/models/facecap.glb',
@@ -33,8 +41,8 @@ export function HeadModel() {
     []
   );
 
-  useFrame(() => {
-    const { status, frames, currentFrame } = useLarynxStore.getState();
+  useFrame(({ clock }) => {
+    const { status, frames, currentFrame, tongueVelocity } = useLarynxStore.getState();
     
     if (status === 'idle' && groupRef.current) {
       groupRef.current.rotation.y += 0.001;
@@ -51,7 +59,6 @@ export function HeadModel() {
 
           if (jawOpenIdx !== undefined) {
             const jawY = frame.sensors.JAW.y || 0;
-            // Jaw: un-clamped max, only clamped at 0 for closure (allows deepfake to break limit)
             influences[jawOpenIdx] = THREE.MathUtils.clamp(-jawY / 20, 0, 3.5); 
           }
 
@@ -61,6 +68,33 @@ export function HeadModel() {
           }
         }
       }
+    }
+
+    // Pink Trombone breach effects: color shift + jitter
+    const threshold = 20;
+    const rawIntensity = tongueVelocity > threshold ? Math.min((tongueVelocity - threshold) / 60, 1) : 0;
+    breachIntensity.current += (rawIntensity - breachIntensity.current) * 0.08;
+
+    if (materialRef.current) {
+      lerpedColor.copy(baseColor).lerp(breachColor, breachIntensity.current);
+      materialRef.current.color.copy(lerpedColor);
+
+      lerpedEmissive.copy(baseEmissive).lerp(breachEmissive, breachIntensity.current);
+      materialRef.current.emissive.copy(lerpedEmissive);
+
+      materialRef.current.emissiveIntensity = 0.18 + breachIntensity.current * 0.6;
+      materialRef.current.opacity = 0.36 + breachIntensity.current * 0.25;
+    }
+
+    // Vertex jitter on breach
+    if (headMeshRef.current && breachIntensity.current > 0.05) {
+      const jitterAmp = breachIntensity.current * 0.3;
+      const t = clock.elapsedTime;
+      headMeshRef.current.position.x = -10.903 + Math.sin(t * 47) * jitterAmp;
+      headMeshRef.current.position.y = -18.028 + Math.sin(t * 53) * jitterAmp * 0.7;
+      headMeshRef.current.position.z = -18.131 + Math.cos(t * 41) * jitterAmp * 0.5;
+    } else if (headMeshRef.current) {
+      headMeshRef.current.position.set(-10.903, -18.028, -18.131);
     }
   });
 
@@ -80,6 +114,7 @@ export function HeadModel() {
               scale={0.002}
             >
               <meshStandardMaterial
+                ref={materialRef}
                 color="#c7ecff"
                 emissive="#38BDF8"
                 emissiveIntensity={0.18}
