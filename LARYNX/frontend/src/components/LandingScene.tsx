@@ -185,16 +185,6 @@ function FaceModel({
   const clonedSolidScene = useMemo(() => scene.clone(), [scene])
   const clonedWireScene = useMemo(() => scene.clone(), [scene])
 
-  const mousePos = useRef({ x: 0, y: 0 })
-
-  useEffect(() => {
-    const handleMouse = (e: MouseEvent) => {
-      mousePos.current.x = (e.clientX / window.innerWidth - 0.5) * 2
-      mousePos.current.y = -(e.clientY / window.innerHeight - 0.5) * 2
-    }
-    window.addEventListener('mousemove', handleMouse)
-    return () => window.removeEventListener('mousemove', handleMouse)
-  }, [])
 
   const customShader = useMemo(() => {
     return {
@@ -235,15 +225,23 @@ function FaceModel({
     }
   }, [])
 
-  const isTeethMesh = (name: string): boolean => {
-    if (!name) return false
-    const normalized = name.toLowerCase()
-    return normalized.includes('teeth') || normalized.includes('tooth')
+  const isTeethOrChild = (child: THREE.Object3D): boolean => {
+    // Check name directly
+    const name = child.name.toLowerCase()
+    if (name.includes('teeth') || name.includes('tooth') || name === 'mesh_3') return true
+    // Check if any parent is teeth (catches unnamed child meshes)
+    let parent = child.parent
+    while (parent) {
+      const pn = parent.name.toLowerCase()
+      if (pn.includes('teeth') || pn.includes('tooth')) return true
+      parent = parent.parent
+    }
+    return false
   }
 
   useEffect(() => {
     clonedSolidScene.traverse((child) => {
-      if (child.name === 'mesh_3' || isTeethMesh(child.name)) {
+      if (isTeethOrChild(child)) {
         child.visible = false
         return
       }
@@ -275,7 +273,7 @@ function FaceModel({
 
     clonedWireScene.traverse((child) => {
       // Hide teeth mesh entirely
-      if (child.name === 'mesh_3' || isTeethMesh(child.name)) {
+      if (isTeethOrChild(child)) {
         child.visible = false
         return
       }
@@ -307,10 +305,10 @@ function FaceModel({
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
 
-    // Parallax
+    // Time-based auto-parallax (replaces mouse tracking)
     if (solidRef.current) {
-      const targetRotX = mousePos.current.y * SCENE.PARALLAX_RANGE
-      const targetRotY = mousePos.current.x * SCENE.PARALLAX_RANGE
+      const targetRotX = Math.sin(t * 0.27) * SCENE.PARALLAX_RANGE * 0.25
+      const targetRotY = Math.cos(t * 0.19) * SCENE.PARALLAX_RANGE * 0.25
       solidRef.current.rotation.x += (targetRotX - solidRef.current.rotation.x) * SCENE.PARALLAX_LERP
       solidRef.current.rotation.y += (targetRotY - solidRef.current.rotation.y) * SCENE.PARALLAX_LERP
 

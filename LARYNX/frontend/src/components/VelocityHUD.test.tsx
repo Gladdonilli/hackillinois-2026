@@ -55,22 +55,24 @@ describe('VelocityHUD', () => {
   });
 
   it('plays alert earcon when threshold is breached', () => {
-    mockStoreState(vi.mocked(useLarynxStore), createMockState({
-      frames: [{
-        sensors: {
-          T1: { x: 0, y: 0, velocity: 120 },
-          T2: { x: 0, y: 0, velocity: 20 },
-          T3: { x: 0, y: 0, velocity: 10 },
-          JAW: { x: 0, y: 0, velocity: 15 },
-          UL: { x: 0, y: 0, velocity: 8 },
-          LL: { x: 0, y: 0, velocity: 8 },
-        },
-        tongueVelocity: 120,
-        timestamp: 0,
-      }],
-      currentFrame: 0,
+    const breachFrame = {
+      sensors: {
+        T1: { x: 0, y: 0, velocity: 120 },
+        T2: { x: 0, y: 0, velocity: 20 },
+        T3: { x: 0, y: 0, velocity: 10 },
+        JAW: { x: 0, y: 0, velocity: 15 },
+        UL: { x: 0, y: 0, velocity: 8 },
+        LL: { x: 0, y: 0, velocity: 8 },
+      },
       tongueVelocity: 120,
-    } as any));
+      timestamp: 0,
+    };
+    const breachState = createMockState({
+      frames: [breachFrame],
+      currentFrame: breachFrame,
+      tongueVelocity: 120,
+    });
+    mockStoreState(vi.mocked(useLarynxStore), breachState);
 
     render(<VelocityHUD />);
     act(() => {

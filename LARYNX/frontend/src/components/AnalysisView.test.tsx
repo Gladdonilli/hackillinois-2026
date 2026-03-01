@@ -10,7 +10,15 @@ import { mockStoreState, createMockState } from '@/test-utils/mockStore';
 import { AnalysisView } from './AnalysisView';
 
 vi.mock('@/store/useLarynxStore');
-const orbitControlsSpy = vi.hoisted(() => vi.fn(() => null));
+const orbitControlsSpy = vi.hoisted(() =>
+  vi.fn(
+    (_props: {
+      enableZoom?: boolean;
+      minAzimuthAngle?: number;
+      maxAzimuthAngle?: number;
+    }) => null,
+  ),
+);
 
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid="r3f-canvas">{children}</div>,
@@ -102,10 +110,13 @@ describe('AnalysisView', () => {
   it('constrains orbit controls to side-view envelope', () => {
     render(<AnalysisView />);
     expect(orbitControlsSpy).toHaveBeenCalled();
-    const firstCallProps = (orbitControlsSpy.mock.calls as unknown[][])[0]?.[0] as Record<string, unknown> | undefined;
-    expect(firstCallProps).toBeDefined();
-    expect(firstCallProps!.enableZoom).toBe(false);
-    expect(firstCallProps!.minAzimuthAngle).toBeCloseTo(-0.18);
-    expect(firstCallProps!.maxAzimuthAngle).toBeCloseTo(0.18);
+    const firstCallProps = orbitControlsSpy.mock.calls[0]?.[0];
+    if (!firstCallProps) {
+      throw new Error('OrbitControls was not called with props');
+    }
+
+    expect(firstCallProps.enableZoom).toBe(false);
+    expect(firstCallProps.minAzimuthAngle).toBeCloseTo(-0.18);
+    expect(firstCallProps.maxAzimuthAngle).toBeCloseTo(0.18);
   });
 });

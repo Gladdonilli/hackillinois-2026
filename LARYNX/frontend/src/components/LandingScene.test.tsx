@@ -5,7 +5,7 @@ import { useLarynxStore } from '@/store/useLarynxStore'
 import { mockStoreState, createMockState } from '@/test-utils/mockStore'
 
 vi.mock('@/store/useLarynxStore')
-const convergenceLinesSpy = vi.hoisted(() => vi.fn(() => null))
+const convergenceLinesSpy = vi.hoisted(() => vi.fn((_: { cursorInfluence?: number }) => null))
 
 // LandingScene is fully R3F (Canvas, mesh, pointLight, useFrame, useGLTF, etc.)
 // Cannot render in jsdom. Test module-level behavior only.
@@ -17,7 +17,14 @@ vi.mock('@react-three/fiber', () => ({
 }))
 
 vi.mock('@react-three/drei', () => ({
-  useGLTF: vi.fn(() => ({ scene: { traverse: vi.fn(), clone: vi.fn() }, nodes: {}, materials: {} })),
+  useGLTF: vi.fn(() => ({
+    scene: {
+      traverse: vi.fn(),
+      clone: vi.fn(() => ({ traverse: vi.fn() })),
+    },
+    nodes: {},
+    materials: {},
+  })),
   Sparkles: vi.fn(() => null),
   Stars: vi.fn(() => null),
   useKTX2: vi.fn(() => []),
@@ -83,12 +90,11 @@ describe('LandingScene', () => {
     expect(result).toBe(setPortalState)
   })
 
-  it('passes anchorRef to convergence lines', async () => {
+  it('applies low cursor influence to detached background convergence lines', async () => {
     const mod = await import('./LandingScene')
     render(<mod.LandingScene />)
     expect(convergenceLinesSpy).toHaveBeenCalled()
-    const props = (convergenceLinesSpy.mock.calls as unknown[][])[0]?.[0] as Record<string, unknown> | undefined
-    expect(props).toBeDefined()
-    expect(props!.anchorRef).toBeDefined()
+    const hasDetachedCursorInfluence = convergenceLinesSpy.mock.calls.some((call) => call[0]?.cursorInfluence === 0.08)
+    expect(hasDetachedCursorInfluence).toBe(true)
   })
-});
+})
