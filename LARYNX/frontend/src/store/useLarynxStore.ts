@@ -6,12 +6,17 @@ import {
   EMASensor,
   FormantData,
   Verdict,
-  SensorName
+  SensorName,
+  TTSEngine,
+  GeminiVoice,
+  OpenAIVoice,
+  EngineVerdict,
+  GenerateCompareResult,
 } from '@/types/larynx'
 
 interface ComparisonState {
-  channelFrames: [EMAFrame[], EMAFrame[]]
-  channelVerdicts: [Verdict | null, Verdict | null]
+  channelFrames: [EMAFrame[], EMAFrame[], EMAFrame[]]
+  channelVerdicts: [Verdict | null, Verdict | null, Verdict | null]
   comparisonSummary: string | null
 }
 
@@ -28,10 +33,8 @@ interface LarynxState {
   postProcessingEnabled: boolean
   formants: FormantData[]
 
-  // Comparison state
   comparison: ComparisonState
 
-  // History state
   showHistory: boolean
   historyItems: Array<{
     reportId: string
@@ -56,26 +59,44 @@ interface LarynxState {
   addFrame: (frame: { sensors: Record<string, { x: number; y: number; velocity?: number }>; tongueVelocity: number; timestamp: number; isAnomalous?: boolean }) => void
   setVerdict: (verdict: Verdict) => void
 
-  // Comparison actions
   resetComparison: () => void
-  addComparisonFrame: (channel: 0 | 1, frame: EMAFrame) => void
-  setComparisonVerdict: (channel: 0 | 1, verdict: Verdict) => void
+  addComparisonFrame: (channel: 0 | 1 | 2, frame: EMAFrame) => void
+  setComparisonVerdict: (channel: 0 | 1 | 2, verdict: Verdict) => void
   setComparisonSummary: (summary: string) => void
 
-  // Portal animation state
   portalState: 'idle' | 'entering' | 'warping' | 'done'
   setPortalState: (state: 'idle' | 'entering' | 'warping' | 'done') => void
-  // Stream abort registry — hooks register their AbortController here
   _streamAbort: AbortController | null
   _setStreamAbort: (controller: AbortController | null) => void
 
   toggleHistory: () => void
   fetchHistory: () => Promise<void>
+
+  generatePromptText: string
+  selectedEngine: TTSEngine | 'both'
+  geminiVoice: GeminiVoice
+  openaiVoice: OpenAIVoice
+  isGenerating: boolean
+  isTranscribing: boolean
+  transcribedText: string | null
+  engineVerdicts: EngineVerdict[]
+  generateCompareResult: GenerateCompareResult | null
+
+  setGeneratePromptText: (text: string) => void
+  setSelectedEngine: (engine: TTSEngine | 'both') => void
+  setGeminiVoice: (voice: GeminiVoice) => void
+  setOpenaiVoice: (voice: OpenAIVoice) => void
+  setIsGenerating: (val: boolean) => void
+  setIsTranscribing: (val: boolean) => void
+  setTranscribedText: (text: string | null) => void
+  addEngineVerdict: (verdict: EngineVerdict) => void
+  setGenerateCompareResult: (result: GenerateCompareResult | null) => void
+  resetGenerateCompare: () => void
 }
 
 const initialComparison: ComparisonState = {
-  channelFrames: [[], []],
-  channelVerdicts: [null, null],
+  channelFrames: [[], [], []],
+  channelVerdicts: [null, null, null],
   comparisonSummary: null,
 }
 
@@ -97,13 +118,22 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   showHistory: false,
   historyItems: [],
   historyLoading: false,
+  generatePromptText: '',
+  selectedEngine: 'gemini',
+  geminiVoice: 'Puck',
+  openaiVoice: 'alloy',
+  isGenerating: false,
+  isTranscribing: false,
+  transcribedText: null,
+  engineVerdicts: [],
+  generateCompareResult: null,
 
   setAudioFile: (file) => {
     const currentUrl = get().audioUrl
     if (currentUrl) URL.revokeObjectURL(currentUrl)
     set({
       audioFile: file,
-      audioUrl: file ? URL.createObjectURL(file) : null
+      audioUrl: file ? URL.createObjectURL(file) : null,
     })
   },
 
@@ -134,11 +164,9 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
   setVerdict: (verdict) => set({ verdict }),
 
   startAnalysis: () => {
-    // No-op — use useAnalysisStream hook for real analysis
   },
 
   reset: () => {
-    // C3 fix: abort any active SSE stream before resetting state
     const state = get()
     if (state._streamAbort) {
       state._streamAbort.abort()
@@ -156,19 +184,30 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
       tongueVelocity: 0,
       tongueT1: { x: 0, y: 0 },
       formants: [],
-      comparison: { ...initialComparison, channelFrames: [[], []], channelVerdicts: [null, null] },
+      comparison: { ...initialComparison, channelFrames: [[], [], []], channelVerdicts: [null, null, null] },
       portalState: 'idle',
       _streamAbort: null,
+      generatePromptText: '',
+      selectedEngine: 'gemini',
+      geminiVoice: 'Puck',
+      openaiVoice: 'alloy',
+      isGenerating: false,
+      isTranscribing: false,
+      transcribedText: null,
+      engineVerdicts: [],
+      generateCompareResult: null,
     })
   },
 
-  resetComparison: () => set({ comparison: { ...initialComparison, channelFrames: [[], []], channelVerdicts: [null, null] } }),
+  resetComparison: () =>
+    set({ comparison: { ...initialComparison, channelFrames: [[], [], []], channelVerdicts: [null, null, null] } }),
 
   addComparisonFrame: (channel, frame) => {
     const state = get()
-    const newFrames: [EMAFrame[], EMAFrame[]] = [
+    const newFrames: [EMAFrame[], EMAFrame[], EMAFrame[]] = [
       [...state.comparison.channelFrames[0]],
       [...state.comparison.channelFrames[1]],
+      [...state.comparison.channelFrames[2]],
     ]
     newFrames[channel] = [...newFrames[channel], frame]
     set({ comparison: { ...state.comparison, channelFrames: newFrames } })
@@ -176,7 +215,7 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
 
   setComparisonVerdict: (channel, verdict) => {
     const state = get()
-    const newVerdicts: [Verdict | null, Verdict | null] = [...state.comparison.channelVerdicts]
+    const newVerdicts: [Verdict | null, Verdict | null, Verdict | null] = [...state.comparison.channelVerdicts]
     newVerdicts[channel] = verdict
     set({ comparison: { ...state.comparison, channelVerdicts: newVerdicts } })
   },
@@ -197,7 +236,6 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
       if (!res.ok) throw new Error('Failed to fetch history')
       const json = await res.json()
       if (json.success && json.data) {
-        // map snake_case to camelCase
         const mappedItems = json.data.map((row: any) => ({
           reportId: row.report_id,
           createdAt: row.created_at,
@@ -208,7 +246,7 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
           anomalousFrames: row.anomalous_frames,
           totalFrames: row.total_frames,
           anomalyRatio: row.anomaly_ratio,
-          processingTimeMs: row.processing_time_ms
+          processingTimeMs: row.processing_time_ms,
         }))
         set({ historyItems: mappedItems, historyLoading: false })
       } else {
@@ -219,6 +257,24 @@ const useLarynxStore = create<LarynxState>((set, get) => ({
       set({ historyLoading: false })
     }
   },
+
+  setGeneratePromptText: (text) => set({ generatePromptText: text }),
+  setSelectedEngine: (engine) => set({ selectedEngine: engine }),
+  setGeminiVoice: (voice) => set({ geminiVoice: voice }),
+  setOpenaiVoice: (voice) => set({ openaiVoice: voice }),
+  setIsGenerating: (val) => set({ isGenerating: val }),
+  setIsTranscribing: (val) => set({ isTranscribing: val }),
+  setTranscribedText: (text) => set({ transcribedText: text }),
+  addEngineVerdict: (verdict) => set((state) => ({ engineVerdicts: [...state.engineVerdicts, verdict] })),
+  setGenerateCompareResult: (result) => set({ generateCompareResult: result }),
+  resetGenerateCompare: () =>
+    set({
+      engineVerdicts: [],
+      generateCompareResult: null,
+      isGenerating: false,
+      isTranscribing: false,
+      transcribedText: null,
+    }),
 }))
 
 export { useLarynxStore }

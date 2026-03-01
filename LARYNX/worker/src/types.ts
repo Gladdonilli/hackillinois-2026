@@ -6,6 +6,8 @@ export interface Env {
   };
   MODAL_API_URL: string;
   MODAL_COMPARE_URL: string;
+  MODAL_GENERATE_URL: string;
+  MODAL_TRANSCRIBE_URL: string;
   // Intelligence layer (Workers AI + Vectorize)
   AI?: Ai;
   VECTOR_SIGNATURES?: VectorizeIndex;
@@ -64,3 +66,17 @@ export interface SimilarityMatch {
   timestamp: string;
 }
 
+// ─── TTS Generate-and-Compare Types ───
+
+export type TTSEngine = 'gemini' | 'openai';
+
+export interface GenerateCompareReport extends Report {
+  engine: TTSEngine;
+  sourceReportId: string; // links to the real-audio report
+}
+
+export interface TranscribeResponse {
+  text: string;
+  language?: string;
+  duration?: number;
+}

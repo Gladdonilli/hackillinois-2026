@@ -10,11 +10,12 @@ import json
 import time
 import uuid
 import asyncio
+import os
 from typing import AsyncGenerator
 
 import modal
 
-from LARYNX.backend.gpu_inference import GpuInference, app, gpu_image  # noqa: F401 — app must be importable
+from gpu_inference import GpuInference, app, gpu_image  # noqa: F401 — app must be importable
 
 # ---------------------------------------------------------------------------
 # CPU Image — health endpoint only
@@ -27,6 +28,10 @@ cpu_image = (
         "uvicorn==0.32.1",
         "python-multipart==0.0.12",
         "pydantic==2.10.3",
+        "google-genai",
+        "openai",
+        "soundfile",
+        "librosa",
     )
 )
 
@@ -76,7 +81,7 @@ def _sse_event(event_type: str, data: dict) -> str:
     return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
 
-async def _stream_gpu_result(result: dict, start_time: float, channel: int | None = None) -> AsyncGenerator[str, None]:
+async def _stream_gpu_result(result: dict, start_time: float, channel: int | None = None, engine: str | None = None) -> AsyncGenerator[str, None]:
     """Convert GPU inference result dict to SSE event stream.
 
     Handles frame thinning (every 5th + anomalous) to reduce SSE overhead by ~80%.
@@ -124,6 +129,8 @@ async def _stream_gpu_result(result: dict, start_time: float, channel: int | Non
     verdict_event["processingTimeMs"] = int((time.time() - start_time) * 1000)
     if channel is not None:
         verdict_event["channel"] = channel
+    if engine is not None:
+        verdict_event["engine"] = engine
     yield _sse_event("verdict", verdict_event)
     await asyncio.sleep(0)
 
@@ -132,7 +139,7 @@ async def _stream_gpu_result(result: dict, start_time: float, channel: int | Non
 # Endpoints — lightweight CPU functions calling GPU class remotely
 # ---------------------------------------------------------------------------
 
-from fastapi import File, UploadFile, Request
+from fastapi import File, UploadFile, Request, Form
 from fastapi.responses import StreamingResponse, JSONResponse
 
 
@@ -281,6 +288,143 @@ async def compare(request: Request, file_a: UploadFile = File(...), file_b: Uplo
 # ---------------------------------------------------------------------------
 # Health — lightweight CPU endpoint
 # ---------------------------------------------------------------------------
+@app.function(
+    image=cpu_image, 
+    cpu=0.5, 
+    memory=512, 
+    timeout=600, 
+    scaledown_window=120, 
+    min_containers=1,
+    secrets=[modal.Secret.from_name("gemini-api-key"), modal.Secret.from_name("openai-api-key")]
+)
+@modal.concurrent(max_inputs=10)
+@modal.fastapi_endpoint(method="POST", label="larynx-generate-compare")
+async def generate_and_compare(
+    request: Request, 
+    real_file: UploadFile = File(...),
+    text: str = Form(...),
+    engine: str = Form(...),
+    voice: str | None = Form(None),
+    gemini_voice: str = Form("Puck"),
+    openai_voice: str = Form("alloy")
+):
+    """POST /api/generate-and-compare — Compare real vs generated TTS."""
+    start_time = time.time()
+    request_id = str(uuid.uuid4())
+    actual_cors = _cors_from_request(request)
+    actual_cors["X-Request-ID"] = request_id
+
+    if engine not in ["gemini", "openai", "both"]:
+        return JSONResponse(status_code=400, content={"success": False, "error": {"code": "INVALID_ENGINE", "message": "Engine must be 'gemini', 'openai', or 'both'"}}, headers=actual_cors)
+
+    real_bytes = await real_file.read()
+    real_filename = real_file.filename or "real_upload.wav"
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        try:
+            from tts_clients import generate_gemini_tts, generate_openai_tts
+            
+            gpu = GpuInference()
+            tasks = []
+            tasks.append((0, real_bytes, real_filename, "real"))
+            
+            yield _sse_event("progress", {"step": "generating", "progress": 0.05, "message": f"Generating TTS via {engine}..."})
+            await asyncio.sleep(0)
+            
+            if engine in ["gemini", "both"]:
+                v = voice if voice else gemini_voice
+                gemini_bytes, _ = await generate_gemini_tts(text, v)
+                tasks.append((1, gemini_bytes, "gemini_generated.wav", "gemini"))
+                
+            if engine in ["openai", "both"]:
+                v = voice if voice else openai_voice
+                ch = 2 if engine == "both" else 1
+                openai_bytes, _ = await generate_openai_tts(text, v)
+                tasks.append((ch, openai_bytes, "openai_generated.wav", "openai"))
+
+            verdicts = [None] * len(tasks)
+            
+            for channel, audio_bytes, fname, eng_label in tasks:
+                yield _sse_event("progress", {"channel": channel, "step": "uploading", "progress": 0.1, "message": f"Sending {eng_label} audio to GPU..."})
+                await asyncio.sleep(0)
+                
+                result = gpu.analyze_single.remote(audio_bytes, fname)
+                
+                stream_engine = eng_label if eng_label != "real" else None
+                async for event in _stream_gpu_result(result, start_time, channel=channel, engine=stream_engine):
+                    yield event
+                    
+                v_copy = dict(result["verdict"])
+                if eng_label != "real":
+                    v_copy["engine"] = eng_label
+                verdicts[channel] = v_copy
+                
+            summary = f"Comparison complete for real vs {engine} generated audio."
+            yield _sse_event("comparison", {
+                "verdicts": verdicts,
+                "summary": summary
+            })
+
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            yield _sse_event("error", {"message": str(e)})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers=actual_cors,
+    )
+
+
+@app.function(
+    image=cpu_image, 
+    cpu=0.25, 
+    memory=256, 
+    timeout=120, 
+    scaledown_window=120, 
+    min_containers=1,
+    secrets=[modal.Secret.from_name("openai-api-key")]
+)
+@modal.concurrent(max_inputs=20)
+@modal.fastapi_endpoint(method="POST", label="larynx-transcribe")
+async def transcribe(request: Request, file: UploadFile = File(...)):
+    """POST /api/transcribe — Transcribe audio via Whisper API."""
+    actual_cors = _cors_from_request(request)
+    actual_cors["X-Request-ID"] = str(uuid.uuid4())
+    
+    if file is None:
+        return JSONResponse(status_code=400, content={"success": False, "error": {"code": "INVALID_FORMAT", "message": "No file provided"}}, headers=actual_cors)
+        
+    audio_bytes = await file.read()
+    
+    try:
+        from openai import AsyncOpenAI
+        import io
+        client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        
+        file_obj = io.BytesIO(audio_bytes)
+        file_obj.name = file.filename or "audio.wav"
+        
+        response = await client.audio.transcriptions.create(
+            model='whisper-1', 
+            file=file_obj,
+            response_format="verbose_json"
+        )
+        
+        return JSONResponse(
+            content={
+                "success": True, 
+                "data": {
+                    "text": response.text,
+                    "language": getattr(response, 'language', None),
+                    "duration": getattr(response, 'duration', None)
+                }
+            },
+            headers=actual_cors
+        )
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"success": False, "error": {"code": "TRANSCRIBE_ERROR", "message": str(e)}}, headers=actual_cors)
 
 @app.function(image=cpu_image, cpu=0.25, memory=256, timeout=30)
 @modal.concurrent(max_inputs=100)

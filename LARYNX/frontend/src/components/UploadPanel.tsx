@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import useLarynxStore from "@/store/useLarynxStore"
 import { useAnalysisStream } from '@/hooks/useAnalysisStream'
 import { useUIEarcons } from '@/hooks/useUIEarcons'
+import GenerateComparePanel from '@/components/GenerateComparePanel'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ALLOWED_TYPES = ["audio/wav", "audio/mpeg", "audio/ogg", "audio/flac", "audio/x-m4a"]
@@ -105,8 +106,6 @@ export default function UploadPanel() {
       
       playSuccess()
       setAudioFile(file)
-
-      handleAnalyze()
     } catch (err) {
       console.error("Failed to decode audio", err)
       setError("Failed to decode audio file.")
@@ -204,6 +203,18 @@ export default function UploadPanel() {
           </div>
         )}
       </AnimatePresence>
+
+      {audioFile && !error && (
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 pointer-events-auto z-30 flex flex-col items-center gap-3">
+          <button
+            onClick={handleAnalyze}
+            className="px-6 py-2 rounded-sm border border-cyan/40 bg-black/60 text-cyan/90 font-mono tracking-wider text-xs hover:bg-cyan/10 hover:border-cyan/60 transition-all"
+          >
+            ANALYZE REAL AUDIO
+          </button>
+          <GenerateComparePanel />
+        </div>
+      )}
 
       {/* Error toast */}
       <AnimatePresence>

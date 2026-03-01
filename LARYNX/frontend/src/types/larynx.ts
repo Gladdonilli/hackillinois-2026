@@ -32,20 +32,20 @@ export interface Verdict {
 }
 
 export interface ChannelVerdict extends Verdict {
-  channel: 0 | 1
+  channel: 0 | 1 | 2
 }
 
 export interface ComparisonResult {
-  verdicts: [Verdict, Verdict]
+  verdicts: [Verdict, Verdict, Verdict]
   summary: string
 }
 
 export interface ChannelProgress extends AnalysisProgress {
-  channel: 0 | 1
+  channel: 0 | 1 | 2
 }
 
 export interface ChannelFrame {
-  channel: 0 | 1
+  channel: 0 | 1 | 2
   sensors: Record<SensorName, EMASensor>
   tongueVelocity: number
   timestamp: number
@@ -69,6 +69,41 @@ export interface SSEProgressEvent {
   step: string
   progress: number
   message: string
+}
+
+export type TTSEngine = 'gemini' | 'openai'
+
+export type GeminiVoice = 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Aoede'
+export type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'
+export type TTSVoice = GeminiVoice | OpenAIVoice
+
+export interface GenerateCompareRequest {
+  text: string
+  engine: TTSEngine | 'both'
+  voice?: TTSVoice
+  geminiVoice?: GeminiVoice
+  openaiVoice?: OpenAIVoice
+}
+
+export interface GenerateCompareProgress extends AnalysisProgress {
+  engine?: TTSEngine
+  phase?: 'generating' | 'analyzing'
+}
+
+export interface EngineVerdict extends Verdict {
+  engine: TTSEngine
+}
+
+export interface GenerateCompareResult {
+  realVerdict: Verdict
+  engineVerdicts: EngineVerdict[]
+  summary: string
+}
+
+export interface TranscribeResult {
+  text: string
+  language?: string
+  duration?: number
 }
 
 // Per-sensor thresholds moved to constants.ts as SENSOR_THRESHOLDS

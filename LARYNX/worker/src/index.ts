@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { Env, ApiResponse, Report, VerdictData, SimilarityMatch } from './types';
+import type { Env, ApiResponse, Report, VerdictData, SimilarityMatch, TranscribeResponse } from './types';
 import { embedAndStore, generateEmbedding, querySimilar, getIndexStats, INTEL_CONFIG } from './intelligence';
 
 const ALLOWED_ORIGINS = [
@@ -411,6 +411,200 @@ app.post('/api/compare', async (c) => {
       'Access-Control-Expose-Headers': 'X-Request-ID',
     },
   });
+});
+// ─── POST /api/generate-and-compare ───
+// Generates fake audio from text via engine, then compares against a real sample.
+// Returns SSE stream with dual analysis results.
+app.post('/api/generate-and-compare', async (c) => {
+  const startTime = Date.now();
+  const requestId = crypto.randomUUID();
+  const reportIdReal = generateReportId();
+  const reportIdFake = generateReportId();
+
+  const formData = await c.req.parseBody();
+  const realFile = formData['real_file'];
+  const text = formData['text'];
+  const engine = formData['engine'] || 'gemini';
+  const voice = formData['voice'];
+
+  if (!realFile || !(realFile instanceof File)) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: { code: 'INVALID_FORMAT', message: 'Real audio file required. Use field name "real_file".' } },
+      400
+    );
+  }
+
+  const arrayBuffer = await realFile.arrayBuffer();
+  const filename = realFile.name || 'real.wav';
+
+  // Upload real sample to R2
+  const audioKeyReal = `audio/${reportIdReal}/${filename}`;
+  await c.env.AUDIO_BUCKET.put(audioKeyReal, arrayBuffer, {
+    httpMetadata: { contentType: realFile.type || 'audio/wav' },
+  });
+
+  // Proxy to Modal generate-and-compare endpoint
+  const modalForm = new FormData();
+  modalForm.append('real_file', new Blob([arrayBuffer], { type: realFile.type || 'audio/wav' }), filename);
+  modalForm.append('text', (text as string) || '');
+  modalForm.append('engine', (engine as string) || 'gemini');
+  if (voice) modalForm.append('voice', voice as string);
+
+  let modalResponse: Response;
+  try {
+    modalResponse = await fetch(c.env.MODAL_GENERATE_URL, {
+      method: 'POST',
+      body: modalForm,
+    });
+  } catch {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: { code: 'MODEL_UNAVAILABLE', message: 'Backend unreachable' } },
+      503
+    );
+  }
+
+  if (!modalResponse.ok || !modalResponse.body) {
+    const errText = await modalResponse.text().catch(() => 'Unknown error');
+    return c.json<ApiResponse<null>>(
+      { success: false, error: { code: 'PROCESSING_FAILED', message: `Backend error ${modalResponse.status}: ${errText.slice(0, 200)}` } },
+      500
+    );
+  }
+
+  const reader = modalResponse.body.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  const db = c.env.DB;
+  const clientIp = c.req.header('CF-Connecting-IP') || 'unknown';
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      let buffer = '';
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const messages = buffer.split('\n\n');
+          buffer = messages.pop() || '';
+
+          for (const msg of messages) {
+            if (!msg.trim()) continue;
+            const eventMatch = msg.match(/^event:\s*(\w+)/m);
+            const dataMatch = msg.match(/^data:\s*(.+)$/m);
+
+            if (eventMatch?.[1] === 'verdict' && dataMatch?.[1]) {
+              try {
+                const verdict = JSON.parse(dataMatch[1]);
+                const processingTimeMs = Date.now() - startTime;
+                
+                // channel 0 = real, channel 1 = fake
+                const isReal = verdict.channel === 0;
+                const currentReportId = isReal ? reportIdReal : reportIdFake;
+                const currentAudioKey = isReal ? audioKeyReal : `generated/${reportIdFake}/output.wav`;
+
+                verdict.reportId = currentReportId;
+                verdict.processingTimeMs = processingTimeMs;
+                verdict.engine = isReal ? undefined : (engine as string);
+
+                // Persist to D1
+                const ipHash = await hashIp(clientIp);
+                await db
+                  .prepare(
+                    `INSERT INTO analysis_reports (
+                      report_id, audio_key, verdict, confidence,
+                      peak_velocity, threshold, anomalous_frames,
+                      total_frames, anomaly_ratio, processing_time_ms,
+                      client_ip_hash, classifier_score, classifier_model,
+                      ensemble_score
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                  )
+                  .bind(
+                    currentReportId,
+                    currentAudioKey,
+                    verdict.isGenuine ? 'GENUINE' : 'DEEPFAKE',
+                    verdict.confidence,
+                    verdict.peakVelocity,
+                    verdict.threshold,
+                    verdict.anomalousFrameCount || 0,
+                    verdict.totalFrameCount || 0,
+                    verdict.anomalyRatio || 0,
+                    processingTimeMs,
+                    ipHash,
+                    verdict.classifierScore ?? null,
+                    verdict.classifierModel ?? null,
+                    verdict.ensembleScore ?? null
+                  )
+                  .run();
+
+                controller.enqueue(encoder.encode(`event: verdict\ndata: ${JSON.stringify(verdict)}\n\n`));
+                continue;
+              } catch {
+                // Fall through
+              }
+            }
+            controller.enqueue(encoder.encode(msg + '\n\n'));
+          }
+        }
+        if (buffer.trim()) controller.enqueue(encoder.encode(buffer + '\n\n'));
+        controller.close();
+      } catch {
+        controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ message: 'Stream interrupted' })}\n\n`));
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Request-ID': requestId,
+      'Access-Control-Allow-Origin': c.req.header('Origin') || ALLOWED_ORIGINS[0],
+      'Access-Control-Expose-Headers': 'X-Request-ID',
+    },
+  });
+});
+
+// ─── POST /api/transcribe ───
+// Simple JSON proxy to Modal transcription endpoint.
+app.post('/api/transcribe', async (c) => {
+  const formData = await c.req.parseBody();
+  const file = formData['file'];
+
+  if (!file || !(file instanceof File)) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: { code: 'INVALID_FORMAT', message: 'Audio file required. Use field name "file".' } },
+      400
+    );
+  }
+
+  const modalForm = new FormData();
+  modalForm.append('file', file, file.name);
+
+  try {
+    const modalResponse = await fetch(c.env.MODAL_TRANSCRIBE_URL, {
+      method: 'POST',
+      body: modalForm,
+    });
+
+    if (!modalResponse.ok) {
+      const errText = await modalResponse.text().catch(() => 'Unknown error');
+      return c.json<ApiResponse<null>>(
+        { success: false, error: { code: 'TRANSCRIPTION_FAILED', message: `Backend error ${modalResponse.status}: ${errText.slice(0, 200)}` } },
+        500
+      );
+    }
+
+    const data = await modalResponse.json();
+    return c.json<ApiResponse<TranscribeResponse>>({ success: true, data });
+  } catch (err) {
+    return c.json<ApiResponse<null>>(
+      { success: false, error: { code: 'MODEL_UNAVAILABLE', message: 'Backend unreachable' } },
+      503
+    );
+  }
 });
 
 // ─── GET /api/reports/:reportId ───
