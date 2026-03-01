@@ -93,8 +93,11 @@ export const CAMERA = {
   QUICK_TO_DURATION: 0.3,
   /** CameraController zoom-in factor */
   ZOOM_FACTOR: 1.2,
+  /** Camera fake-shake jitter interval (milliseconds) */
   SHAKE_JITTER_INTERVAL_MS: 30,
+  /** Delay before settling from fake-shake to complete pose (seconds) */
   SHAKE_SETTLE_DELAY_S: 0.3,
+  /** Delay before returning from skull-clip closeup to orbit (seconds) */
   SKULL_CLIP_RETURN_DELAY_S: 0.5,
 } as const
 
@@ -150,12 +153,20 @@ export const TIMING = {
   NAV_BUTTON_DELAY: 0.8,
   /** Verdict nav button appear delay */
   VERDICT_NAV_DELAY: 1.5,
+  /** Landing camera portal enter animation duration */
   PORTAL_ENTER_DURATION: 2.0,
 } as const
 
+// ============================================================================
+// STREAM WATCHDOG / SSE
+// ============================================================================
+
 export const STREAM = {
+  /** Initial silence timeout while upload + backend warmup happen */
   WATCHDOG_INITIAL_MS: 60_000,
+  /** Silence timeout while actively receiving stream events */
   WATCHDOG_ACTIVE_MS: 20_000,
+  /** Grace period after terminal stream event before forcing close */
   WATCHDOG_TERMINAL_MS: 5_000,
 } as const
 

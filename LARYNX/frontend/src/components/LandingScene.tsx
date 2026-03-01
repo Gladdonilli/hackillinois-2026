@@ -1,12 +1,13 @@
 import { useRef, useEffect, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Sparkles, Stars, useGLTF } from '@react-three/drei'
+import { Html, useGLTF } from '@react-three/drei'
 import { EffectComposer, Vignette, Noise } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
 import { SCENE, TIMING } from '@/constants'
 import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup'
 import { useLarynxStore } from '@/store/useLarynxStore'
+import { SoundEngine } from '@/audio/SoundEngine'
 import { ConvergenceLines } from './ConvergenceLines'
 import gsap from 'gsap'
 
@@ -20,22 +21,24 @@ function MouthGlow({ portalState }: { portalState: string }) {
     const t = clock.elapsedTime
     if (!groupRef.current) return
 
-    // Gentle volatile positioning
-    const shake = 0.015
-    groupRef.current.position.x = SCENE.MOUTH_BEACON_POSITION[0] + (Math.random() - 0.5) * shake + Math.sin(t * 1.3) * 0.02
-    groupRef.current.position.y = SCENE.MOUTH_BEACON_POSITION[1] + Math.sin(t * 0.8) * 0.03 + (Math.random() - 0.5) * shake
-    groupRef.current.position.z = SCENE.MOUTH_BEACON_POSITION[2] + (Math.random() - 0.5) * shake
+    const driftX = Math.sin(t * 1.3) * 0.02 + Math.sin(t * 4.7) * 0.005
+    const driftY = Math.sin(t * 0.8) * 0.03 + Math.sin(t * 3.6) * 0.004
+    const driftZ = Math.sin(t * 1.7) * 0.006
+
+    groupRef.current.position.x = SCENE.MOUTH_BEACON_POSITION[0] + driftX
+    groupRef.current.position.y = SCENE.MOUTH_BEACON_POSITION[1] + driftY
+    groupRef.current.position.z = SCENE.MOUTH_BEACON_POSITION[2] + driftZ
 
     // Ring rotation + pulse
     if (ringRef.current) {
-      ringRef.current.rotation.z += 0.005
-      const pulse = 1 + Math.sin(t * 3) * 0.12 + Math.sin(t * 5.7) * 0.08
+      ringRef.current.rotation.z += 0.0035
+      const pulse = 1 + Math.sin(t * 2.8) * 0.1 + Math.sin(t * 5.1) * 0.06
       ringRef.current.scale.setScalar(pulse)
     }
 
     // Glow intensity pulse
     if (glowRef.current) {
-      glowRef.current.intensity = 2.5 + Math.sin(t * 2.5) * 0.8
+      glowRef.current.intensity = 2.8 + Math.sin(t * 2.5) * 0.75
     }
   })
 
@@ -43,15 +46,14 @@ function MouthGlow({ portalState }: { portalState: string }) {
 
   return (
     <group ref={groupRef} position={SCENE.MOUTH_BEACON_POSITION as [number, number, number]} renderOrder={10}>
-      {/* Bright inner ring */}
       <mesh ref={ringRef} renderOrder={10}>
-        <torusGeometry args={[0.35, 0.04, 16, 64]} />
+        <torusGeometry args={[0.34, 0.045, 18, 80]} />
         <meshStandardMaterial
-          color={[3.0, 2.5, 2.0]} // Clean warm white
-          emissive={[3.0, 2.5, 2.0]}
-          emissiveIntensity={1.8}
+          color={[3.2, 2.85, 1.75]}
+          emissive={[3.2, 2.85, 1.75]}
+          emissiveIntensity={2.4}
           transparent
-          opacity={0.9}
+          opacity={0.94}
           toneMapped={false}
           depthWrite={false}
           depthTest={false}
@@ -60,13 +62,13 @@ function MouthGlow({ portalState }: { portalState: string }) {
 
       {/* Outer soft halo ring */}
       <mesh renderOrder={10}>
-        <torusGeometry args={[0.38, 0.12, 16, 64]} />
+        <torusGeometry args={[0.39, 0.13, 16, 72]} />
         <meshStandardMaterial
-          color={[2.5, 2.0, 1.5]} // Much more subtle halo
-          emissive={[2.5, 2.0, 1.5]}
-          emissiveIntensity={1.0}
+          color={[2.8, 2.45, 1.6]}
+          emissive={[2.8, 2.45, 1.6]}
+          emissiveIntensity={1.35}
           transparent
-          opacity={0.1}
+          opacity={0.14}
           toneMapped={false}
           depthWrite={false}
           depthTest={false}
@@ -74,15 +76,14 @@ function MouthGlow({ portalState }: { portalState: string }) {
         />
       </mesh>
 
-      {/* Inner glow disc - hollowed out effect */}
       <mesh renderOrder={10}>
-        <circleGeometry args={[0.3, 32]} />
+        <circleGeometry args={[0.29, 40]} />
         <meshStandardMaterial
-          color={[3.0, 2.5, 2.0]}
-          emissive={[3.0, 2.5, 2.0]}
-          emissiveIntensity={0.8}
+          color={[3.2, 2.85, 1.75]}
+          emissive={[3.2, 2.85, 1.75]}
+          emissiveIntensity={0.95}
           transparent
-          opacity={0.12} // Deeply subtle so ring dominates
+          opacity={0.18}
           toneMapped={false}
           depthWrite={false}
           depthTest={false}
@@ -91,8 +92,7 @@ function MouthGlow({ portalState }: { portalState: string }) {
         />
       </mesh>
 
-      {/* Warm point light */}
-      <pointLight ref={glowRef} color="#FFF0D0" intensity={1.2} distance={5} decay={1.5} />
+      <pointLight ref={glowRef} color="#FFE8B3" intensity={1.4} distance={5.5} decay={1.45} />
     </group>
   )
 }
@@ -359,9 +359,131 @@ function FaceModel({ portalState }: { portalState: string }) {
   )
 }
 
+function FanTelemetryPanels({ portalState }: { portalState: string }) {
+  const leftCanvasRef = useRef<HTMLCanvasElement>(null)
+  const rightCanvasRef = useRef<HTMLCanvasElement>(null)
+  const leftHzRef = useRef<HTMLSpanElement>(null)
+  const rightHzRef = useRef<HTMLSpanElement>(null)
+  const leftStatRef = useRef<HTMLSpanElement>(null)
+  const rightStatRef = useRef<HTMLSpanElement>(null)
+  const audioTickRef = useRef(0)
+
+  useFrame(({ clock, pointer }, delta) => {
+    if (portalState === 'entering' || portalState === 'warping') return
+
+    const t = clock.elapsedTime
+    const magnitude = Math.min(1, Math.hypot(pointer.x, pointer.y))
+    const hzBase = 780 + Math.abs(pointer.x) * 2200 + Math.abs(pointer.y) * 950
+    const depthValue = 20 + magnitude * 80
+
+    if (leftHzRef.current) leftHzRef.current.textContent = `${hzBase.toFixed(0)} Hz`
+    if (rightHzRef.current) rightHzRef.current.textContent = `${(hzBase * 0.93).toFixed(0)} Hz`
+    if (leftStatRef.current) leftStatRef.current.textContent = `AMP ${(0.32 + magnitude * 0.6).toFixed(2)}`
+    if (rightStatRef.current) rightStatRef.current.textContent = `DEPTH ${depthValue.toFixed(0)}%`
+
+    const renderPanel = (canvas: HTMLCanvasElement | null, side: 1 | -1) => {
+      if (!canvas) return
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      const width = canvas.width
+      const height = canvas.height
+      const endX = side === -1 ? width - 10 : 10
+      const startX = side === -1 ? 8 : width - 8
+
+      ctx.clearRect(0, 0, width, height)
+      ctx.globalAlpha = 0.3
+      ctx.strokeStyle = 'rgba(120,220,255,0.22)'
+      for (let i = 0; i < 5; i += 1) {
+        const gy = 12 + (i / 4) * (height - 24)
+        ctx.beginPath()
+        ctx.moveTo(0, gy)
+        ctx.lineTo(width, gy)
+        ctx.stroke()
+      }
+
+      ctx.globalAlpha = 0.95
+      for (let i = 0; i < 12; i += 1) {
+        const p = i / 11
+        const baseY = 10 + p * (height - 20)
+        const wobble = Math.sin(t * (2.6 + i * 0.04) + i * 0.45) * (4.5 + magnitude * 8)
+        const startY = baseY + wobble
+        const ctrlX = width * (0.45 + side * pointer.x * 0.06)
+        const ctrlY = baseY + Math.sin(t * 3.8 + i * 0.4) * (8 + Math.abs(pointer.y) * 10)
+
+        ctx.strokeStyle = i % 3 === 0 ? 'rgba(180,240,255,0.95)' : 'rgba(110,225,255,0.68)'
+        ctx.lineWidth = i % 3 === 0 ? 1.2 : 0.8
+        ctx.beginPath()
+        ctx.moveTo(startX, startY)
+        ctx.quadraticCurveTo(ctrlX, ctrlY, endX, height * 0.52 + pointer.y * 6)
+        ctx.stroke()
+      }
+
+      ctx.fillStyle = 'rgba(155,245,255,0.9)'
+      for (let i = 0; i < 22; i += 1) {
+        const x = (i / 21) * (width - 20) + 10
+        const bar = 5 + (Math.sin(t * 6.5 + i * 0.55 + side * pointer.x * 2.6) * 0.5 + 0.5) * (14 + magnitude * 24)
+        ctx.fillRect(x, 4, 3, bar)
+      }
+    }
+
+    renderPanel(leftCanvasRef.current, -1)
+    renderPanel(rightCanvasRef.current, 1)
+
+    audioTickRef.current += delta
+    if (audioTickRef.current > 0.16 && SoundEngine.isInitialized()) {
+      SoundEngine.playDataPoint(6 + magnitude * 75 + Math.abs(pointer.x) * 20)
+      audioTickRef.current = 0
+    }
+  })
+
+  if (portalState === 'entering' || portalState === 'warping') return null
+
+  return (
+    <>
+      <Html position={[-6.8, -0.1, 0.25]} transform={false} zIndexRange={[12, 18]}>
+        <div style={{ width: '220px', pointerEvents: 'none', mixBlendMode: 'screen' }}>
+          <canvas ref={leftCanvasRef} width={220} height={120} style={{ width: '220px', height: '120px', opacity: 0.88 }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.14em', color: 'rgba(145,232,255,0.9)' }}>
+            <span>FAN-L</span>
+            <span ref={leftHzRef}>0 Hz</span>
+            <span ref={leftStatRef}>AMP 0.00</span>
+          </div>
+        </div>
+      </Html>
+      <Html position={[6.8, -0.1, 0.25]} transform={false} zIndexRange={[12, 18]}>
+        <div style={{ width: '220px', pointerEvents: 'none', mixBlendMode: 'screen' }}>
+          <canvas ref={rightCanvasRef} width={220} height={120} style={{ width: '220px', height: '120px', opacity: 0.88 }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.14em', color: 'rgba(145,232,255,0.9)' }}>
+            <span>FAN-R</span>
+            <span ref={rightHzRef}>0 Hz</span>
+            <span ref={rightStatRef}>DEPTH 0%</span>
+          </div>
+        </div>
+      </Html>
+    </>
+  )
+}
+
 export function LandingScene() {
   const portalState = useLarynxStore((state) => state.portalState)
   const setPortalState = useLarynxStore((state) => state.setPortalState)
+  const lastPortalStateRef = useRef(portalState)
+
+  useEffect(() => {
+    if (!SoundEngine.isInitialized()) {
+      lastPortalStateRef.current = portalState
+      return
+    }
+
+    if (portalState !== lastPortalStateRef.current) {
+      if (portalState === 'entering') SoundEngine.playPortalEntry()
+      if (portalState === 'warping') SoundEngine.playWarpTransition()
+      if (portalState === 'done') SoundEngine.playScanSweep()
+    }
+
+    lastPortalStateRef.current = portalState
+  }, [portalState])
 
   return (
     <Canvas
@@ -389,13 +511,12 @@ export function LandingScene() {
       <pointLight position={[-3, -2, 4]} intensity={0.4} color="#4488FF" />
       <spotLight position={[0, 3, 8]} angle={0.5} penumbra={0.8} intensity={0.6} color="#FFFFFF" />
 
-      <Sparkles count={150} scale={15} size={2.5} speed={0.3} opacity={0.6} color="#38BDF8" />
-      <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade speed={1} />
-
       <FaceModel portalState={portalState} />
       <MouthGlow portalState={portalState} />
+      <FanTelemetryPanels portalState={portalState} />
       <ConvergenceLines
         visible={portalState !== 'entering' && portalState !== 'warping'}
+        cursorInfluence={0.92}
       />
 
       {/* Landing-specific postprocessing */}

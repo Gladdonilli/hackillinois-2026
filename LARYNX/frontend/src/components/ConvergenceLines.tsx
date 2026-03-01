@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { SCENE } from '@/constants'
@@ -7,6 +7,7 @@ interface ConvergenceLinesProps {
   visible?: boolean
   boost?: boolean
   target?: [number, number, number]
+  cursorInfluence?: number
 }
 
 /**
@@ -15,23 +16,37 @@ interface ConvergenceLinesProps {
  * AdditiveBlending for a volumetric light beam effect.
  */
 
-const CURVE_RESOLUTION = 64
-const RADIUS_INNER = 0.005
-const RADIUS_OUTER = 0.02
+const CURVE_RESOLUTION = 52
+const RADIUS_INNER = 0.0035
+const RADIUS_OUTER = 0.011
+const PULSE_COUNT = 10
 
-// 8 lines: 4 left, 4 right
-const LINE_CONFIGS = [
-  // Left side
-  { start: [-18, 6.0, -1.0], curvature: 0.25, speedOffset: 0.1 },
-  { start: [-16, 2.0, -0.5], curvature: 0.15, speedOffset: 0.4 },
-  { start: [-16, -2.0, -0.5], curvature: 0.2, speedOffset: 0.7 },
-  { start: [-18, -6.0, -1.0], curvature: 0.3, speedOffset: 0.2 },
-  // Right side
-  { start: [18, 6.0, -1.0], curvature: 0.25, speedOffset: 0.6 },
-  { start: [16, 2.0, -0.5], curvature: 0.15, speedOffset: 0.3 },
-  { start: [16, -2.0, -0.5], curvature: 0.2, speedOffset: 0.9 },
-  { start: [18, -6.0, -1.0], curvature: 0.3, speedOffset: 0.8 },
-]
+type BeamConfig = {
+  start: [number, number, number]
+  curvature: number
+  speedOffset: number
+}
+
+const LINE_CONFIGS: BeamConfig[] = (() => {
+  const countPerSide = 12
+  const left: BeamConfig[] = Array.from({ length: countPerSide }, (_, i) => {
+    const p = i / (countPerSide - 1)
+    const y = THREE.MathUtils.lerp(7.2, -7.2, p)
+    return {
+      start: [-19.5 + Math.sin(i * 0.5) * 1.2, y, -1.5 + Math.cos(i * 0.35) * 0.8],
+      curvature: 0.14 + (i % 5) * 0.035,
+      speedOffset: 0.12 + i * 0.09,
+    }
+  })
+
+  const right: BeamConfig[] = left.map((beam, i) => ({
+    start: [-beam.start[0], beam.start[1], beam.start[2]],
+    curvature: beam.curvature,
+    speedOffset: beam.speedOffset + (i % 3) * 0.05,
+  }))
+
+  return [...left, ...right]
+})()
 
 function generateArcCurve(
   start: THREE.Vector3,
@@ -58,31 +73,50 @@ function generateArcCurve(
 }
 
 function GlowingBeam({
-  curve,
+  start,
+  targetRef,
+  curvature,
   baseOpacity,
   boost,
   speedOffset
 }: {
-  curve: THREE.CatmullRomCurve3
+  start: THREE.Vector3
+  targetRef: React.MutableRefObject<THREE.Vector3>
+  curvature: number
   baseOpacity: number
   boost: boolean
   speedOffset: number
 }) {
+  const meshOuterRef = useRef<THREE.Mesh>(null)
+  const meshInnerRef = useRef<THREE.Mesh>(null)
   const matRefOuter = useRef<THREE.MeshStandardMaterial>(null)
   const matRefInner = useRef<THREE.MeshStandardMaterial>(null)
+  const pulseRefs = useRef<Array<THREE.Mesh | null>>([])
   const opacityRefOuter = useRef(baseOpacity * 0.4)
   const opacityRefInner = useRef(baseOpacity)
+  const lastEndRef = useRef(targetRef.current.clone())
+  const lastRebuildTimeRef = useRef(0)
 
-  // Memoize geometries so they aren't recreated
-  const geoOuter = useMemo(() => new THREE.TubeGeometry(curve, CURVE_RESOLUTION, RADIUS_OUTER, 8, false), [curve])
-  const geoInner = useMemo(() => new THREE.TubeGeometry(curve, CURVE_RESOLUTION, RADIUS_INNER, 6, false), [curve])
+  const initialCurve = useMemo(
+    () => generateArcCurve(start, targetRef.current, curvature),
+    [start, targetRef, curvature]
+  )
+  const curveRef = useRef(initialCurve)
 
-  useFrame(({ clock }) => {
+  const geoOuter = useMemo(
+    () => new THREE.TubeGeometry(initialCurve, CURVE_RESOLUTION, RADIUS_OUTER, 8, false),
+    [initialCurve]
+  )
+  const geoInner = useMemo(
+    () => new THREE.TubeGeometry(initialCurve, CURVE_RESOLUTION, RADIUS_INNER, 6, false),
+    [initialCurve]
+  )
+
+  useFrame(({ clock }, delta) => {
     if (!matRefOuter.current || !matRefInner.current) return
 
-    // Pulsing logic — varied per beam using speedOffset
     const t = clock.elapsedTime * (1 + speedOffset * 0.5) + speedOffset * 10
-    const pulse = (Math.sin(t * 2.0) * 0.5 + 0.5) * 0.4 + 0.6 // 0.6 to 1.0
+    const pulse = (Math.sin(t * 2.0) * 0.5 + 0.5) * 0.4 + 0.6
 
     const targetOuter = boost ? 0.6 : baseOpacity * 0.4 * pulse
     const targetInner = boost ? 1.0 : baseOpacity * pulse
@@ -92,38 +126,101 @@ function GlowingBeam({
 
     matRefOuter.current.opacity = opacityRefOuter.current
     matRefInner.current.opacity = opacityRefInner.current
+
+    const dir = start.x < targetRef.current.x ? 1 : -1
+    pulseRefs.current.forEach((pulse, idx) => {
+      if (!pulse) return
+      const phase = (t * (0.22 + speedOffset * 0.1) + idx / PULSE_COUNT) % 1
+      const point = curveRef.current.getPoint(phase)
+      const wobble = Math.sin(t * (6 + speedOffset * 2) + idx * 1.3) * 0.04
+      pulse.position.set(
+        point.x,
+        point.y + wobble * 0.35,
+        point.z + wobble * 0.2 * dir
+      )
+
+      const pulseScale = 0.6 + (Math.sin(t * (10 + speedOffset) + idx * 0.8) * 0.5 + 0.5) * 1.05
+      pulse.scale.setScalar(boost ? pulseScale * 1.35 : pulseScale)
+    })
+
+    const now = clock.elapsedTime
+    const dist = lastEndRef.current.distanceTo(targetRef.current)
+    if (dist < 0.035) return
+    if (now - lastRebuildTimeRef.current < Math.max(0.025, Math.min(delta * 6, 0.085))) return
+
+    const updatedCurve = generateArcCurve(start, targetRef.current, curvature)
+    curveRef.current = updatedCurve
+    const nextOuter = new THREE.TubeGeometry(updatedCurve, CURVE_RESOLUTION, RADIUS_OUTER, 8, false)
+    const nextInner = new THREE.TubeGeometry(updatedCurve, CURVE_RESOLUTION, RADIUS_INNER, 6, false)
+
+    if (meshOuterRef.current) {
+      const previous = meshOuterRef.current.geometry
+      meshOuterRef.current.geometry = nextOuter
+      previous.dispose()
+    }
+
+    if (meshInnerRef.current) {
+      const previous = meshInnerRef.current.geometry
+      meshInnerRef.current.geometry = nextInner
+      previous.dispose()
+    }
+
+    lastEndRef.current.copy(targetRef.current)
+    lastRebuildTimeRef.current = now
   })
 
   return (
     <group>
-      {/* Outer soft glow tube */}
-      <mesh geometry={geoOuter} frustumCulled={false} renderOrder={1}>
+      <mesh ref={meshOuterRef} geometry={geoOuter} frustumCulled={false} renderOrder={1}>
         <meshStandardMaterial
           ref={matRefOuter}
-          color={[2.0, 2.0, 2.2]} // Cool white/silver
-          emissive={[2.0, 2.0, 2.2]}
-          emissiveIntensity={1.0}
+          color={[0.5, 2.2, 2.5]}
+          emissive={[0.5, 2.2, 2.5]}
+          emissiveIntensity={1.15}
           transparent
           blending={THREE.AdditiveBlending}
           depthWrite={false}
-          depthTest={true} // MUST be true so head occludes lines
+          depthTest={false}
           toneMapped={false}
         />
       </mesh>
-      {/* Inner bright core tube */}
-      <mesh geometry={geoInner} frustumCulled={false} renderOrder={2}>
+      <mesh ref={meshInnerRef} geometry={geoInner} frustumCulled={false} renderOrder={2}>
         <meshStandardMaterial
           ref={matRefInner}
-          color={[2.5, 2.5, 2.8]} // Bright cool white
-          emissive={[2.5, 2.5, 2.8]}
-          emissiveIntensity={2.0}
+          color={[0.9, 2.5, 2.9]}
+          emissive={[0.9, 2.5, 2.9]}
+          emissiveIntensity={2.2}
           transparent
           blending={THREE.AdditiveBlending}
           depthWrite={false}
-          depthTest={true} // MUST be true so head occludes lines
+          depthTest={false}
           toneMapped={false}
         />
       </mesh>
+      {Array.from({ length: PULSE_COUNT }).map((_, idx) => (
+        <mesh
+          // eslint-disable-next-line react/no-array-index-key
+          key={idx}
+          ref={(node) => {
+            pulseRefs.current[idx] = node
+          }}
+          frustumCulled={false}
+          renderOrder={3}
+        >
+          <sphereGeometry args={[0.026, 10, 10]} />
+          <meshStandardMaterial
+            color={[1.1, 2.8, 3.0]}
+            emissive={[1.1, 2.8, 3.0]}
+            emissiveIntensity={2.2}
+            transparent
+            opacity={0.9}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            depthTest={false}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
     </group>
   )
 }
@@ -132,23 +229,38 @@ export function ConvergenceLines({
   visible = true,
   boost = false,
   target,
+  cursorInfluence = 0.75,
 }: ConvergenceLinesProps) {
-  const endPoint = useMemo(() => {
+  const baseTarget = useMemo(() => {
     const pos = target ?? (SCENE.MOUTH_BEACON_POSITION as [number, number, number])
     return new THREE.Vector3(...pos)
   }, [target])
 
+  const targetRef = useRef(baseTarget.clone())
+  const desiredRef = useRef(baseTarget.clone())
+
+  useFrame(({ pointer }, delta) => {
+    desiredRef.current.set(
+      baseTarget.x + pointer.x * cursorInfluence,
+      baseTarget.y + pointer.y * cursorInfluence * 0.56,
+      baseTarget.z
+    )
+
+    const alpha = Math.max(0.04, Math.min(delta * 7.5, 0.36))
+    targetRef.current.lerp(desiredRef.current, alpha)
+  })
+
   const curveData = useMemo(() => {
     return LINE_CONFIGS.map((config, i) => {
       const start = new THREE.Vector3(...(config.start as [number, number, number]))
-      const curve = generateArcCurve(start, endPoint, config.curvature)
       return {
-        curve,
+        start,
+        curvature: config.curvature,
         baseOpacity: 0.6 + (i % 4) * 0.1,
         speedOffset: config.speedOffset
       }
     })
-  }, [endPoint])
+  }, [])
 
   if (!visible) return null
 
@@ -157,7 +269,9 @@ export function ConvergenceLines({
       {curveData.map((data, i) => (
         <GlowingBeam
           key={i}
-          curve={data.curve}
+          start={data.start}
+          targetRef={targetRef}
+          curvature={data.curvature}
           baseOpacity={data.baseOpacity}
           boost={boost}
           speedOffset={data.speedOffset}
