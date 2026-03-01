@@ -16,10 +16,17 @@ const CompareView = lazy(() => import('@/components/CompareView').then(m => ({ d
 const TechnicalDetailPanel = lazy(() => import('@/components/TechnicalDetailPanel').then(m => ({ default: m.TechnicalDetailPanel })))
 const ClosingScreen = lazy(() => import('@/components/ClosingScreen').then(m => ({ default: m.ClosingScreen })))
 
+declare global {
+  interface Window {
+    __larynxSoundEngine?: typeof SoundEngine
+  }
+}
+
 export default function App() {
   const status = useLarynxStore((state) => state.status)
   const [showIntro, setShowIntro] = useState(true)
   const initRef = useRef(false)
+  const prevStatusRef = useRef(status)
 
   // Preload demo panels when analysis starts
   useEffect(() => {
@@ -52,9 +59,23 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      window.__larynxSoundEngine = SoundEngine
+      return () => {
+        delete window.__larynxSoundEngine
+      }
+    }
+  }, [])
+
   // Sound lifecycle tied to analysis status
   useEffect(() => {
     if (!SoundEngine.isInitialized() || showIntro) return
+
+    if (prevStatusRef.current !== status) {
+      SoundEngine.cancelAllTransitions()
+      prevStatusRef.current = status
+    }
 
     switch (status) {
       case 'uploading':
@@ -86,20 +107,12 @@ export default function App() {
       case 'closing':
         SoundEngine.stopTicking()
         SoundEngine.stopDrone()
-        SoundEngine.stopIECAlarm()
-        SoundEngine.stopRiser()
-        SoundEngine.restoreFromVacuum()
-        SoundEngine.stopSoundtrack()
         break
       case 'error':
       case 'idle':
         SoundEngine.stopTicking()
         SoundEngine.stopDrone()
-        SoundEngine.stopIECAlarm()
-        SoundEngine.stopRiser()
         SoundEngine.stopBackgroundLayer()
-        SoundEngine.restoreFromVacuum()
-        SoundEngine.stopSoundtrack()
         break
     }
   }, [status, showIntro])
@@ -150,7 +163,6 @@ export default function App() {
       />
 
       {/* Background effects — always visible */}
-      <div className="grid-bg" />
       <div className="vignette" />
       {/* Scene views — no AnimatePresence (incompatible with R3F Canvas teardown) */}
       {appState === 'intro' && (

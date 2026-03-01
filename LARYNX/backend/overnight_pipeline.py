@@ -183,129 +183,196 @@ ELEVENLABS_VOICES = [
 
 
 # ---------------------------------------------------------------------------
-# Modal Functions
+# Modal Inference Class — dataset + models loaded to local NVMe in __enter__
 # ---------------------------------------------------------------------------
-@app.function(
+@app.cls(
     image=image,
     volumes={"/model-cache": model_cache},
-    gpu="B200",                      # 192GB VRAM ($6.25/hr) — 7× FP16 TFLOPS vs A100, faster wall-clock
+    gpu="B200",
     timeout=600,
+    startup_timeout=1200,
     retries=3,
-    max_containers=10,            # 10 GPU cap on Modal account
-    min_containers=1,              # 1 container always hot — models in VRAM, zero cold start
-    )
-@modal.concurrent(max_inputs=20) # 20 concurrent batches per container — model loaded once, GPU stays saturated
-def predict_ema_batch(wav_paths: list[str]) -> list[dict]:
-    """Process a batch of WAV files from volume paths through AAI model."""
-    import torch
-    import numpy as np
-    import soundfile as sf
-    import yaml
-    import gdown
-    from pathlib import Path
-    from scipy.interpolate import interp1d
+    max_containers=1,
+    min_containers=0,
+)
+@modal.concurrent(max_inputs=1)
+class LarynxInference:
+    @modal.enter()
+    def setup(self):
+        """One-time: copy dataset + models from FUSE volume to local NVMe, load to GPU."""
+        import torch
+        import subprocess
+        import yaml
+        import gdown
+        from pathlib import Path
+        import time as _time
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        t0 = _time.monotonic()
 
-    # --- Download checkpoint if needed ---
-    ckpt_dir = Path("/model-cache/aai/hprc_h2")
-    ckpt_path = ckpt_dir / "best_mel_ckpt.pkl"
-    config_path = ckpt_dir / "config.yml"
+        # --- Copy dataset from FUSE volume → local NVMe (one-time, ~2.8GB) ---
+        local_dataset = Path("/tmp/dataset")
+        if not local_dataset.exists():
+            print("Copying dataset from volume to local NVMe...")
+            local_dataset.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["cp", "-a", "/model-cache/dataset/real", str(local_dataset / "real")], check=True)
+            subprocess.run(["cp", "-a", "/model-cache/dataset/fake", str(local_dataset / "fake")], check=True)
+            n_real = len(list((local_dataset / "real").iterdir()))
+            n_fake = len(list((local_dataset / "fake").iterdir()))
+            print(f"  Copied {n_real} real + {n_fake} fake to local NVMe ({_time.monotonic() - t0:.1f}s)")
 
-    if not ckpt_path.exists():
-        ckpt_dir.mkdir(parents=True, exist_ok=True)
-        gdown.download_folder(
-            id="1O-1kX_ngHf1T8EN7HXWABCaEIJLNqxUI",
-            output=str(ckpt_dir),
-            quiet=False,
-        )
-        model_cache.commit()
-        print(f"Checkpoint downloaded to {ckpt_dir}")
+        # --- Copy AAI checkpoint to local NVMe too ---
+        vol_ckpt_dir = Path("/model-cache/aai/hprc_h2")
+        vol_ckpt = vol_ckpt_dir / "best_mel_ckpt.pkl"
+        local_aai = Path("/tmp/aai/hprc_h2")
+        local_ckpt = local_aai / "best_mel_ckpt.pkl"
+        local_config = local_aai / "config.yml"
 
-    # --- Load HuBERT ---
-    print("Loading HuBERT large...")
-    import s3prl.hub as hub
-    hubert_model = hub.hubert_large_ll60k().to(device)
-    hubert_model.eval()
+        if not vol_ckpt.exists():
+            vol_ckpt_dir.mkdir(parents=True, exist_ok=True)
+            gdown.download_folder(
+                id="1O-1kX_ngHf1T8EN7HXWABCaEIJLNqxUI",
+                output=str(vol_ckpt_dir),
+                quiet=False,
+            )
+            model_cache.commit()
+            print(f"Checkpoint downloaded to {vol_ckpt_dir}")
 
-    # --- Load AAI inversion model ---
-    print("Loading AAI inversion model...")
-    with open(config_path) as f:
-        inversion_config = yaml.safe_load(f)
+        if not local_aai.exists():
+            local_aai.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["cp", "-a", str(vol_ckpt_dir) + "/.", str(local_aai)], check=True)
+            print(f"  AAI checkpoint copied to local NVMe")
 
-    from articulatory.utils import load_model
+        # --- Load HuBERT to GPU ---
+        print("Loading HuBERT large...")
+        import s3prl.hub as hub
+        self.hubert_model = hub.hubert_large_ll60k().to(self.device)
+        self.hubert_model.eval()
 
-    model = load_model(str(ckpt_path), inversion_config)
-    model.remove_weight_norm()
-    model.to(device).eval()
-    print("Models loaded.")
+        # --- Load AAI inversion model to GPU ---
+        print("Loading AAI inversion model...")
+        with open(local_config) as f:
+            inversion_config = yaml.safe_load(f)
 
-    # Refresh volume to see latest dataset uploads (handles warm containers)
-    model_cache.reload()
+        from articulatory.utils import load_model
+        self.aai_model = load_model(str(local_ckpt), inversion_config)
+        self.aai_model.remove_weight_norm()
+        self.aai_model.to(self.device).eval()
+        print(f"Container ready: models on GPU, dataset on NVMe ({_time.monotonic() - t0:.1f}s total)")
 
-    # --- Process batch ---
-    results = []
-    for vol_path in wav_paths:
-        filename = Path(vol_path).name
-        try:
-            audio, sr = sf.read(vol_path)
-            if len(audio.shape) > 1:
-                audio = audio[:, 0]
-            if sr != 16000:
-                # Resample
-                from scipy.signal import resample
-                audio = resample(audio, int(len(audio) * 16000 / sr))
-                sr = 16000
+    @modal.method()
+    def analyze(self, wav_paths: list[str]) -> list[dict]:
+        """Process a batch of WAV files through batched HuBERT + per-sample AAI.
+        Reads from local NVMe only — zero FUSE volume access during inference."""
+        import torch
+        import numpy as np
+        import soundfile as sf
+        from pathlib import Path
 
-            audio = audio.astype(np.float32)
-            if np.max(np.abs(audio)) > 0:
-                audio = audio / np.max(np.abs(audio))
+        # --- Remap volume paths → local NVMe paths ---
+        local_paths = [p.replace("/model-cache/dataset", "/tmp/dataset") for p in wav_paths]
 
-            wavs = torch.FloatTensor(audio).unsqueeze(0).to(device)
+        # --- Preload all WAVs from local NVMe (microseconds per file) ---
+        results = []
+        loaded_wavs = []
+
+        for local_path in local_paths:
+            filename = Path(local_path).name
+            try:
+                audio, sr = sf.read(local_path)
+                if len(audio.shape) > 1:
+                    audio = audio[:, 0]
+                if sr != 16000:
+                    from scipy.signal import resample
+                    audio = resample(audio, int(len(audio) * 16000 / sr))
+                audio = audio.astype(np.float32)
+                if np.max(np.abs(audio)) > 0:
+                    audio = audio / np.max(np.abs(audio))
+                loaded_wavs.append((filename, audio))
+            except Exception as e:
+                results.append({"filename": filename, "error": str(e)})
+
+        if not loaded_wavs:
+            return results
+
+        # --- Batched HuBERT inference (B=64 per chunk, ~8GB VRAM per chunk) ---
+        HUBERT_BATCH = 64
+        all_hidden = []
+        all_filenames = []
+
+        def _hubert_output_len(input_len: int) -> int:
+            """Compute HuBERT CNN feature extractor output length."""
+            length = input_len
+            for k, s in zip([10, 3, 3, 3, 3, 2, 2], [5, 2, 2, 2, 2, 2, 2]):
+                length = (length - k) // s + 1
+                if length <= 0:
+                    return 0
+            return length
+
+        for chunk_start in range(0, len(loaded_wavs), HUBERT_BATCH):
+            chunk = loaded_wavs[chunk_start:chunk_start + HUBERT_BATCH]
+            wav_tensors = [torch.FloatTensor(audio).to(self.device) for _, audio in chunk]
 
             with torch.inference_mode(), torch.autocast('cuda', dtype=torch.bfloat16):
-                hidden = hubert_model(wavs)["hidden_states"][-1].squeeze(0)  # (T, 1024)
-                feat = hidden.unsqueeze(0).transpose(1, 2)
-                feat = torch.nn.functional.interpolate(feat, scale_factor=2, mode="linear", align_corners=False)
-                feat = feat.transpose(1, 2).squeeze(0)  # (T*2, 1024)
-                ema_pred = model.inference(feat, normalize_before=False)
+                out = self.hubert_model(wav_tensors)
+                hidden_batch = out["hidden_states"][-1]  # (B, T_max, 1024)
 
-            ema = ema_pred.cpu().numpy()  # (T, 12+)
-            ema = ema[:, :12]  # Keep only 12 EMA dims
+            for i, (filename, audio) in enumerate(chunk):
+                t_valid = _hubert_output_len(len(audio))
+                if t_valid <= 0:
+                    results.append({"filename": filename, "error": "audio too short for HuBERT"})
+                    continue
+                all_hidden.append(hidden_batch[i, :t_valid, :])  # (T_i, 1024)
+                all_filenames.append(filename)
 
-            # Compute velocity, acceleration, jerk for all 6 articulators
-            dt = 1.0 / 200.0  # 200 Hz EMA rate
-            art_names = ["li", "ul", "ll", "tt", "tb", "td"]
-            result = {"filename": filename, "num_frames": ema.shape[0]}
+            del hidden_batch, wav_tensors
+            torch.cuda.empty_cache()
 
-            for i, name in enumerate(art_names):
-                ix, iy = i * 2, i * 2 + 1
-                dx = np.diff(ema[:, ix])
-                dy = np.diff(ema[:, iy])
-                vel = np.sqrt(dx**2 + dy**2) / dt / 10.0  # cm/s
-                accel = np.abs(np.diff(vel) / dt)
-                jerk = np.abs(np.diff(accel) / dt)
+        # --- Per-sample AAI + vectorized metrics ---
+        dt = 1.0 / 200.0  # 200 Hz EMA rate
+        art_names = ["li", "ul", "ll", "tt", "tb", "td"]
 
-                for metric, arr in [("vel", vel), ("accel", accel), ("jerk", jerk)]:
-                    if len(arr) > 0:
-                        result[f"{name}_{metric}_peak"] = float(np.max(arr))
-                        result[f"{name}_{metric}_mean"] = float(np.mean(arr))
-                        result[f"{name}_{metric}_p95"] = float(np.percentile(arr, 95))
-                        result[f"{name}_{metric}_p99"] = float(np.percentile(arr, 99))
-                        result[f"{name}_{metric}_median"] = float(np.median(arr))
-                        result[f"{name}_{metric}_std"] = float(np.std(arr))
-                    else:
-                        for s in ["peak", "mean", "p95", "p99", "median", "std"]:
-                            result[f"{name}_{metric}_{s}"] = 0.0
+        for idx, (hidden_single, filename) in enumerate(zip(all_hidden, all_filenames)):
+            try:
+                with torch.inference_mode(), torch.autocast('cuda', dtype=torch.bfloat16):
+                    feat = hidden_single.unsqueeze(0).transpose(1, 2)
+                    feat = torch.nn.functional.interpolate(feat, scale_factor=2, mode="linear", align_corners=False)
+                    feat = feat.transpose(1, 2).squeeze(0)  # (T*2, 1024)
+                    ema_pred = self.aai_model.inference(feat, normalize_before=False)
 
-            results.append(result)
-            print(f"  OK: {filename} ({ema.shape[0]} frames)")
+                ema = ema_pred.cpu().numpy()[:, :12]  # (T, 12)
+                result = {"filename": filename, "num_frames": ema.shape[0]}
 
-        except Exception as e:
-            print(f"  FAIL: {filename}: {e}")
-            results.append({"filename": filename, "error": str(e)})
+                for i, name in enumerate(art_names):
+                    ix, iy = i * 2, i * 2 + 1
+                    dx = np.diff(ema[:, ix])
+                    dy = np.diff(ema[:, iy])
+                    vel = np.sqrt(dx**2 + dy**2) / dt / 10.0  # cm/s
+                    accel = np.abs(np.diff(vel) / dt)
+                    jerk = np.abs(np.diff(accel) / dt)
 
-    return results
+                    for metric, arr in [("vel", vel), ("accel", accel), ("jerk", jerk)]:
+                        if len(arr) > 0:
+                            result[f"{name}_{metric}_peak"] = float(np.max(arr))
+                            result[f"{name}_{metric}_mean"] = float(np.mean(arr))
+                            result[f"{name}_{metric}_p95"] = float(np.percentile(arr, 95))
+                            result[f"{name}_{metric}_p99"] = float(np.percentile(arr, 99))
+                            result[f"{name}_{metric}_median"] = float(np.median(arr))
+                            result[f"{name}_{metric}_std"] = float(np.std(arr))
+                        else:
+                            for s in ["peak", "mean", "p95", "p99", "median", "std"]:
+                                result[f"{name}_{metric}_{s}"] = 0.0
+
+                results.append(result)
+                if (idx + 1) % 50 == 0 or idx + 1 == len(all_hidden):
+                    print(f"    AAI progress: {idx + 1}/{len(all_hidden)} samples")
+
+            except Exception as e:
+                results.append({"filename": filename, "error": str(e)})
+
+        ok = sum(1 for r in results if "error" not in r)
+        print(f"  Batch done: {ok}/{len(results)} OK")
+        return results
 
 
 @app.function(image=image, timeout=1200, volumes={"/model-cache": model_cache})
@@ -508,37 +575,21 @@ def main():
     print("=" * 80)
     start_time = time.time()
 
-    # ---- Step 1: Sync dataset to Modal volume (upload once, read at NVMe speed) ----
-    print("\n📦 Step 1: Syncing dataset to Modal volume...")
+    # ---- Step 1: Verify pre-loaded dataset on Modal volume (NO upload) ----
+    print("\n📦 Step 1: Verifying dataset on Modal volume (pre-loaded, skip upload)...")
     existing = list_volume_dataset.remote()
-    existing_real = set(existing.get("real", []))
-    existing_fake = set(existing.get("fake", []))
-    print(f"  Volume has {len(existing_real)} real + {len(existing_fake)} fake WAVs cached")
+    existing_real = sorted(existing.get("real", []))
+    existing_fake = sorted(existing.get("fake", []))
+    print(f"  Volume has {len(existing_real)} real + {len(existing_fake)} fake WAVs")
 
-    all_real_names = sorted([f.name for f in MERGED_REAL_DIR.glob("*.wav")])
-    all_fake_names = sorted([f.name for f in MERGED_FAKE_DIR.glob("*.wav")])
-    new_real = [n for n in all_real_names if n not in existing_real]
-    new_fake = [n for n in all_fake_names if n not in existing_fake]
+    if len(existing_real) < 5000 or len(existing_fake) < 5000:
+        print(f"  ❌ ABORT: Expected 5000 real + 5000 fake on volume, got {len(existing_real)} + {len(existing_fake)}")
+        print(f"     Re-upload dataset to model-cache volume before running.")
+        sys.exit(1)
 
-    UPLOAD_BATCH = 500  # ~25MB per batch at ~50KB/WAV
-    if new_real or new_fake:
-        print(f"  Uploading {len(new_real)} real + {len(new_fake)} fake new WAVs (one-time transfer)...")
-        for label, new_names, src_dir in [("real", new_real, MERGED_REAL_DIR), ("fake", new_fake, MERGED_FAKE_DIR)]:
-            for i in range(0, len(new_names), UPLOAD_BATCH):
-                batch_names = new_names[i:i + UPLOAD_BATCH]
-                batch = []
-                for name in batch_names:
-                    with open(src_dir / name, "rb") as f:
-                        batch.append((name, f.read()))
-                written = upload_wavs_to_volume.remote(batch, label)
-                done = min(i + UPLOAD_BATCH, len(new_names))
-                print(f"    {label}: {done}/{len(new_names)} (+{written} new)")
-    else:
-        print("  ✅ All WAVs already on volume — skipping upload")
-
-    real_paths = [f"/model-cache/dataset/real/{n}" for n in all_real_names]
-    fake_paths = [f"/model-cache/dataset/fake/{n}" for n in all_fake_names]
-    print(f"  ✅ {len(real_paths)} real + {len(fake_paths)} fake = {len(real_paths) + len(fake_paths)} samples ready on volume")
+    real_paths = [f"/model-cache/dataset/real/{n}" for n in existing_real]
+    fake_paths = [f"/model-cache/dataset/fake/{n}" for n in existing_fake]
+    print(f"  ✅ {len(real_paths)} real + {len(fake_paths)} fake = {len(real_paths) + len(fake_paths)} samples ready on volume (no upload needed)")
 
     # ---- Step 2: AAI inference on Modal (batched, multi-pass overnight mode) ----
     n_samples_once = len(real_paths) + len(fake_paths)
@@ -568,7 +619,7 @@ def main():
 
         pass_results = []
         for batch_idx, batch_result in enumerate(
-            predict_ema_batch.map(batches, return_exceptions=True, wrap_returned_exceptions=False)
+            LarynxInference().analyze.map(batches, return_exceptions=True, wrap_returned_exceptions=False)
         ):
             if isinstance(batch_result, Exception):
                 err_str = str(batch_result)

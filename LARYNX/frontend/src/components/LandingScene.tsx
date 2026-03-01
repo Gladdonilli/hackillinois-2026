@@ -1,46 +1,41 @@
 import { useRef, useEffect, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Sparkles, Stars, useGLTF, Text, Billboard } from '@react-three/drei'
+import { Sparkles, Stars, useGLTF } from '@react-three/drei'
+import { EffectComposer, Vignette, Noise } from '@react-three/postprocessing'
+import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
 import { SCENE } from '@/constants'
 import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup'
 import { useLarynxStore } from '@/store/useLarynxStore'
+import { ConvergenceLines } from './ConvergenceLines'
 import gsap from 'gsap'
 
 
-function MouthBeacon({ portalState }: { portalState: string }) {
+function MouthGlow({ portalState }: { portalState: string }) {
   const groupRef = useRef<THREE.Group>(null)
-  const icoRef = useRef<THREE.Mesh>(null)
-  const arrowRef = useRef<THREE.Group>(null)
+  const ringRef = useRef<THREE.Mesh>(null)
   const glowRef = useRef<THREE.PointLight>(null)
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     if (!groupRef.current) return
 
-    // Volatile shaking
-    const shake = 0.015
-    groupRef.current.position.x = SCENE.MOUTH_BEACON_POSITION[0] + (Math.random() - 0.5) * shake + Math.sin(t * 1.3) * 0.03
-    groupRef.current.position.y = SCENE.MOUTH_BEACON_POSITION[1] + Math.sin(t * 0.8) * 0.05 + (Math.random() - 0.5) * shake
+    // Gentle volatile positioning
+    const shake = 0.01
+    groupRef.current.position.x = SCENE.MOUTH_BEACON_POSITION[0] + (Math.random() - 0.5) * shake + Math.sin(t * 1.3) * 0.02
+    groupRef.current.position.y = SCENE.MOUTH_BEACON_POSITION[1] + Math.sin(t * 0.8) * 0.03 + (Math.random() - 0.5) * shake
     groupRef.current.position.z = SCENE.MOUTH_BEACON_POSITION[2] + (Math.random() - 0.5) * shake
-    // Rotate icosahedron
-    if (icoRef.current) {
-      icoRef.current.rotation.x += 0.008
-      icoRef.current.rotation.y += 0.012
-      icoRef.current.rotation.z += 0.005
-      // Volatile scale pulsing
-      const pulse = 1 + Math.sin(t * 4) * 0.08 + Math.sin(t * 7.3) * 0.04
-      icoRef.current.scale.setScalar(pulse)
+
+    // Ring rotation + pulse
+    if (ringRef.current) {
+      ringRef.current.rotation.z += 0.005
+      const pulse = 1 + Math.sin(t * 3) * 0.1 + Math.sin(t * 5.7) * 0.05
+      ringRef.current.scale.setScalar(pulse)
     }
 
-    // Arrow bob
-    if (arrowRef.current) {
-      arrowRef.current.position.x = -0.6 + Math.sin(t * 2) * 0.08
-    }
-
-    // Glow pulse
+    // Glow intensity pulse
     if (glowRef.current) {
-      glowRef.current.intensity = 0.6 + Math.sin(t * 3) * 0.3
+      glowRef.current.intensity = 1.2 + Math.sin(t * 2.5) * 0.5
     }
   })
 
@@ -48,61 +43,37 @@ function MouthBeacon({ portalState }: { portalState: string }) {
 
   return (
     <group ref={groupRef} position={SCENE.MOUTH_BEACON_POSITION as [number, number, number]}>
-      {/* Volatile icosahedron */}
-      <mesh ref={icoRef}>
-        <icosahedronGeometry args={[0.22, 0]} />
+      {/* Warm amber ring — focal point */}
+      <mesh ref={ringRef}>
+        <torusGeometry args={[0.2, 0.035, 16, 48]} />
         <meshStandardMaterial
-          color="#38BDF8"
-          emissive="#38BDF8"
-          emissiveIntensity={0.6}
+          color={[4.0, 2.5, 1.0]}
+          emissive={[4.0, 2.5, 1.0]}
+          emissiveIntensity={1.5}
           transparent
-          opacity={0.7}
-          wireframe
+          opacity={0.85}
+          toneMapped={false}
+          depthWrite={false}
         />
       </mesh>
 
-      {/* Glow */}
-      <pointLight ref={glowRef} color="#38BDF8" intensity={0.6} distance={3} />
+      {/* Inner glow disc */}
+      <mesh>
+        <circleGeometry args={[0.15, 32]} />
+        <meshStandardMaterial
+          color={[3.0, 2.0, 0.8]}
+          emissive={[3.0, 2.0, 0.8]}
+          emissiveIntensity={1.0}
+          transparent
+          opacity={0.3}
+          toneMapped={false}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
 
-      {/* Arrow pointing left toward mouth */}
-      <group ref={arrowRef} position={[-0.6, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
-        <mesh>
-          <coneGeometry args={[0.06, 0.18, 4]} />
-          <meshStandardMaterial
-            color="#38BDF8"
-            emissive="#38BDF8"
-            emissiveIntensity={0.8}
-            transparent
-            opacity={0.9}
-          />
-        </mesh>
-        {/* Arrow shaft */}
-        <mesh position={[0, 0.2, 0]}>
-          <cylinderGeometry args={[0.015, 0.015, 0.25, 8]} />
-          <meshStandardMaterial
-            color="#38BDF8"
-            emissive="#38BDF8"
-            emissiveIntensity={0.6}
-            transparent
-            opacity={0.8}
-          />
-        </mesh>
-      </group>
-
-      {/* Label pointing to mouth */}
-      <Billboard position={[0.5, 0.3, 0]} follow lockX={false} lockY={false} lockZ={false}>
-        <Text
-          fontSize={0.08}
-          color="#38BDF8"
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.003}
-          outlineColor="#0c2a3a"
-          font={undefined}
-        >
-          DROP FILE IN MOUTH
-        </Text>
-      </Billboard>
+      {/* Warm point light */}
+      <pointLight ref={glowRef} color="#FFD080" intensity={1.2} distance={4} decay={2} />
     </group>
   )
 }
@@ -348,7 +319,8 @@ export function LandingScene() {
     >
       <PortalCameraController portalState={portalState} setPortalState={setPortalState} />
       
-      <fog attach="fog" args={['#000000', 10, 45]} />
+      <color attach="background" args={['#030305']} />
+      <fog attach="fog" args={['#030305', 5, 25]} />
       <ambientLight intensity={0.15} />
       <pointLight position={[0, 5, 5]} intensity={0.8} color="#38BDF8" />
       <pointLight position={[-3, -2, 4]} intensity={0.4} color="#4488FF" />
@@ -358,8 +330,18 @@ export function LandingScene() {
       <Stars radius={100} depth={50} count={2000} factor={4} saturation={0} fade speed={1} />
 
       <FaceModel portalState={portalState} />
-      <MouthBeacon portalState={portalState} />
+      <MouthGlow portalState={portalState} />
+      <ConvergenceLines
+        visible={portalState !== 'entering' && portalState !== 'warping'}
+      />
+
+      {/* Landing-specific postprocessing */}
+      <EffectComposer enableNormalPass={false} multisampling={0}>
+        <Vignette offset={0.1} darkness={1.1} />
+        <Noise premultiply blendFunction={BlendFunction.OVERLAY} opacity={0.02} />
+      </EffectComposer>
 
     </Canvas>
+
   )
 }
