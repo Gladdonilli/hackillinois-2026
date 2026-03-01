@@ -5,6 +5,9 @@ node_modules/
 dist/
 .vite/
 .wrangler/
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
 
 # ── Environment ──
 *.local
