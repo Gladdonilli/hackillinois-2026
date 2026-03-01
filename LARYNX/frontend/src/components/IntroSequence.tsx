@@ -39,7 +39,7 @@ export function IntroSequence({ onComplete }: IntroSequenceProps) {
     };
   }, [onComplete]);
 
-  const text = "LARYNX.";
+  const text = "LARYNX";
   const subtitleTxt = "Deepfake Voice Detection via Articulatory Physics";
   const readoutLines = [
     "> ARTICULATORY PHYSICS ENGINE ... OK",

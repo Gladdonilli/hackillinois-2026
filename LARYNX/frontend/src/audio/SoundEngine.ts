@@ -125,6 +125,67 @@ const MIN_MASTER_GAIN = 0.0001
 const DEFAULT_TICK_BPM = 60
 const IEC_BASE_FREQ = 440  // A4 — IEC 60601-1-8 alarm base
 let tickJitterActive = false
+let tickJitterTimer: ReturnType<typeof setTimeout> | null = null
+let geigerClickIntervalMs = 400
+const pendingTimers = new Set<ReturnType<typeof setTimeout>>()
+let revealSequenceActive = false
+
+type SchedulableParam = {
+  cancelAndHoldAtTime?: (time: number) => void
+  setTargetAtTime: (value: number, startTime: number, timeConstant: number) => void
+}
+
+const scheduleTimer = (callback: () => void, delayMs: number): ReturnType<typeof setTimeout> => {
+  const id = setTimeout(() => {
+    pendingTimers.delete(id)
+    callback()
+  }, delayMs)
+  pendingTimers.add(id)
+  return id
+}
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+
+const clearAllTimers = (): void => {
+  for (const id of pendingTimers) {
+    clearTimeout(id)
+  }
+  pendingTimers.clear()
+  if (geigerInterval) {
+    clearTimeout(geigerInterval)
+    geigerInterval = null
+  }
+  if (tickJitterTimer) {
+    clearTimeout(tickJitterTimer)
+    tickJitterTimer = null
+  }
+}
+
+type StoppableSource = {
+  state: 'started' | 'stopped'
+  stop: (time?: number) => void
+}
+
+const stopIfStarted = (source: StoppableSource | null | undefined): void => {
+  if (!source) return
+  if (source.state === 'started') {
+    source.stop()
+  }
+}
+
+const holdAndSetTarget = (
+  param: SchedulableParam | null | undefined,
+  value: number,
+  now: number,
+  timeConstant: number
+): void => {
+  if (!param) return
+  param.cancelAndHoldAtTime?.(now)
+  param.setTargetAtTime(value, now, timeConstant)
+}
 
 const contextIsRunning = (): boolean => Tone.getContext().state === 'running'
 
@@ -428,16 +489,18 @@ const ensureInitializedGraph = (): void => {
 
 export const SoundEngine = {
   init: async (): Promise<void> => {
-    ensureInitializedGraph()
     if (!contextIsRunning()) {
       await Tone.start()
     }
+    ensureInitializedGraph()
   },
 
   /** Expose master compressor node for uiEarcons routing */
   masterCompressorNode: (): Tone.Compressor | null => masterCompressor,
 
   dispose: (): void => {
+    clearAllTimers()
+    revealSequenceActive = false
     processingTickLoop?.stop(0)
     processingTickLoop?.dispose()
     processingTickLoop = null
@@ -484,7 +547,7 @@ export const SoundEngine = {
     iecAlarmSynth = null; iecAlarmGain = null
     iecAlarmLoop?.stop(0); iecAlarmLoop?.dispose(); iecAlarmLoop = null
     geigerSynth = null; geigerFilter = null; geigerGain = null
-    if (geigerInterval) { clearTimeout(geigerInterval); geigerInterval = null }
+    geigerInterval = null
     oximeterOsc = null; oximeterGain = null
     tensionPad = null; tensionFilter = null; tensionGain = null
     portalMembrane = null; portalSub = null; portalSubGain = null; portalFilter = null
@@ -495,6 +558,30 @@ export const SoundEngine = {
     masterHighpass = null; masterLimiter = null; masterBus = null
 
     initialized = false
+  },
+
+  cancelAllTransitions: (): void => {
+    clearAllTimers()
+    revealSequenceActive = false
+    tickJitterActive = false
+    geigerActive = false
+    const now = Tone.now()
+    holdAndSetTarget(ambientGain?.gain, 0.05, now, 0.05)
+    holdAndSetTarget(bgLayerGain?.gain, 0.05, now, 0.05)
+    holdAndSetTarget(tensionGain?.gain, 0.05, now, 0.05)
+    holdAndSetTarget(soundtrackGain?.gain, 0.05, now, 0.05)
+    holdAndSetTarget(iecAlarmGain?.gain, 0.0001, now, 0.03)
+    holdAndSetTarget(geigerGain?.gain, 0.0001, now, 0.03)
+    holdAndSetTarget(oximeterGain?.gain, 0.0001, now, 0.03)
+    holdAndSetTarget(portalSubGain?.gain, 0.0001, now, 0.03)
+    holdAndSetTarget(verdictSubGain?.gain, 0.0001, now, 0.03)
+    holdAndSetTarget(riserVolume?.volume, -100, now, 0.03)
+    scheduleTimer(() => {
+      processingTickLoop?.stop(0)
+      iecAlarmLoop?.stop(0)
+      soundtrackLoop?.stop(0)
+      stopIfStarted(riserNoise)
+    }, 90)
   },
 
   setMasterVolume: (vol: number): void => {
@@ -641,20 +728,30 @@ export const SoundEngine = {
 
   stopTicking: (): void => {
     if (!initialized || !processingTickLoop) return
-    processingTickLoop.stop(0)
+    const now = Tone.now()
+    if (processingTickSynth) {
+      processingTickSynth.volume.cancelAndHoldAtTime?.(now)
+      processingTickSynth.volume.linearRampToValueAtTime(-60, now + 0.08)
+      scheduleTimer(() => {
+        processingTickLoop?.stop(0)
+      }, 100)
+    } else {
+      processingTickLoop.stop(0)
+    }
     tickingActive = false
     tickJitterActive = false
-    // Fade out tension pad
+    if (tickJitterTimer) {
+      clearTimeout(tickJitterTimer)
+      tickJitterTimer = null
+    }
     if (tensionGain) {
-      const now = Tone.now()
+      holdAndSetTarget(tensionGain.gain, 0.0001, now, 0.08)
       tensionGain.gain.setTargetAtTime(0, now, 0.3)
     }
-    // Stop Geiger clicks
     geigerActive = false
     if (geigerInterval) { clearTimeout(geigerInterval); geigerInterval = null }
-    if (geigerGain) geigerGain.gain.setTargetAtTime(0, Tone.now(), 0.2)
-    // Stop oximeter
-    if (oximeterGain) oximeterGain.gain.setTargetAtTime(0, Tone.now(), 0.2)
+    if (geigerGain) holdAndSetTarget(geigerGain.gain, 0.0001, now, 0.08)
+    if (oximeterGain) holdAndSetTarget(oximeterGain.gain, 0.0001, now, 0.08)
   },
 
   setTickBPM: (bpm: number): void => {
@@ -695,7 +792,13 @@ export const SoundEngine = {
 
   stopRiser: (): void => {
     if (!initialized) return
-    riserNoise?.stop()
+    const now = Tone.now()
+    if (riserVolume) {
+      holdAndSetTarget(riserVolume.volume, -100, now, 0.03)
+    }
+    scheduleTimer(() => {
+      stopIfStarted(riserNoise)
+    }, 90)
   },
 
   triggerSilence: (): void => {
@@ -717,7 +820,7 @@ export const SoundEngine = {
         ambientOsc2?.start()
         ambientOscsStarted = true
       }
-      ambientGain.gain.setTargetAtTime(0.02, now, 0.01)
+      holdAndSetTarget(ambientGain.gain, 0.04, now, 0.08)
       ambientGain.gain.setTargetAtTime(0.15, now + 4, 1)
     }
   },
@@ -734,7 +837,7 @@ export const SoundEngine = {
         ambientOsc2?.start()
         ambientOscsStarted = true
       }
-      ambientGain.gain.setTargetAtTime(0.02, now, 0.01)
+      holdAndSetTarget(ambientGain.gain, 0.04, now, 0.08)
       ambientGain.gain.setTargetAtTime(0.15, now + 4, 1)
     }
   },
@@ -754,12 +857,13 @@ export const SoundEngine = {
   stopIECAlarm: (): void => {
     if (!iecAlarmActive) return
     iecAlarmActive = false
+    const now = Tone.now()
     if (iecAlarmGain) {
-      iecAlarmGain.gain.setTargetAtTime(0, Tone.now(), 0.1)
+      holdAndSetTarget(iecAlarmGain.gain, 0.0001, now, 0.04)
     }
-    setTimeout(() => {
+    scheduleTimer(() => {
       iecAlarmLoop?.stop(0)
-    }, 500)
+    }, 120)
   },
 
   // ==================== VERDICT ====================
@@ -771,25 +875,25 @@ export const SoundEngine = {
       return
     }
     const now = Tone.now()
+    clearAllTimers()
     if (!verdictSubStarted) {
       verdictSub?.start()
       verdictSubStarted = true
     }
-    // Fade everything to silence over 0.5s
-    masterBus.volume.setValueAtTime(0, now)
-    masterBus.volume.linearRampToValueAtTime(-60, now + 0.5)
-    // Start barely audible sub rumble
+    masterBus.volume.cancelAndHoldAtTime?.(now)
+    masterBus.volume.setTargetAtTime(-60, now, 0.08)
     if (verdictSubGain) {
-      verdictSubGain.gain.setTargetAtTime(0.3, now + 0.3, 0.1)
+      verdictSubGain.gain.cancelAndHoldAtTime?.(now)
+      verdictSubGain.gain.setTargetAtTime(0.3, now + 0.3, 0.08)
     }
-    // After 1.5s total silence, slam back
-    setTimeout(() => {
+    scheduleTimer(() => {
       if (verdictSubGain) {
-        verdictSubGain.gain.setTargetAtTime(0, Tone.now(), 0.05)
+        holdAndSetTarget(verdictSubGain.gain, 0.0001, Tone.now(), 0.04)
       }
       if (masterBus) {
-        masterBus.volume.setValueAtTime(-60, Tone.now())
-        masterBus.volume.linearRampToValueAtTime(0, Tone.now() + 0.05)
+        const backNow = Tone.now()
+        masterBus.volume.cancelAndHoldAtTime?.(backNow)
+        masterBus.volume.linearRampToValueAtTime(0, backNow + 0.07)
       }
       onReady()
     }, 1500)
@@ -812,11 +916,10 @@ export const SoundEngine = {
         genuinePadFilter.frequency.linearRampToValueAtTime(2000, now + 3)
       }
       genuinePad?.triggerAttack(['C3', 'E3', 'G3', 'B3'], now)
-      // Release after 6s
-      setTimeout(() => {
+      scheduleTimer(() => {
         genuinePad?.triggerRelease(['C3', 'E3', 'G3', 'B3'])
         if (genuinePadGain) {
-          genuinePadGain.gain.setTargetAtTime(0, Tone.now(), 1)
+          holdAndSetTarget(genuinePadGain.gain, 0.0001, Tone.now(), 0.4)
         }
       }, 6000)
     } else {
@@ -827,16 +930,20 @@ export const SoundEngine = {
   },
 
   triggerDeepfakeReveal: (): void => {
+    clearAllTimers()
+    revealSequenceActive = true
     SoundEngine.stopTicking()
-    // Acoustic vacuum: fade everything to near-silence for horror lean-in
     SoundEngine.triggerAcousticVacuum()
-    setTimeout(() => {
+    scheduleTimer(() => {
+      if (!revealSequenceActive) return
       SoundEngine.startRiser()
     }, 1500)
-    setTimeout(() => {
+    scheduleTimer(() => {
+      if (!revealSequenceActive) return
       SoundEngine.restoreFromVacuum()
       SoundEngine.triggerSilence()
-      setTimeout(() => {
+      scheduleTimer(() => {
+        if (!revealSequenceActive) return
         SoundEngine.playSubImpact()
         SoundEngine.playNoiseBurst()
         SoundEngine.playVerdict('deepfake')
@@ -875,22 +982,28 @@ export const SoundEngine = {
     const clickRate = clamp(safeVelocity * 0.3, 0.5, 25)
     const clickIntervalMs = 1000 / clickRate
 
-    // Clear previous interval and set new one
-    if (geigerInterval) clearTimeout(geigerInterval)
+    geigerClickIntervalMs = clickIntervalMs
     if (geigerGain && safeVelocity > 0.1) {
-      geigerGain.gain.setTargetAtTime(1, Tone.now(), 0.05)
-      const scheduleClick = () => {
-        if (!geigerActive || !geigerSynth) return
-        geigerSynth.triggerAttackRelease('32n')
-        // Add ±20% jitter to prevent regularity
-        const jitter = clickIntervalMs * (0.8 + Math.random() * 0.4)
-        geigerInterval = setTimeout(scheduleClick, jitter)
+      holdAndSetTarget(geigerGain.gain, 1, Tone.now(), 0.05)
+      if (!geigerActive) {
+        const scheduleClick = () => {
+          if (!geigerActive || !geigerSynth) return
+          geigerSynth.triggerAttackRelease('32n')
+          const jitter = geigerClickIntervalMs * (0.8 + Math.random() * 0.4)
+          geigerInterval = scheduleTimer(scheduleClick, jitter)
+        }
+        geigerActive = true
+        scheduleClick()
       }
-      geigerActive = true
-      scheduleClick()
     } else {
       geigerActive = false
-      if (geigerGain) geigerGain.gain.setTargetAtTime(0, Tone.now(), 0.1)
+      if (geigerInterval) {
+        clearTimeout(geigerInterval)
+        geigerInterval = null
+      }
+      if (geigerGain) {
+        holdAndSetTarget(geigerGain.gain, 0.0001, Tone.now(), 0.08)
+      }
     }
 
     // --- Oximeter pitch: deviation maps to semitone drops ---
@@ -924,7 +1037,7 @@ export const SoundEngine = {
     if (soundtrackGain) {
       soundtrackGain.gain.setTargetAtTime(0, Tone.now(), 0.5)
     }
-    setTimeout(() => {
+    scheduleTimer(() => {
       soundtrackLoop?.stop(0)
     }, 2000)
   },
@@ -973,13 +1086,17 @@ export const SoundEngine = {
       // IEC spec: interval jitter >50ms = sympathetic nervous system response
       const baseInterval = (60 / (Tone.Transport.bpm.value || 120)) * 1000
       const jitter = baseInterval * (0.7 + Math.random() * 0.6)  // ±30% variation
-      setTimeout(jitterTick, jitter)
+      tickJitterTimer = scheduleTimer(jitterTick, jitter)
     }
     jitterTick()
   },
 
   disableTickJitter: (): void => {
     tickJitterActive = false
+    if (tickJitterTimer) {
+      clearTimeout(tickJitterTimer)
+      tickJitterTimer = null
+    }
     // Resume steady loop if still ticking
     if (tickingActive && processingTickLoop) {
       processingTickLoop.start(0)
@@ -1009,6 +1126,63 @@ export const SoundEngine = {
 
   stopOximeter: (): void => {
     if (oximeterGain) oximeterGain.gain.setTargetAtTime(0, Tone.now(), 0.2)
+  },
+
+  getDebugState: () => ({
+    initialized,
+    contextState: Tone.getContext().state,
+    tickingActive,
+    geigerActive,
+    iecAlarmActive,
+    soundtrackActive,
+    revealSequenceActive,
+    pendingTimers: pendingTimers.size,
+    hasGeigerTimer: geigerInterval !== null,
+    hasTickJitterTimer: tickJitterTimer !== null,
+  }),
+
+  runDiagnostics: async (): Promise<{ ok: boolean; checks: Record<string, boolean>; details: string[] }> => {
+    const checks: Record<string, boolean> = {}
+    const details: string[] = []
+
+    try {
+      await SoundEngine.init()
+      checks.initOk = true
+    } catch (error) {
+      checks.initOk = false
+      details.push(`init failed: ${error instanceof Error ? error.message : String(error)}`)
+      return { ok: false, checks, details }
+    }
+
+    SoundEngine.cancelAllTransitions()
+    await sleep(120)
+
+    SoundEngine.startTicking()
+    SoundEngine.updateVelocity(90)
+    await sleep(160)
+    checks.geigerTimerStarted = geigerInterval !== null
+    checks.tickingStarted = tickingActive
+
+    SoundEngine.triggerDeepfakeReveal()
+    await sleep(250)
+    checks.revealScheduled = revealSequenceActive
+    checks.pendingTimersScheduled = pendingTimers.size > 0
+
+    SoundEngine.cancelAllTransitions()
+    await sleep(180)
+
+    checks.pendingTimersCleared = pendingTimers.size === 0
+    checks.geigerTimerCleared = geigerInterval === null
+    checks.tickJitterTimerCleared = tickJitterTimer === null
+    checks.revealCancelled = !revealSequenceActive
+    checks.geigerInactive = !geigerActive
+    checks.tickJitterInactive = !tickJitterActive
+
+    const ok = Object.values(checks).every(Boolean)
+    if (!ok) {
+      details.push(`failed checks: ${Object.entries(checks).filter(([, pass]) => !pass).map(([name]) => name).join(', ')}`)
+    }
+    return { ok, checks, details }
   },
 
   isInitialized: (): boolean => initialized,

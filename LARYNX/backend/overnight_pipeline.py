@@ -8,7 +8,7 @@ Usage:
   source ~/modal-env/bin/activate
   modal run LARYNX/backend/overnight_pipeline.py
 
-Estimated: ~1-2 hours on Modal B200 (30 passes × 10000 samples, volume-cached)
+Estimated: ~30 min on Modal B200 (5 passes × 10000 samples, volume-cached)
 """
 
 import modal
@@ -82,15 +82,16 @@ image = (
         "pyyaml",
         "scipy==1.11.4",
         "numpy<2",
+        "articulatory @ git+https://github.com/articulatory/articulatory.git@a50eafd4fb8235643f1523bbbf9ac1d50bbf271b",
         extra_index_url="https://download.pytorch.org/whl/cu128",
     )
     .run_commands(
-        "pip install git+https://github.com/articulatory/articulatory.git",
-        # Articulatory currently imports kaiser from scipy.signal directly.
-        # Keep scipy <1.12 to preserve that API surface.
-        "pip install --no-cache-dir scipy==1.11.4",
-        "python3 -c \"from scipy.signal import kaiser; print('scipy.signal.kaiser import OK')\"",
+        # Articulatory pulls scipy>=1.12 which breaks its own kaiser import.
+        # Force downgrade AFTER articulatory is installed.
+        "pip install --no-cache-dir --no-deps scipy==1.11.4",
+        "python3 -c \"from scipy.signal import kaiser; print('scipy OK')\"",
     )
+    .env({"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"})
 )
 
 # ---------------------------------------------------------------------------
@@ -100,7 +101,7 @@ MERGED_REAL_DIR = Path("/home/li859/datasets/larynx-5k/real")
 MERGED_FAKE_DIR = Path("/home/li859/datasets/larynx-5k/fake")
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
-INFERENCE_PASSES = 30
+INFERENCE_PASSES = 5
 
 # Phonetically diverse sentences for TTS generation
 SENTENCES = [
@@ -192,16 +193,15 @@ ELEVENLABS_VOICES = [
     timeout=600,
     startup_timeout=1200,
     retries=3,
-    max_containers=1,
+    max_containers=10,
     min_containers=0,
 )
-@modal.concurrent(max_inputs=1)
+@modal.concurrent(max_inputs=3)
 class LarynxInference:
     @modal.enter()
     def setup(self):
-        """One-time: copy dataset + models from FUSE volume to local NVMe, load to GPU."""
+        """One-time: copy dataset to local NVMe, load models to GPU."""
         import torch
-        import subprocess
         import yaml
         import gdown
         from pathlib import Path
@@ -209,26 +209,30 @@ class LarynxInference:
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         t0 = _time.monotonic()
+        print(f"[ENTER] Container starting on {self.device}...")
 
-        # --- Copy dataset from FUSE volume → local NVMe (one-time, ~2.8GB) ---
-        local_dataset = Path("/tmp/dataset")
+        # --- Copy dataset + AAI checkpoint from FUSE volume to local NVMe ---
+        # Required for multi-container: FUSE can't handle 8 containers × 16 concurrent reads
+        import subprocess, shutil
+        local_dataset = Path('/tmp/dataset')
+        local_aai = Path('/tmp/aai')
         if not local_dataset.exists():
-            print("Copying dataset from volume to local NVMe...")
-            local_dataset.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["cp", "-a", "/model-cache/dataset/real", str(local_dataset / "real")], check=True)
-            subprocess.run(["cp", "-a", "/model-cache/dataset/fake", str(local_dataset / "fake")], check=True)
-            n_real = len(list((local_dataset / "real").iterdir()))
-            n_fake = len(list((local_dataset / "fake").iterdir()))
-            print(f"  Copied {n_real} real + {n_fake} fake to local NVMe ({_time.monotonic() - t0:.1f}s)")
+            print('[ENTER] Copying dataset from FUSE volume to local NVMe...')
+            t_copy = _time.monotonic()
+            subprocess.run(['cp', '-a', '/model-cache/dataset', '/tmp/dataset'], check=True)
+            print(f'[ENTER] Dataset copied ({_time.monotonic() - t_copy:.1f}s)')
+        if not local_aai.exists():
+            print('[ENTER] Copying AAI checkpoint to local NVMe...')
+            subprocess.run(['cp', '-a', '/model-cache/aai', '/tmp/aai'], check=True)
+            print('[ENTER] AAI checkpoint copied')
 
-        # --- Copy AAI checkpoint to local NVMe too ---
-        vol_ckpt_dir = Path("/model-cache/aai/hprc_h2")
-        vol_ckpt = vol_ckpt_dir / "best_mel_ckpt.pkl"
-        local_aai = Path("/tmp/aai/hprc_h2")
-        local_ckpt = local_aai / "best_mel_ckpt.pkl"
-        local_config = local_aai / "config.yml"
+        # --- Ensure AAI checkpoint exists on volume ---
+        vol_ckpt_dir = Path('/tmp/aai/hprc_h2')
+        vol_ckpt = vol_ckpt_dir / 'best_mel_ckpt.pkl'
+        vol_config = vol_ckpt_dir / 'config.yml'
 
         if not vol_ckpt.exists():
+            print("[ENTER] Downloading AAI checkpoint from GDrive...")
             vol_ckpt_dir.mkdir(parents=True, exist_ok=True)
             gdown.download_folder(
                 id="1O-1kX_ngHf1T8EN7HXWABCaEIJLNqxUI",
@@ -236,50 +240,43 @@ class LarynxInference:
                 quiet=False,
             )
             model_cache.commit()
-            print(f"Checkpoint downloaded to {vol_ckpt_dir}")
-
-        if not local_aai.exists():
-            local_aai.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["cp", "-a", str(vol_ckpt_dir) + "/.", str(local_aai)], check=True)
-            print(f"  AAI checkpoint copied to local NVMe")
+            print(f"[ENTER] Checkpoint downloaded to {vol_ckpt_dir}")
 
         # --- Load HuBERT to GPU ---
-        print("Loading HuBERT large...")
+        print("[ENTER] Loading HuBERT large...")
         import s3prl.hub as hub
         self.hubert_model = hub.hubert_large_ll60k().to(self.device)
         self.hubert_model.eval()
 
         # --- Load AAI inversion model to GPU ---
-        print("Loading AAI inversion model...")
-        with open(local_config) as f:
+        print("[ENTER] Loading AAI inversion model...")
+        with open(vol_config) as f:
             inversion_config = yaml.safe_load(f)
 
         from articulatory.utils import load_model
-        self.aai_model = load_model(str(local_ckpt), inversion_config)
+        self.aai_model = load_model(str(vol_ckpt), inversion_config)
         self.aai_model.remove_weight_norm()
         self.aai_model.to(self.device).eval()
-        print(f"Container ready: models on GPU, dataset on NVMe ({_time.monotonic() - t0:.1f}s total)")
-
+        print(f"[ENTER] Container ready ({_time.monotonic() - t0:.1f}s total)")
     @modal.method()
     def analyze(self, wav_paths: list[str]) -> list[dict]:
         """Process a batch of WAV files through batched HuBERT + per-sample AAI.
-        Reads from local NVMe only — zero FUSE volume access during inference."""
+        Remaps /model-cache/ paths to local /tmp/ NVMe — zero FUSE during inference."""
         import torch
         import numpy as np
         import soundfile as sf
         from pathlib import Path
 
-        # --- Remap volume paths → local NVMe paths ---
-        local_paths = [p.replace("/model-cache/dataset", "/tmp/dataset") for p in wav_paths]
-
+        # Remap FUSE volume paths to local NVMe copy
         # --- Preload all WAVs from local NVMe (microseconds per file) ---
         results = []
         loaded_wavs = []
 
-        for local_path in local_paths:
+        for local_path in wav_paths:
             filename = Path(local_path).name
             try:
-                audio, sr = sf.read(local_path)
+                local_path_nvme = local_path.replace('/model-cache/dataset', '/tmp/dataset')
+                audio, sr = sf.read(local_path_nvme)
                 if len(audio.shape) > 1:
                     audio = audio[:, 0]
                 if sr != 16000:
@@ -290,13 +287,14 @@ class LarynxInference:
                     audio = audio / np.max(np.abs(audio))
                 loaded_wavs.append((filename, audio))
             except Exception as e:
+                print(f"    ⚠ Load error {filename}: {e}")
                 results.append({"filename": filename, "error": str(e)})
 
         if not loaded_wavs:
             return results
 
         # --- Batched HuBERT inference (B=64 per chunk, ~8GB VRAM per chunk) ---
-        HUBERT_BATCH = 64
+        HUBERT_BATCH = 128
         all_hidden = []
         all_filenames = []
 
@@ -334,8 +332,8 @@ class LarynxInference:
 
         for idx, (hidden_single, filename) in enumerate(zip(all_hidden, all_filenames)):
             try:
-                with torch.inference_mode(), torch.autocast('cuda', dtype=torch.bfloat16):
-                    feat = hidden_single.unsqueeze(0).transpose(1, 2)
+                with torch.inference_mode():
+                    feat = hidden_single.float().unsqueeze(0).transpose(1, 2)
                     feat = torch.nn.functional.interpolate(feat, scale_factor=2, mode="linear", align_corners=False)
                     feat = feat.transpose(1, 2).squeeze(0)  # (T*2, 1024)
                     ema_pred = self.aai_model.inference(feat, normalize_before=False)
@@ -368,6 +366,7 @@ class LarynxInference:
                     print(f"    AAI progress: {idx + 1}/{len(all_hidden)} samples")
 
             except Exception as e:
+                print(f"    ⚠ AAI error {filename}: {e}")
                 results.append({"filename": filename, "error": str(e)})
 
         ok = sum(1 for r in results if "error" not in r)
@@ -599,7 +598,7 @@ def main():
     )
 
     # Batch into groups of 20 for fewer scheduling round trips
-    BATCH_SIZE = 100  # Larger batches = fewer scheduling round trips, containers stay saturated
+    BATCH_SIZE = 200  # Larger batches = fewer scheduling round trips
     all_items_labeled = [(p, "real") for p in real_paths] + [(p, "deepfake") for p in fake_paths]
     labels = {Path(p).name: l for p, l in all_items_labeled}
 
@@ -615,7 +614,7 @@ def main():
             batch = [p for p, _ in batch_items]
             batches.append(batch)
 
-        print(f"  \U0001f501 Pass {pass_idx + 1}/{INFERENCE_PASSES}: dispatching {len(batches)} batches across 10 GPUs")
+        print(f"  \U0001f501 Pass {pass_idx + 1}/{INFERENCE_PASSES}: dispatching {len(batches)} batches (max_inputs=3)")
 
         pass_results = []
         for batch_idx, batch_result in enumerate(

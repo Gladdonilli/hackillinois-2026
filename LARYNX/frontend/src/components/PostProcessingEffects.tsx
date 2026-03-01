@@ -39,19 +39,21 @@ export function PostProcessingEffects() {
     else if (velocity > VELOCITY_THRESHOLDS.GLITCH) targetIntensity = 2.0
     else if (velocity > VELOCITY_THRESHOLDS.HUMAN_MAX) targetIntensity = 1.0
 
-    bloomIntensityRef.current += (targetIntensity - bloomIntensityRef.current) * 10 * delta
+    // Clamp delta to prevent NaN/Infinity during tab throttling (delta > 0.1)
+    const safeDelta = Math.min(delta, 0.1)
+    bloomIntensityRef.current += (targetIntensity - bloomIntensityRef.current) * 10 * safeDelta
 
     let targetOffset: number = POST_PROCESSING.CA_BASELINE
     if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP) targetOffset = POST_PROCESSING.CA_TIER_3
     else if (velocity > VELOCITY_THRESHOLDS.GLITCH) targetOffset = POST_PROCESSING.CA_TIER_2
     else if (velocity > VELOCITY_THRESHOLDS.HUMAN_MAX) targetOffset = POST_PROCESSING.CA_TIER_1
 
-    offsetRef.current.x += (targetOffset - offsetRef.current.x) * 10 * delta
-    offsetRef.current.y += (targetOffset - offsetRef.current.y) * 10 * delta
+    offsetRef.current.x += (targetOffset - offsetRef.current.x) * 10 * safeDelta
+    offsetRef.current.y += (targetOffset - offsetRef.current.y) * 10 * safeDelta
 
     let targetScanline = 1.5
     if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP) targetScanline = 3.0
-    scanlineDensityRef.current += (targetScanline - scanlineDensityRef.current) * 10 * delta
+    scanlineDensityRef.current += (targetScanline - scanlineDensityRef.current) * 10 * safeDelta
 
     let currentGlitchMode = GlitchMode.DISABLED
     let currentDelay: [number, number] = [0.5, 1]

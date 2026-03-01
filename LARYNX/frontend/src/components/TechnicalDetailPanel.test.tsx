@@ -1,7 +1,9 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TechnicalDetailPanel } from './TechnicalDetailPanel';
-import React from 'react';
 
 vi.mock('gsap', () => {
   const timeline = () => ({ to: vi.fn().mockReturnThis(), from: vi.fn().mockReturnThis(), fromTo: vi.fn().mockReturnThis(), set: vi.fn().mockReturnThis(), play: vi.fn(), kill: vi.fn(), clear: vi.fn(), pause: vi.fn(), add: vi.fn().mockReturnThis(), addLabel: vi.fn().mockReturnThis() })

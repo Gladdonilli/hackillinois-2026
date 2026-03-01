@@ -21,7 +21,7 @@ function MouthGlow({ portalState }: { portalState: string }) {
     if (!groupRef.current) return
 
     // Gentle volatile positioning
-    const shake = 0.01
+    const shake = 0.015
     groupRef.current.position.x = SCENE.MOUTH_BEACON_POSITION[0] + (Math.random() - 0.5) * shake + Math.sin(t * 1.3) * 0.02
     groupRef.current.position.y = SCENE.MOUTH_BEACON_POSITION[1] + Math.sin(t * 0.8) * 0.03 + (Math.random() - 0.5) * shake
     groupRef.current.position.z = SCENE.MOUTH_BEACON_POSITION[2] + (Math.random() - 0.5) * shake
@@ -29,51 +29,70 @@ function MouthGlow({ portalState }: { portalState: string }) {
     // Ring rotation + pulse
     if (ringRef.current) {
       ringRef.current.rotation.z += 0.005
-      const pulse = 1 + Math.sin(t * 3) * 0.1 + Math.sin(t * 5.7) * 0.05
+      const pulse = 1 + Math.sin(t * 3) * 0.12 + Math.sin(t * 5.7) * 0.08
       ringRef.current.scale.setScalar(pulse)
     }
 
     // Glow intensity pulse
     if (glowRef.current) {
-      glowRef.current.intensity = 1.2 + Math.sin(t * 2.5) * 0.5
+      glowRef.current.intensity = 2.5 + Math.sin(t * 2.5) * 0.8
     }
   })
 
   if (portalState === 'entering' || portalState === 'warping') return null
 
   return (
-    <group ref={groupRef} position={SCENE.MOUTH_BEACON_POSITION as [number, number, number]}>
-      {/* Warm amber ring — focal point */}
-      <mesh ref={ringRef}>
-        <torusGeometry args={[0.2, 0.035, 16, 48]} />
+    <group ref={groupRef} position={SCENE.MOUTH_BEACON_POSITION as [number, number, number]} renderOrder={10}>
+      {/* Bright inner ring */}
+      <mesh ref={ringRef} renderOrder={10}>
+        <torusGeometry args={[0.35, 0.04, 16, 64]} />
         <meshStandardMaterial
-          color={[4.0, 2.5, 1.0]}
-          emissive={[4.0, 2.5, 1.0]}
-          emissiveIntensity={1.5}
+          color={[3.0, 2.5, 2.0]} // Clean warm white
+          emissive={[3.0, 2.5, 2.0]}
+          emissiveIntensity={1.8}
           transparent
-          opacity={0.85}
+          opacity={0.9}
           toneMapped={false}
           depthWrite={false}
+          depthTest={false}
         />
       </mesh>
 
-      {/* Inner glow disc */}
-      <mesh>
-        <circleGeometry args={[0.15, 32]} />
+      {/* Outer soft halo ring */}
+      <mesh renderOrder={10}>
+        <torusGeometry args={[0.38, 0.12, 16, 64]} />
         <meshStandardMaterial
-          color={[3.0, 2.0, 0.8]}
-          emissive={[3.0, 2.0, 0.8]}
+          color={[2.5, 2.0, 1.5]} // Much more subtle halo
+          emissive={[2.5, 2.0, 1.5]}
           emissiveIntensity={1.0}
           transparent
-          opacity={0.3}
+          opacity={0.1}
           toneMapped={false}
           depthWrite={false}
+          depthTest={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Inner glow disc - hollowed out effect */}
+      <mesh renderOrder={10}>
+        <circleGeometry args={[0.3, 32]} />
+        <meshStandardMaterial
+          color={[3.0, 2.5, 2.0]}
+          emissive={[3.0, 2.5, 2.0]}
+          emissiveIntensity={0.8}
+          transparent
+          opacity={0.12} // Deeply subtle so ring dominates
+          toneMapped={false}
+          depthWrite={false}
+          depthTest={false}
           side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
         />
       </mesh>
 
       {/* Warm point light */}
-      <pointLight ref={glowRef} color="#FFD080" intensity={1.2} distance={4} decay={2} />
+      <pointLight ref={glowRef} color="#FFF0D0" intensity={1.2} distance={5} decay={1.5} />
     </group>
   )
 }
@@ -184,6 +203,22 @@ function FaceModel({ portalState }: { portalState: string }) {
 
   useEffect(() => {
     clonedSolidScene.traverse((child) => {
+      // Hide teeth mesh — check all known name variants + hide anything that isn't the main head
+      if (child.name === 'teeth' || child.name === 'mesh_3' || child.name === 'Wolf3D_Teeth' ||
+          (child.name && child.name.toLowerCase().includes('teeth'))) {
+        child.visible = false
+        return
+      }
+      // Also hide eye meshes (mesh_0, mesh_1) — only keep head (mesh_2)
+      if ((child as THREE.Mesh).isMesh && child.name !== 'mesh_2' && child.name !== 'head' &&
+          !child.name.includes('grp') && child.name !== '') {
+        // Check if this is an unwanted sub-mesh (eyes, teeth)
+        const meshIdx = child.name.match(/mesh_(\d+)/)
+        if (meshIdx && parseInt(meshIdx[1]) !== 2) {
+          child.visible = false
+          return
+        }
+      }
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
         const mat = new THREE.MeshStandardMaterial({
@@ -201,6 +236,11 @@ function FaceModel({ portalState }: { portalState: string }) {
     })
 
     clonedWireScene.traverse((child) => {
+      // Hide teeth mesh entirely
+      if (child.name === 'teeth' || child.name === 'mesh_3' || child.name === 'Wolf3D_Teeth') {
+        child.visible = false
+        return
+      }
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh
         mesh.material = new THREE.MeshStandardMaterial({

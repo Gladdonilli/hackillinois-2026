@@ -10,6 +10,7 @@ export function TongueModel() {
   const colorObj = useRef(new THREE.Color('#38BDF8'));
   const scalePulseRef = useRef(1.0);
   const wasAbove80Ref = useRef(false);
+  const targetColor = useRef(new THREE.Color('#38BDF8'));
 
   useFrame((_, delta) => {
     const { frames, currentFrame, tongueVelocity } = useLarynxStore.getState();
@@ -46,7 +47,7 @@ export function TongueModel() {
         targetHex = '#FDE047'; // yellow-300
     }
 
-    const targetColor = useRef(new THREE.Color('#38BDF8'))
+    // targetColor ref is declared at component top level (line 13)
     matRef.current.distort += (targetDistort - matRef.current.distort) * 10 * delta;
     matRef.current.speed += (targetSpeed - matRef.current.speed) * 10 * delta;
     matRef.current.emissiveIntensity += (targetEmissive - matRef.current.emissiveIntensity) * 10 * delta;
