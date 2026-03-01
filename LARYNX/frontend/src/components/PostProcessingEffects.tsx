@@ -1,4 +1,4 @@
-import { EffectComposer, Bloom, ChromaticAberration, Scanline, Glitch, BrightnessContrast } from '@react-three/postprocessing'
+import { EffectComposer, Bloom, Scanline, Glitch, BrightnessContrast } from '@react-three/postprocessing'
 import { GlitchMode, BlendFunction } from 'postprocessing'
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
@@ -8,7 +8,6 @@ import { VELOCITY_THRESHOLDS, POST_PROCESSING } from '@/constants'
 export function PostProcessingEffects() {
   const enabled = useLarynxStore((s) => s.postProcessingEnabled)
   const bloomIntensityRef = useRef(POST_PROCESSING.BLOOM_BASELINE)
-  const offsetRef = useRef(new THREE.Vector2(POST_PROCESSING.CA_BASELINE, POST_PROCESSING.CA_BASELINE))
   const scanlineDensityRef = useRef(1.5)
   
   const frameCount = useRef(0)
@@ -17,7 +16,6 @@ export function PostProcessingEffects() {
   const flashOpacityRef = useRef(0)
 
   const bloomRef = useRef<any>(null)
-  const caRef = useRef<any>(null)
   const scanlineRef = useRef<any>(null)
   const glitchRef = useRef<any>(null)
   const bcRef = useRef<any>(null)
@@ -43,26 +41,25 @@ export function PostProcessingEffects() {
     const safeDelta = Math.min(delta, 0.1)
     bloomIntensityRef.current += (targetIntensity - bloomIntensityRef.current) * 10 * safeDelta
 
-    let targetOffset: number = POST_PROCESSING.CA_BASELINE
-    if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP) targetOffset = POST_PROCESSING.CA_TIER_3
-    else if (velocity > VELOCITY_THRESHOLDS.GLITCH) targetOffset = POST_PROCESSING.CA_TIER_2
-    else if (velocity > VELOCITY_THRESHOLDS.HUMAN_MAX) targetOffset = POST_PROCESSING.CA_TIER_1
-
-    offsetRef.current.x += (targetOffset - offsetRef.current.x) * 10 * safeDelta
-    offsetRef.current.y += (targetOffset - offsetRef.current.y) * 10 * safeDelta
-
     let targetScanline = 1.5
     if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP) targetScanline = 3.0
     scanlineDensityRef.current += (targetScanline - scanlineDensityRef.current) * 10 * safeDelta
 
     let currentGlitchMode = GlitchMode.DISABLED
-    let currentDelay: [number, number] = [0.5, 1]
+    let currentDelay: [number, number] = [2.0, 3.5]
+    let currentStrength: [number, number] = [0.05, 0.1]
     if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP) {
-      currentGlitchMode = GlitchMode.CONSTANT_WILD
-      currentDelay = [0, 0]
+      currentGlitchMode = GlitchMode.SPORADIC
+      currentDelay = [0.8, 1.6]
+      currentStrength = [0.12, 0.2]
     } else if (velocity > VELOCITY_THRESHOLDS.GLITCH) {
       currentGlitchMode = GlitchMode.SPORADIC
-      currentDelay = [0.5, 1]
+      currentDelay = [1.0, 2.2]
+      currentStrength = [0.08, 0.14]
+    } else if (velocity > VELOCITY_THRESHOLDS.HUMAN_MAX) {
+      currentGlitchMode = GlitchMode.SPORADIC
+      currentDelay = [1.4, 2.8]
+      currentStrength = [0.05, 0.1]
     }
 
     if (velocity > VELOCITY_THRESHOLDS.SKULL_CLIP && !wasAbove80.current) {
@@ -75,14 +72,12 @@ export function PostProcessingEffects() {
     }
 
     if (bloomRef.current) bloomRef.current.intensity = bloomIntensityRef.current
-    if (caRef.current) {
-        caRef.current.offset.set(offsetRef.current.x, offsetRef.current.y)
-    }
     if (scanlineRef.current) scanlineRef.current.density = scanlineDensityRef.current
     
     if (glitchRef.current) {
         glitchRef.current.mode = currentGlitchMode
         glitchRef.current.delay = new THREE.Vector2(currentDelay[0], currentDelay[1])
+        glitchRef.current.strength = new THREE.Vector2(currentStrength[0], currentStrength[1])
     }
     
     if (bcRef.current) {
@@ -95,9 +90,8 @@ export function PostProcessingEffects() {
   return (
     <EffectComposer enableNormalPass={false} multisampling={4}>
       <Bloom ref={bloomRef} luminanceThreshold={1.0} intensity={bloomIntensityRef.current} mipmapBlur />
-      <ChromaticAberration ref={caRef} offset={offsetRef.current as any} blendFunction={BlendFunction.NORMAL} radialModulation={false} modulationOffset={0.0} />
       <Scanline ref={scanlineRef} density={scanlineDensityRef.current} opacity={0.12} blendFunction={BlendFunction.OVERLAY} />
-      <Glitch ref={glitchRef} delay={new THREE.Vector2(0.5, 1)} mode={GlitchMode.DISABLED} active={true} />
+      <Glitch ref={glitchRef} delay={new THREE.Vector2(2, 4)} duration={new THREE.Vector2(0.1, 0.3)} strength={new THREE.Vector2(0.02, 0.04)} mode={GlitchMode.DISABLED} active={true} ratio={0.85} />
       <BrightnessContrast ref={bcRef} brightness={0} contrast={0} />
     </EffectComposer>
   )

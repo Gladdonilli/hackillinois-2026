@@ -3,7 +3,7 @@ import useLarynxStore from '@/store/useLarynxStore';
 
 const BINS = [
   { label: 'SAFE', min: 0, max: 22, color: '#22c55e' },
-  { label: 'ELEV', min: 22, max: 50, color: '#EAB308' },
+  { label: 'ELEVATED', min: 22, max: 50, color: '#EAB308' },
   { label: 'HIGH', min: 50, max: 80, color: '#F97316' },
   { label: 'EXTR', min: 80, max: Infinity, color: '#EF4444' },
 ];

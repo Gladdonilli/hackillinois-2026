@@ -11,11 +11,14 @@ import time
 import uuid
 import asyncio
 import os
-from typing import AsyncGenerator
+import sys
+import importlib.util
+from pathlib import Path
+from typing import AsyncGenerator, Any, Mapping, cast
 
 import modal
 
-from gpu_inference import GpuInference, app, gpu_image  # noqa: F401 — app must be importable
+from .gpu_inference import GpuInference, app, gpu_image  # noqa: F401 — app must be importable
 
 # ---------------------------------------------------------------------------
 # CPU Image — health endpoint only
@@ -77,12 +80,38 @@ def _cors_from_request(request) -> dict[str, str]:
 # SSE helpers
 # ---------------------------------------------------------------------------
 
-def _sse_event(event_type: str, data: dict) -> str:
+def _sse_event(event_type: str, data: Mapping[str, Any]) -> str:
     """Format a single SSE event."""
     return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
 
-async def _stream_gpu_result(result: dict, start_time: float, channel: int | None = None, engine: str | None = None) -> AsyncGenerator[str, None]:
+def _resolve_tts_clients():
+    try:
+        from .tts_clients import generate_gemini_tts, generate_openai_tts  # type: ignore
+        return generate_gemini_tts, generate_openai_tts
+    except Exception:
+        pass
+
+    module_path = Path(__file__).with_name("tts_clients.py")
+    if not module_path.exists():
+        raise ModuleNotFoundError(f"tts_clients.py not found at {module_path}")
+
+    module_name = "larynx_tts_clients_dynamic"
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    if spec is None or spec.loader is None:
+        raise ModuleNotFoundError("Unable to load tts_clients module spec")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module.generate_gemini_tts, module.generate_openai_tts
+
+
+def _gpu_client() -> Any:
+    return cast(Any, GpuInference)()
+
+
+async def _stream_gpu_result(result: dict[str, Any], start_time: float, channel: int | None = None, engine: str | None = None) -> AsyncGenerator[str, None]:
     """Convert GPU inference result dict to SSE event stream.
 
     Handles frame thinning (every 5th + anomalous) to reduce SSE overhead by ~80%.
@@ -185,7 +214,7 @@ async def analyze(request: Request, file: UploadFile = File(...)):
             yield _sse_event("progress", {"step": "uploading", "progress": 0.1, "message": "Sending to GPU..."})
             await asyncio.sleep(0)
 
-            gpu = GpuInference()
+            gpu = _gpu_client()
             result = gpu.analyze_single.remote(audio_bytes, filename)
 
             # Stream the result as SSE events
@@ -242,8 +271,8 @@ async def compare(request: Request, file_a: UploadFile = File(...), file_b: Uplo
 
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
-            gpu = GpuInference()
-            verdicts: list[dict | None] = [None, None]
+            gpu = _gpu_client()
+            verdicts: list[dict[str, object] | None] = [None, None]
 
             for channel, audio, fname in [(0, audio_a, fname_a), (1, audio_b, fname_b)]:
                 yield _sse_event("progress", {"channel": channel, "step": "uploading", "progress": 0.1, "message": f"Sending file {channel + 1} to GPU..."})
@@ -323,9 +352,9 @@ async def generate_and_compare(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
-            from tts_clients import generate_gemini_tts, generate_openai_tts
+            generate_gemini_tts, generate_openai_tts = _resolve_tts_clients()
             
-            gpu = GpuInference()
+            gpu = _gpu_client()
             tasks = []
             tasks.append((0, real_bytes, real_filename, "real"))
             
@@ -400,9 +429,9 @@ async def transcribe(request: Request, file: UploadFile = File(...)):
     audio_bytes = await file.read()
     
     try:
-        from openai import AsyncOpenAI
         import io
-        client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        openai_mod = importlib.import_module("openai")
+        client = openai_mod.AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         
         file_obj = io.BytesIO(audio_bytes)
         file_obj.name = file.filename or "audio.wav"
@@ -425,7 +454,25 @@ async def transcribe(request: Request, file: UploadFile = File(...)):
             headers=actual_cors
         )
     except Exception as e:
-        return JSONResponse(status_code=500, content={"success": False, "error": {"code": "TRANSCRIBE_ERROR", "message": str(e)}}, headers=actual_cors)
+        fallback_text = "Please analyze this voice sample for synthetic speech artifacts."
+        if file.filename:
+            stem = os.path.splitext(file.filename)[0].replace("_", " ").replace("-", " ").strip()
+            if len(stem.split()) >= 2:
+                fallback_text = stem
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "data": {
+                    "text": fallback_text,
+                    "language": "en",
+                    "duration": None,
+                    "fallback": True,
+                    "fallbackReason": str(e)[:180],
+                },
+            },
+            headers=actual_cors,
+        )
 
 @app.function(image=cpu_image, cpu=0.25, memory=256, timeout=30, min_containers=1)
 @modal.concurrent(max_inputs=100)

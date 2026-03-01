@@ -709,7 +709,7 @@ button:focus-visible, input:focus-visible, [data-interactive]:focus-visible {
   gap: 4px;
   background: none;
   border: none;
-  padding: 20px 36px;
+  padding: 22px 38px;
   cursor: none;
   transition: transform 0.3s ease, opacity 0.3s ease, filter 0.3s ease;
   animation: label-glow-pulse 4s ease-in-out infinite;
@@ -748,22 +748,22 @@ button:focus-visible, input:focus-visible, [data-interactive]:focus-visible {
 
 .floating-label-text {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: 0.35em;
-  text-indent: 0.35em;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-indent: 0.24em;
   color: rgba(56, 189, 248, 0.95);
-  text-shadow: 0 0 12px rgba(var(--cyan-glow), 0.45), 0 0 24px rgba(var(--cyan-glow), 0.22);
+  text-shadow: 0 0 14px rgba(var(--cyan-glow), 0.55), 0 0 30px rgba(var(--cyan-glow), 0.28);
   transition: color 0.3s ease, text-shadow 0.3s ease, transform 0.15s ease;
   white-space: nowrap;
 }
 
 .floating-label-sub {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0.2em;
-  color: rgba(125, 211, 252, 0.8);
+  letter-spacing: 0.16em;
+  color: rgba(125, 211, 252, 0.92);
   transition: color 0.3s ease;
 }
 

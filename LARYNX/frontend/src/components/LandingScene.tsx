@@ -9,6 +9,7 @@ import { configureKTX2ForGLTFLoader } from '@/utils/ktx2Setup'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import { SoundEngine } from '@/audio/SoundEngine'
 import { ConvergenceLines } from './ConvergenceLines'
+import { BackgroundWaves } from './BackgroundWaves'
 import gsap from 'gsap'
 
 
@@ -567,10 +568,11 @@ export function LandingScene({
         visible={portalState !== 'entering' && portalState !== 'warping'}
         anchorRef={mouthAnchorRef}
       />
+      <BackgroundWaves />
 
       {/* Landing-specific postprocessing */}
       <EffectComposer enableNormalPass={false} multisampling={0}>
-        <Vignette offset={0.1} darkness={1.1} />
+        <Vignette offset={0.3} darkness={0.7} />
         <Noise premultiply blendFunction={BlendFunction.OVERLAY} opacity={0.02} />
       </EffectComposer>
 

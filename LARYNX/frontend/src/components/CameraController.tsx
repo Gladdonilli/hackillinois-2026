@@ -178,7 +178,14 @@ export function CameraController() {
         skullClipTriggered.current = false
         isCameraOverride.current = false
         currentTarget.current.set(...CAMERA_PRESETS.analyzing.target)
-        camera.position.set(...CAMERA_PRESETS.analyzing.position)
+        // Sweep from front to side profile (was instant snap)
+        tl.to(camera.position, {
+          x: CAMERA_PRESETS.analyzing.position[0],
+          y: CAMERA_PRESETS.analyzing.position[1],
+          z: CAMERA_PRESETS.analyzing.position[2],
+          duration: 2.0,
+          ease: "power2.inOut",
+        }, 0)
         if ('fov' in camera) {
           camera.fov = 45
           camera.updateProjectionMatrix()

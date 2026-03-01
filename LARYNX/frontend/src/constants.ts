@@ -224,13 +224,13 @@ export const POST_PROCESSING = {
   /** Bloom baseline intensity */
   BLOOM_BASELINE: 0.3,
   /** Chromatic aberration baseline */
-  CA_BASELINE: 0.0004,
+  CA_BASELINE: 0.0002,
   /** CA at >22 cm/s (HUMAN_MAX) */
-  CA_TIER_1: 0.002,
+  CA_TIER_1: 0.0008,
   /** CA at >50 cm/s (GLITCH) */
-  CA_TIER_2: 0.006,
+  CA_TIER_2: 0.002,
   /** CA at >80 cm/s (SKULL_CLIP) */
-  CA_TIER_3: 0.015,
+  CA_TIER_3: 0.005,
 } as const
 
 // ============================================================================

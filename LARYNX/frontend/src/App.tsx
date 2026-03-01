@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { useLarynxStore } from '@/store/useLarynxStore'
 import { FloatingIdleControls } from '@/components/FloatingIdleControls'
 import { useAnalysisStream } from '@/hooks/useAnalysisStream'
+import { useGenerateCompareStream } from '@/hooks/useGenerateCompareStream'
 import { AnalysisView } from '@/components/AnalysisView'
 import { VelocityHUD } from '@/components/VelocityHUD'
 import { VerdictPanel } from '@/components/VerdictPanel'
@@ -13,7 +14,7 @@ import { LandingScene } from '@/components/LandingScene'
 import { CustomCursor } from '@/components/CustomCursor'
 import { WarpTransition } from '@/components/WarpTransition'
 import { HistoryPanel } from '@/components/HistoryPanel'
-import { THRESHOLDS } from '@/constants'
+import { DEMO_MODE_ENABLED, THRESHOLDS } from '@/constants'
 import { Button } from '@/components/ui/button'
 const CompareView = lazy(() => import('@/components/CompareView').then(m => ({ default: m.CompareView })))
 const TechnicalDetailPanel = lazy(() => import('@/components/TechnicalDetailPanel').then(m => ({ default: m.TechnicalDetailPanel })))
@@ -36,12 +37,56 @@ export default function App() {
   // Analyze trigger for mouth aura
   const audioFile = useLarynxStore((state) => state.audioFile)
   const { startStream } = useAnalysisStream()
+  const { startGenerateCompare } = useGenerateCompareStream()
+  const generateCompareResult = useLarynxStore((state) => state.generateCompareResult)
   const canAnalyze = Boolean(audioFile) && status === 'idle' && portalState === 'idle'
+
+  const handleCompareAnalysis = useCallback(async () => {
+    const store = useLarynxStore.getState()
+    const file = store.audioFile
+    if (!file) return
+
+    // Step 1: Transcribe the real audio
+    const API_BASE = (import.meta.env.VITE_API_URL || 'https://larynx-api.tianyi35.workers.dev').replace(/\/$/, '')
+    store.setIsTranscribing(true)
+    store.setStatus('analyzing')
+    store.setProgress({ message: 'Transcribing audio...', percent: 5 })
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`${API_BASE}/api/transcribe`, { method: 'POST', body: formData })
+      const payload = await res.json().catch(() => null)
+
+      if (!res.ok || !payload?.success || !payload?.data?.text) {
+        throw new Error(payload?.error?.message || `Transcription failed (${res.status})`)
+      }
+
+      const text = payload.data.text as string
+      store.setTranscribedText(text)
+      store.setGeneratePromptText(text)
+      store.setIsTranscribing(false)
+
+      await startGenerateCompare(file, { initialStatus: 'analyzing' })
+    } catch (err) {
+      store.setIsTranscribing(false)
+      store.setStatus('error')
+      store.setProgress({
+        message: err instanceof Error ? err.message : 'Transcription failed',
+        percent: 0,
+      })
+    }
+  }, [startGenerateCompare])
+
   const handleAnalyze = useCallback(() => {
     if (canAnalyze) {
-      startStream()
+      if (DEMO_MODE_ENABLED) {
+        void startStream()
+      } else {
+        void handleCompareAnalysis()
+      }
     }
-  }, [canAnalyze, startStream])
+  }, [canAnalyze, handleCompareAnalysis, startStream])
 
   // Preload demo panels when analysis starts
   useEffect(() => {
@@ -201,11 +246,14 @@ export default function App() {
           className="relative z-10 flex items-center justify-center h-screen transition-opacity duration-500 grid-bg"
         >
           <LandingScene canAnalyze={canAnalyze} onAnalyze={handleAnalyze} />
-          {/* LARYNX title overlay */}
-          <div className="absolute top-12 left-1/2 -translate-x-1/2 z-20 text-center pointer-events-none">
-            <h1 className="text-5xl font-mono text-white text-glow-cyan glitch-text" style={{ letterSpacing: '0.5em', textIndent: '0.5em' }} data-text="LARYNX">LARYNX</h1>
-            <p className="text-xs font-mono text-white/70 mt-2" style={{ letterSpacing: '0.3em', textIndent: '0.3em' }}>DEEPFAKE VOICE DETECTION</p>
-          </div>
+        </div>
+      )}
+
+      {/* Title overlay — position:fixed to sit above the Canvas which is also position:fixed */}
+      {appState === 'idle' && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 text-center pointer-events-none" style={{ zIndex: 100 }}>
+          <h1 className="text-6xl md:text-7xl font-mono font-semibold glitch-text" style={{ letterSpacing: '0.38em', textIndent: '0.38em', color: '#38BDF8', textShadow: '0 0 20px rgba(56,189,248,0.85), 0 0 48px rgba(56,189,248,0.45)' }} data-text="LARYNX">LARYNX</h1>
+          <p className="text-sm font-mono mt-2" style={{ letterSpacing: '0.22em', textIndent: '0.22em', color: '#7DD3FC', opacity: 0.9, textShadow: '0 0 12px rgba(56,189,248,0.55)' }}>DEEPFAKE VOICE DETECTOR</p>
         </div>
       )}
 
@@ -252,14 +300,16 @@ export default function App() {
                 </div>
               </div>
 
-              <Button
-                variant="outline"
-                className="absolute bottom-8 right-8 z-30 font-mono text-sm tracking-wider animate-[fadeIn_0.5s_ease-out_1.5s_both]"
-                onClick={() => useLarynxStore.getState().setStatus('comparing')}
-                data-interactive
-              >
-                COMPARE ANALYSIS →
-              </Button>
+              {!generateCompareResult && (
+                <Button
+                  variant="outline"
+                  className="absolute bottom-8 right-8 z-30 font-mono text-sm tracking-wider animate-[fadeIn_0.5s_ease-out_1.5s_both]"
+                  onClick={handleCompareAnalysis}
+                  data-interactive
+                >
+                  COMPARE ANALYSIS →
+                </Button>
+              )}
             </>
           )}
         </div>

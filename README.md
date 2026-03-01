@@ -4,6 +4,12 @@
 
 **[Live Demo →](https://voxlarynx.tech)** · **[Devpost →](https://devpost.com/software/larynx)**
 
+### Latest Update (Wave 2)
+
+- TTS integration is now first-class in the user flow: upload/trigger analysis now auto-runs transcription and **generate-and-compare** (Gemini default) before the compare reveal.
+- Demo mode remains available and currently enabled for reliability during live demos.
+- Visual polish pass shipped: bilateral convergence particles, reduced chromatic fringing in favor of controlled glitch behavior, improved idle typography, and deeper animated background waves.
+
 ---
 
 ## The Problem

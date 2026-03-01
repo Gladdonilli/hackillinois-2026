@@ -14,7 +14,7 @@ function normalizeProgressPercent(progress: unknown): number {
 export function useGenerateCompareStream() {
   const abortRef = useRef<AbortController | null>(null)
 
-  const startGenerateCompare = useCallback(async (realFile: File) => {
+  const startGenerateCompare = useCallback(async (realFile: File, opts?: { initialStatus?: 'analyzing' | 'comparing' }) => {
     const store = useLarynxStore.getState()
     
     // Cancel any existing stream
@@ -27,7 +27,7 @@ export function useGenerateCompareStream() {
     store.resetGenerateCompare()
     store.resetComparison()
     store.setIsGenerating(true)
-    store.setStatus('comparing')
+    store.setStatus(opts?.initialStatus ?? 'comparing')
     store.setProgress({ message: 'Initializing generation pipeline...', percent: 0 })
 
     const { generatePromptText, selectedEngine, geminiVoice, openaiVoice } = store
@@ -62,6 +62,7 @@ export function useGenerateCompareStream() {
       let buffer = ''
       let hasReceivedEvent = false
       let terminalEventSeen = false
+      let enteredComparing = false
 
       while (true) {
         const readPromise = reader.read()
@@ -116,6 +117,10 @@ export function useGenerateCompareStream() {
 
               case 'frame': {
                 hasReceivedEvent = true
+                if (!enteredComparing) {
+                  store.setStatus('comparing')
+                  enteredComparing = true
+                }
                 const channel = parsed.channel as 0 | 1 | 2
                 store.addComparisonFrame(channel, {
                   sensors: parsed.sensors as Record<SensorName, EMASensor>,

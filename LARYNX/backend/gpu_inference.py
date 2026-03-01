@@ -43,13 +43,22 @@ gpu_image = (
         # which breaks in PEP 517 isolated builds)
         "pip install --no-build-isolation 'articulatory @ git+https://github.com/articulatory/articulatory.git@a50eafd4fb8235643f1523bbbf9ac1d50bbf271b'",
         # Patch scipy 1.12+ kaiser move: scipy.signal.kaiser -> scipy.signal.windows.kaiser
-        "sed -i 's/from scipy.signal import kaiser/from scipy.signal.windows import kaiser/g' $(python3 -c 'import articulatory.layers.pqmf; import inspect; print(inspect.getfile(articulatory.layers.pqmf))')",
+        # Belt-and-suspenders: sed first, then Python fallback if sed missed it
+        "for f in $(find /usr/local/lib -name pqmf.py -path '*/articulatory/*'); do sed -i 's/from scipy.signal import kaiser/from scipy.signal.windows import kaiser/g' \"$f\"; done",
+        # Python fallback: patch any remaining pqmf.py files that still have the old import
+        "python3 -c \""
+        "import glob, pathlib; "
+        "[pathlib.Path(f).write_text(pathlib.Path(f).read_text().replace('from scipy.signal import kaiser', 'from scipy.signal.windows import kaiser')) "
+        "for f in glob.glob('/usr/local/lib/**/articulatory/layers/pqmf.py', recursive=True) "
+        "if 'from scipy.signal import kaiser' in pathlib.Path(f).read_text()]; "
+        "print('kaiser python-patch done')"
+        "\"",
         # Verify kaiser patch applied
         "python3 -c 'from articulatory.layers.pqmf import PQMF; print(\"kaiser patch OK\")'",
         # Pre-download HuBERT into the image so cold starts don't need 1.18GB download
         "python3 -c \"import s3prl.hub; s3prl.hub.hubert_large_ll60k(); print('HuBERT cached')\"",
     )
-    .env({"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "LARYNX_BUILD": "v5-kaiser-fix"})
+    .env({"PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True", "LARYNX_BUILD": "v6-ffmpeg-247feat"})
     .add_local_file(
         "training_data/ensemble_model.pkl",
         "/root/ensemble_model.pkl",
@@ -204,6 +213,8 @@ class GpuInference:
             dict with keys: frames, verdict, processing_time_ms, pass_scores
         """
         import io
+        import subprocess
+        import tempfile
 
         import librosa
         import numpy as np
@@ -215,7 +226,29 @@ class GpuInference:
         inference_passes = max(1, inference_passes)
 
         # --- 1. Load and preprocess audio ---
-        wav_raw, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
+        # Try soundfile (WAV/FLAC/OGG) first; fall back to ffmpeg for MP3/M4A/WebM/etc.
+        try:
+            wav_raw, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
+        except Exception:
+            # ffmpeg transcode: any format → 16kHz mono WAV
+            with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tmp_in:
+                tmp_in.write(audio_bytes)
+                tmp_in_path = tmp_in.name
+            tmp_out_path = tmp_in_path + ".wav"
+            try:
+                subprocess.run(
+                    ["ffmpeg", "-y", "-i", tmp_in_path,
+                     "-ar", "16000", "-ac", "1", "-f", "wav", tmp_out_path],
+                    capture_output=True, timeout=30, check=True,
+                )
+                wav_raw, sr = sf.read(tmp_out_path, dtype="float32")
+            finally:
+                import os
+                for p in (tmp_in_path, tmp_out_path):
+                    try:
+                        os.unlink(p)
+                    except OSError:
+                        pass
         if wav_raw.ndim > 1:
             wav_raw = wav_raw.mean(axis=1)  # stereo → mono
         if sr != 16000:
@@ -261,7 +294,7 @@ class GpuInference:
             # --- AAI inference (FP32 required) ---
             feat = hidden.float().unsqueeze(0).transpose(1, 2)  # (1, 1024, T)
             feat = F.interpolate(feat, scale_factor=2, mode="linear", align_corners=False)
-            feat = feat.transpose(1, 2)  # (1, T*2, 1024)
+            feat = feat.transpose(1, 2).squeeze(0)  # (T*2, 1024) — 2D for inference()
 
             with torch.no_grad():
                 ema_pred = self.aai_model.inference(feat, normalize_before=False)

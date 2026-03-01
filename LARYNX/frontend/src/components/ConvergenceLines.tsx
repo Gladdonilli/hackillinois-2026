@@ -15,7 +15,7 @@ interface ConvergenceLinesProps {
 const LINE_COUNT = 14              // lines per side (left + right = 28 total)
 const CURVE_POINTS = 64            // sample points per curve
 const TUBE_RADIUS = 0.004
-const PARTICLE_COUNT = 28
+const PARTICLE_COUNT = 56
 
 // ── Hyperbolic Cosine Model ─────────────────────────────────────────
 //
@@ -245,9 +245,9 @@ function HoppingParticles({
   const particles = useRef<Particle[]>(
     Array.from({ length: PARTICLE_COUNT }, (_, i) => ({
       line: i % (LINE_COUNT * 4),
-      progress: (i * 0.13) % 1,
-      speed: 0.12 + (i % 5) * 0.04,
-      jumpCooldown: 0.2 + (i % 4) * 0.1,
+      progress: Math.random(),
+      speed: 0.10 + Math.random() * 0.06,
+      jumpCooldown: 0.2 + Math.random() * 0.3,
     })),
   )
 
