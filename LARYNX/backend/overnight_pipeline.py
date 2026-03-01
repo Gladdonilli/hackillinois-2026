@@ -101,7 +101,7 @@ MERGED_REAL_DIR = Path("/home/li859/datasets/larynx-5k/real")
 MERGED_FAKE_DIR = Path("/home/li859/datasets/larynx-5k/fake")
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
-INFERENCE_PASSES = 1  # SMOKE TEST — bump to 3 for full run
+INFERENCE_PASSES = 3  # FULL RUN — 3 passes for TTA averaging
 
 # Phonetically diverse sentences for TTS generation
 SENTENCES = [
@@ -193,7 +193,7 @@ ELEVENLABS_VOICES = [
     timeout=600,
     startup_timeout=1200,
     retries=3,
-    max_containers=1,  # SMOKE TEST — bump to 8 for full run
+    max_containers=8,  # FULL RUN — 8 B200 containers
     min_containers=0,
 )
 @modal.concurrent(max_inputs=2)  # SAFE ceiling: each HuBERT pass uses ~56 GiB, 2×56=112 fits B200's 178 GiB
