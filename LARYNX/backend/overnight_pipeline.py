@@ -1,14 +1,14 @@
 """
-LARYNX Overnight Training Pipeline — Run 6
+LARYNX Overnight Training Pipeline — Run 7
 =============================================
-Loads external balanced dataset (5000 real + 5000 fake) → AAI inference
-on Modal B200 → acoustic features → trains ensemble classifier with GroupKFold by speaker.
+Loads external dataset (5000 real + 11400 fake, 73 TTS architectures) → AAI inference
+on Modal B200 → acoustic features → trains ensemble classifier with StratifiedGroupKFold.
 
 Usage:
   source ~/modal-env/bin/activate
   modal run LARYNX/backend/overnight_pipeline.py
 
-Estimated: ~30 min on Modal B200 (5 passes × 10000 samples, volume-cached)
+Estimated: ~25 min on Modal B200 (3 passes × 16400 samples, volume-cached)
 """
 
 import modal
@@ -101,7 +101,7 @@ MERGED_REAL_DIR = Path("/home/li859/datasets/larynx-5k/real")
 MERGED_FAKE_DIR = Path("/home/li859/datasets/larynx-5k/fake")
 # Long-run control: repeat full AAI inference passes to build a much larger
 # training table overnight without changing I/O plumbing.
-INFERENCE_PASSES = 15
+INFERENCE_PASSES = 1  # SMOKE TEST — bump to 3 for full run
 
 # Phonetically diverse sentences for TTS generation
 SENTENCES = [
@@ -193,10 +193,10 @@ ELEVENLABS_VOICES = [
     timeout=600,
     startup_timeout=1200,
     retries=3,
-    max_containers=10,
+    max_containers=1,  # SMOKE TEST — bump to 8 for full run
     min_containers=0,
 )
-@modal.concurrent(max_inputs=2)
+@modal.concurrent(max_inputs=2)  # SAFE ceiling: each HuBERT pass uses ~56 GiB, 2×56=112 fits B200's 178 GiB
 class LarynxInference:
     @modal.enter()
     def setup(self):
@@ -219,8 +219,14 @@ class LarynxInference:
         if not local_dataset.exists():
             print('[ENTER] Copying dataset from FUSE volume to local NVMe...')
             t_copy = _time.monotonic()
-            subprocess.run(['cp', '-a', '/model-cache/dataset', '/tmp/dataset'], check=True)
-            print(f'[ENTER] Dataset copied ({_time.monotonic() - t_copy:.1f}s)')
+            local_dataset.mkdir(parents=True, exist_ok=True)
+            # tar pipe: streams as single FUSE read — 10x faster than cp -a on 16K files
+            subprocess.run(
+                'tar cf - -C /model-cache/dataset . | tar xf - -C /tmp/dataset',
+                shell=True, check=True,
+            )
+            n_copied = sum(1 for _ in local_dataset.rglob('*.wav'))
+            print(f'[ENTER] Dataset copied: {n_copied} files ({_time.monotonic() - t_copy:.1f}s)')
         if not local_aai.exists():
             print('[ENTER] Copying AAI checkpoint to local NVMe...')
             subprocess.run(['cp', '-a', '/model-cache/aai', '/tmp/aai'], check=True)
@@ -293,8 +299,8 @@ class LarynxInference:
         if not loaded_wavs:
             return results
 
-        # --- Batched HuBERT inference (B=64 per chunk, ~8GB VRAM per chunk) ---
-        HUBERT_BATCH = 128
+        # --- Batched HuBERT inference (B=128 per chunk, ~56 GiB VRAM per pass on B200) ---
+        HUBERT_BATCH = 128  # 256 caused OOM — do NOT increase
         all_hidden = []
         all_filenames = []
 
@@ -324,7 +330,6 @@ class LarynxInference:
                 all_filenames.append(filename)
 
             del hidden_batch, wav_tensors
-            torch.cuda.empty_cache()
 
         # --- Per-sample AAI + vectorized metrics ---
         dt = 1.0 / 200.0  # 200 Hz EMA rate
@@ -570,7 +575,7 @@ def main():
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     print("=" * 80)
-    print("LARYNX PIPELINE — RUN 6 (5k×5k Balanced Dataset + B200 + GroupKFold)")
+    print("LARYNX PIPELINE — RUN 7 (5k real + 11.4k fake, 73 TTS architectures, StratifiedGroupKFold)")
     print("=" * 80)
     start_time = time.time()
 
@@ -581,8 +586,8 @@ def main():
     existing_fake = sorted(existing.get("fake", []))
     print(f"  Volume has {len(existing_real)} real + {len(existing_fake)} fake WAVs")
 
-    if len(existing_real) < 5000 or len(existing_fake) < 5000:
-        print(f"  ❌ ABORT: Expected 5000 real + 5000 fake on volume, got {len(existing_real)} + {len(existing_fake)}")
+    if len(existing_real) < 100 or len(existing_fake) < 100:
+        print(f"  ❌ ABORT: Volume nearly empty — got {len(existing_real)} real + {len(existing_fake)} fake")
         print(f"     Re-upload dataset to model-cache volume before running.")
         sys.exit(1)
 
@@ -598,7 +603,7 @@ def main():
     )
 
     # Batch into groups of 20 for fewer scheduling round trips
-    BATCH_SIZE = 200  # Larger batches = fewer scheduling round trips
+    BATCH_SIZE = 400  # Larger batches = fewer scheduling round trips (B200 NVMe handles it)
     all_items_labeled = [(p, "real") for p in real_paths] + [(p, "deepfake") for p in fake_paths]
     labels = {Path(p).name: l for p, l in all_items_labeled}
 
@@ -698,24 +703,27 @@ def main():
         X.append(row)
         y.append(1 if r["label"] == "deepfake" else 0)
         filenames.append(r["filename"])
-        # Extract speaker from filename for GroupKFold:
+        # Extract speaker from filename for StratifiedGroupKFold:
         # libri_NNNNN.wav → speaker from LibriSpeech (251 speakers via modulo)
         # elkey1_NNNN.wav / elkey2_NNNN.wav → "elkey1" / "elkey2" (ElevenLabs)
         # wf_WF1_NNNN.wav .. wf_WF7_NNNN.wav → "wf_WF1" .. "wf_WF7" (WaveFake vocoders)
+        # mlaad_{tts_system}_{idx}.wav → "mlaad_{tts_system}" (MLAAD-tiny)
         fn = r["filename"]
         if fn.startswith("libri_"):
-            # libri_train-clean-100_SPEAKER_CHAPTER.wav → use actual speaker ID
             parts = fn.replace(".wav", "").split("_")
-            # parts: ['libri', 'train-clean-100', 'SPEAKER', 'CHAPTER']
             speaker = f"libri_{parts[-2]}" if len(parts) >= 4 else f"libri_{parts[-1]}"
         elif fn.startswith("elkey1_"):
             speaker = "elkey1"
         elif fn.startswith("elkey2_"):
             speaker = "elkey2"
         elif fn.startswith("wf_"):
-            # wf_WF3_0042.wav → speaker = "wf_WF3"
             parts = fn.split("_")
             speaker = f"{parts[0]}_{parts[1]}" if len(parts) >= 3 else "wf_unknown"
+        elif fn.startswith("mlaad_"):
+            # mlaad_bark_0042.wav → speaker = "mlaad_bark"
+            # mlaad_parler_tts_large_v1_0001.wav → speaker = "mlaad_parler_tts_large_v1"
+            parts = fn.replace(".wav", "").split("_")
+            speaker = "_".join(parts[:-1])  # everything except trailing index
         else:
             speaker = fn.split("_")[0]
         speakers.append(speaker)
@@ -731,19 +739,20 @@ def main():
     from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, HistGradientBoostingClassifier
     from sklearn.svm import SVC
     from sklearn.linear_model import LogisticRegression
-    from sklearn.model_selection import GroupKFold, cross_val_predict
+    from sklearn.model_selection import StratifiedGroupKFold, cross_val_predict
     from sklearn.metrics import accuracy_score, classification_report
     import pickle
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # GroupKFold by speaker — prevents train/test leakage
+    # StratifiedGroupKFold by speaker — prevents train/test leakage while
+    # maintaining class distribution across folds (critical for imbalanced data)
     groups = np.array(speakers)
     n_unique_speakers = len(set(speakers))
     n_splits = min(5, n_unique_speakers)  # Can't have more splits than speakers
-    print(f"  Unique speakers: {n_unique_speakers}, using {n_splits}-fold GroupKFold")
-    cv = GroupKFold(n_splits=n_splits)
+    print(f"  Unique speakers: {n_unique_speakers}, using {n_splits}-fold StratifiedGroupKFold")
+    cv = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=42)
 
     # Scale model selection with dataset size
     n_samples = len(y)
@@ -753,6 +762,7 @@ def main():
                 max_depth=8,
                 learning_rate=0.05,
                 max_iter=400,
+                class_weight="balanced",
                 random_state=42,
             ),
             "RandomForest": RandomForestClassifier(
@@ -873,7 +883,7 @@ def main():
     medium = sum(1 for s in best_signals if 10 < s[0] <= 20)
 
     print(f"\n{'=' * 80}")
-    print(f"RUN 6 COMPLETE")
+    print(f"RUN 7 COMPLETE")
     print(f"{'=' * 80}")
     print(f"  Samples: {len(real_results)} real + {len(fake_results)} fake = {len(good_results)} total")
     print(f"  Features: {len(feature_keys)}")

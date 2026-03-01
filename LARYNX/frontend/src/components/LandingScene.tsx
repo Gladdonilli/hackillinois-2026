@@ -1,6 +1,6 @@
 import { useRef, useEffect, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Html, useGLTF } from '@react-three/drei'
+import { useGLTF } from '@react-three/drei'
 import { EffectComposer, Vignette, Noise } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
@@ -72,22 +72,6 @@ function MouthGlow({ portalState }: { portalState: string }) {
           toneMapped={false}
           depthWrite={false}
           depthTest={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-
-      <mesh renderOrder={10}>
-        <circleGeometry args={[0.29, 40]} />
-        <meshStandardMaterial
-          color={[3.2, 2.85, 1.75]}
-          emissive={[3.2, 2.85, 1.75]}
-          emissiveIntensity={0.95}
-          transparent
-          opacity={0.18}
-          toneMapped={false}
-          depthWrite={false}
-          depthTest={false}
-          side={THREE.DoubleSide}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
@@ -224,11 +208,15 @@ function FaceModel({ portalState }: { portalState: string }) {
     }
   }, [])
 
+  const isTeethMesh = (name: string): boolean => {
+    if (!name) return false
+    const normalized = name.toLowerCase()
+    return normalized.includes('teeth') || normalized.includes('tooth')
+  }
+
   useEffect(() => {
     clonedSolidScene.traverse((child) => {
-      // Hide teeth mesh — check all known name variants + hide anything that isn't the main head
-      if (child.name === 'teeth' || child.name === 'mesh_3' || child.name === 'Wolf3D_Teeth' ||
-          (child.name && child.name.toLowerCase().includes('teeth'))) {
+      if (child.name === 'mesh_3' || isTeethMesh(child.name)) {
         child.visible = false
         return
       }
@@ -260,7 +248,7 @@ function FaceModel({ portalState }: { portalState: string }) {
 
     clonedWireScene.traverse((child) => {
       // Hide teeth mesh entirely
-      if (child.name === 'teeth' || child.name === 'mesh_3' || child.name === 'Wolf3D_Teeth') {
+      if (child.name === 'mesh_3' || isTeethMesh(child.name)) {
         child.visible = false
         return
       }
@@ -359,112 +347,6 @@ function FaceModel({ portalState }: { portalState: string }) {
   )
 }
 
-function FanTelemetryPanels({ portalState }: { portalState: string }) {
-  const leftCanvasRef = useRef<HTMLCanvasElement>(null)
-  const rightCanvasRef = useRef<HTMLCanvasElement>(null)
-  const leftHzRef = useRef<HTMLSpanElement>(null)
-  const rightHzRef = useRef<HTMLSpanElement>(null)
-  const leftStatRef = useRef<HTMLSpanElement>(null)
-  const rightStatRef = useRef<HTMLSpanElement>(null)
-  const audioTickRef = useRef(0)
-
-  useFrame(({ clock, pointer }, delta) => {
-    if (portalState === 'entering' || portalState === 'warping') return
-
-    const t = clock.elapsedTime
-    const magnitude = Math.min(1, Math.hypot(pointer.x, pointer.y))
-    const hzBase = 780 + Math.abs(pointer.x) * 2200 + Math.abs(pointer.y) * 950
-    const depthValue = 20 + magnitude * 80
-
-    if (leftHzRef.current) leftHzRef.current.textContent = `${hzBase.toFixed(0)} Hz`
-    if (rightHzRef.current) rightHzRef.current.textContent = `${(hzBase * 0.93).toFixed(0)} Hz`
-    if (leftStatRef.current) leftStatRef.current.textContent = `AMP ${(0.32 + magnitude * 0.6).toFixed(2)}`
-    if (rightStatRef.current) rightStatRef.current.textContent = `DEPTH ${depthValue.toFixed(0)}%`
-
-    const renderPanel = (canvas: HTMLCanvasElement | null, side: 1 | -1) => {
-      if (!canvas) return
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-
-      const width = canvas.width
-      const height = canvas.height
-      const endX = side === -1 ? width - 10 : 10
-      const startX = side === -1 ? 8 : width - 8
-
-      ctx.clearRect(0, 0, width, height)
-      ctx.globalAlpha = 0.3
-      ctx.strokeStyle = 'rgba(120,220,255,0.22)'
-      for (let i = 0; i < 5; i += 1) {
-        const gy = 12 + (i / 4) * (height - 24)
-        ctx.beginPath()
-        ctx.moveTo(0, gy)
-        ctx.lineTo(width, gy)
-        ctx.stroke()
-      }
-
-      ctx.globalAlpha = 0.95
-      for (let i = 0; i < 12; i += 1) {
-        const p = i / 11
-        const baseY = 10 + p * (height - 20)
-        const wobble = Math.sin(t * (2.6 + i * 0.04) + i * 0.45) * (4.5 + magnitude * 8)
-        const startY = baseY + wobble
-        const ctrlX = width * (0.45 + side * pointer.x * 0.06)
-        const ctrlY = baseY + Math.sin(t * 3.8 + i * 0.4) * (8 + Math.abs(pointer.y) * 10)
-
-        ctx.strokeStyle = i % 3 === 0 ? 'rgba(180,240,255,0.95)' : 'rgba(110,225,255,0.68)'
-        ctx.lineWidth = i % 3 === 0 ? 1.2 : 0.8
-        ctx.beginPath()
-        ctx.moveTo(startX, startY)
-        ctx.quadraticCurveTo(ctrlX, ctrlY, endX, height * 0.52 + pointer.y * 6)
-        ctx.stroke()
-      }
-
-      ctx.fillStyle = 'rgba(155,245,255,0.9)'
-      for (let i = 0; i < 22; i += 1) {
-        const x = (i / 21) * (width - 20) + 10
-        const bar = 5 + (Math.sin(t * 6.5 + i * 0.55 + side * pointer.x * 2.6) * 0.5 + 0.5) * (14 + magnitude * 24)
-        ctx.fillRect(x, 4, 3, bar)
-      }
-    }
-
-    renderPanel(leftCanvasRef.current, -1)
-    renderPanel(rightCanvasRef.current, 1)
-
-    audioTickRef.current += delta
-    if (audioTickRef.current > 0.16 && SoundEngine.isInitialized()) {
-      SoundEngine.playDataPoint(6 + magnitude * 75 + Math.abs(pointer.x) * 20)
-      audioTickRef.current = 0
-    }
-  })
-
-  if (portalState === 'entering' || portalState === 'warping') return null
-
-  return (
-    <>
-      <Html position={[-6.8, -0.1, 0.25]} transform={false} zIndexRange={[12, 18]}>
-        <div style={{ width: '220px', pointerEvents: 'none', mixBlendMode: 'screen' }}>
-          <canvas ref={leftCanvasRef} width={220} height={120} style={{ width: '220px', height: '120px', opacity: 0.88 }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.14em', color: 'rgba(145,232,255,0.9)' }}>
-            <span>FAN-L</span>
-            <span ref={leftHzRef}>0 Hz</span>
-            <span ref={leftStatRef}>AMP 0.00</span>
-          </div>
-        </div>
-      </Html>
-      <Html position={[6.8, -0.1, 0.25]} transform={false} zIndexRange={[12, 18]}>
-        <div style={{ width: '220px', pointerEvents: 'none', mixBlendMode: 'screen' }}>
-          <canvas ref={rightCanvasRef} width={220} height={120} style={{ width: '220px', height: '120px', opacity: 0.88 }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'monospace', fontSize: '10px', letterSpacing: '0.14em', color: 'rgba(145,232,255,0.9)' }}>
-            <span>FAN-R</span>
-            <span ref={rightHzRef}>0 Hz</span>
-            <span ref={rightStatRef}>DEPTH 0%</span>
-          </div>
-        </div>
-      </Html>
-    </>
-  )
-}
-
 export function LandingScene() {
   const portalState = useLarynxStore((state) => state.portalState)
   const setPortalState = useLarynxStore((state) => state.setPortalState)
@@ -513,7 +395,6 @@ export function LandingScene() {
 
       <FaceModel portalState={portalState} />
       <MouthGlow portalState={portalState} />
-      <FanTelemetryPanels portalState={portalState} />
       <ConvergenceLines
         visible={portalState !== 'entering' && portalState !== 'warping'}
         cursorInfluence={0.92}
