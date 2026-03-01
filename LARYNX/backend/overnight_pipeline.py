@@ -196,7 +196,7 @@ ELEVENLABS_VOICES = [
     max_containers=10,
     min_containers=0,
 )
-@modal.concurrent(max_inputs=3)
+@modal.concurrent(max_inputs=2)
 class LarynxInference:
     @modal.enter()
     def setup(self):
@@ -614,7 +614,7 @@ def main():
             batch = [p for p, _ in batch_items]
             batches.append(batch)
 
-        print(f"  \U0001f501 Pass {pass_idx + 1}/{INFERENCE_PASSES}: dispatching {len(batches)} batches (max_inputs=3)")
+        print(f"  \U0001f501 Pass {pass_idx + 1}/{INFERENCE_PASSES}: dispatching {len(batches)} batches (max_inputs=2)")
 
         pass_results = []
         for batch_idx, batch_result in enumerate(

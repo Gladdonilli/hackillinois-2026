@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Project:** HackIllinois 2026 — LARYNX (Deepfake Voice Detection via Articulatory Physics)
-**Updated:** 2026-02-28 (Cloudflare Stack Finalized)
+**Updated:** 2026-03-01
 
 ## OVERVIEW
 
@@ -12,8 +12,8 @@
 ```
 hackillinois/
 ├── LARYNX/              # Voice deepfake detection (formant→tongue velocity→3D skull clip)
-│   ├── backend/         # Modal pipeline, classifier, SSE endpoint
-│   ├── frontend/        # R3F + Zustand + GSAP + Tone.js cinematic UI
+│   ├── backend/         # Modal pipeline, classifier, SSE endpoint (13 .py files)
+│   ├── frontend/        # R3F + Zustand + GSAP + Tone.js cinematic UI (39 components)
 │   └── worker/          # CF Worker (Hono) — API proxy, D1, R2, Vectorize, AI Gateway
 ├── SYNAPSE/             # [ARCHIVED] — decision gate chose LARYNX, do not modify
 ├── shared/              # Infrastructure configs, runbooks, API contracts
@@ -23,8 +23,9 @@ hackillinois/
 │   └── runbooks/        # BOOTSTRAP.md (smoke tests), demo-day-checklist.md
 ├── research/            # Sound design, architecture research
 ├── competitive-intel/   # 13 competitor dossiers from Discord #find-a-team
-├── _intel/              # Ideation sweep outputs (deep/artistry/ultrabrain analyses)
-├── scripts/             # Utility scripts (auto-push removed)
+├── _intel/              # Ideation sweep outputs, archived code
+├── scripts/             # Utility scripts
+├── Macroscope.md        # CI bot config — DO NOT DELETE
 ├── package.json         # Root shim (build delegates to LARYNX/frontend)
 ├── ATTENDEE_GUIDE.md    # Logistics, shuttles, food, WiFi
 └── RESOURCES.md         # API keys, Figma, Modal credits, CF config
@@ -92,7 +93,7 @@ CF Pages → CF Worker (/api/analyze, /api/compare, /api/history) → Modal SSE
 - **API envelope**: Every endpoint returns `ApiResponse<T>` = `{ success: boolean, data?: T, error?: string }`
 - **SSE streaming**: Progress events use `event: progress\ndata: {step, progress, message}\n\n` format
 - **Animation state**: Zustand transient store (`useStore.getState()`) or `useRef`. **NEVER `useState`** for per-frame data
-- **Modal backend**: Single `modal.App("hackillinois")` with `LarynxProcessor` class. Shared `/model-cache` volume. `min_containers=1`
+- **Modal backend**: Single `modal.App("hackillinois-2026")` with `LarynxProcessor` class. Shared `/model-cache` volume. `min_containers=1`
 - **Versions**: Pin exact versions in STACK.md. Key constraints: `modal==1.3.4`, `praat-parselmouth==0.4.5`, `librosa==0.10.2.post1`
 - **Desktop only**: Min-width 1280px. No responsive mobile
 
@@ -105,6 +106,8 @@ CF Pages → CF Worker (/api/analyze, /api/compare, /api/history) → Modal SSE
 - **NEVER** use Tone.js `rampTo()` for frequency changes — internally uses `exponentialRampTo` which throws `RangeError` when current===target. Use `linearRampTo()` instead
 - **NEVER** upgrade parselmouth without regression-testing formant extraction on known-good WAV samples
 - **NEVER** use `useGLTF.preload()` with KTX2-compressed models — incompatible with custom loader config. facecap.glb requires KTX2Loader + basis transcoder WASM in `public/basis/`
+- **NEVER** use `useRef(new THREE.Color())` inside useFrame or callbacks — React Rules of Hooks violation. All useRef at component top level only
+- **NEVER** use `current += (target - current) * factor * delta` without clamping delta — tab throttling sends delta > 0.1, factor exceeds 1.0, causes NaN/Infinity corruption. Always `Math.min(delta, 0.1)`
 
 ## COMMANDS
 
@@ -117,6 +120,12 @@ jj git push               # Push to GitHub
 
 # Deploy frontend to CF Pages
 cd LARYNX/frontend && npx wrangler pages deploy dist/
+
+# Build frontend
+cd LARYNX/frontend && npx vite build
+
+# Type check frontend
+cd LARYNX/frontend && npx tsc --noEmit
 ```
 
 ## JJ CONFIG
@@ -127,7 +136,6 @@ snapshot.max-new-file-size = 27000000  # 27MB (default 1MB)
 ```
 
 **Note**: Files exceeding this limit are silently excluded from JJ snapshots.
-The `elevenlabs_dataset.zip` (314MB) is above this limit AND in `.gitignore` — doubly excluded.
 
 ## .GITIGNORE POLICY
 
@@ -137,35 +145,42 @@ The `elevenlabs_dataset.zip` (314MB) is above this limit AND in `.gitignore` —
 - `LARYNX/worker/` — CF Worker (Hono router, D1/R2/Vectorize/AI bindings)
 - `LARYNX/frontend/public/` — static assets (facecap.glb is <1MB, OK)
 - `LARYNX/*.md` — architecture docs, stack, demo script, todos
-- `LARYNX/backend/training_data/ensemble_model.pkl` — trained model (<1MB, whitelisted)
+- `LARYNX/backend/training_data/ensemble_model.pkl` — trained model (<2MB, whitelisted)
 - `shared/`, `competitive-intel/`, `research/`, `scripts/`, `_intel/`
-- Top-level docs: `AGENTS.md`, `ATTENDEE_GUIDE.md`, `RESOURCES.md`
+- Top-level docs: `AGENTS.md`, `ATTENDEE_GUIDE.md`, `RESOURCES.md`, `Macroscope.md`
 - Config files: `package.json`, `tsconfig.json`, `vite.config.ts`, `wrangler.toml`
 
 **What is .gitignored (NEVER push):**
-- `LARYNX/backend/training_data/datasets/` — 14GB of WAVs (merged/real, merged/fake, intermediate dirs)
+- `LARYNX/backend/training_data/datasets/` — 14GB of WAVs
 - `LARYNX/backend/training_data/audio/` — 270MB intermediate audio
 - `LARYNX/backend/training_data/aai_results.json` — 52MB AAI inference results
 - `LARYNX/backend/training_data/aai_results_checkpoint.json` — large checkpoint
 - `LARYNX/backend/training_data/ema_outputs/` — EMA trajectory outputs
+- `LARYNX/backend/classifier_model.pkl` — OLD superseded model
+- `LARYNX/backend/csis_phase2_results.json` — research artifact
+- `*.npy` — numpy debug artifacts
 - `*.zip`, `*.tar.gz`, `*.tar.bz2` — raw dataset downloads
 - `node_modules/`, `dist/`, `.vite/`, `.wrangler/` — build artifacts
 - `__pycache__/`, `*.pyc` — Python bytecode
+- `bun.lock` — wrong package manager
 - `.env`, `.env.*` — secrets
+- `.opencode/`, `.sisyphus/` — AI agent internal state
+- `Dockerfile`, `nixpacks.toml` — abandoned Aedify configs
 
 **If adding new large files**: Add to `.gitignore` BEFORE they get tracked by JJ.
-Once JJ snapshots a file, it's in git objects — removing it from `.gitignore` later
-requires `jj file untrack <path>` and history rewriting to avoid pushing bloated commits.
+Once JJ snapshots a file, it's in git objects — removing requires `jj file untrack <path>`.
 
 ## NOTES
 
-- **VCS**: JJ-colocated repo. `main` = primary branch. `synapse` bookmark exists on GitHub (legacy, research docs only). No `git add` — working copy IS the commit
+- **VCS**: JJ-colocated repo. `main` = primary branch. No `git add` — working copy IS the commit
 - **Remote**: `Gladdonilli/hackillinois-2026` (private)
 - **Identity**: Gladdonilli / tianyi35@illinois.edu
 - **Strategy**: Modal track. LARYNX is fundamentally GPU inference (AAI model) — perfect fit for sponsor track
 - **Primary threat**: Aryan Keluskar (3x Modal track winner), Krish Golcha (HackPrinceton Overall Winner)
+- **Model accuracy**: 76.75% CV (HistGradientBoostingClassifier, 108 features, trained on 43,210 balanced samples)
+- **Visual polish**: convergence lines, mouth glow, teeth hiding, fog — exist on `visual-polish-isolated` branch (tkzuptzw), NOT yet merged to main
 
-## TRAINING DATASET (Run 6)
+## TRAINING DATASET
 
 **Location:** `/home/li859/datasets/larynx-5k/` (OUTSIDE repo — not tracked by JJ)
 
@@ -179,18 +194,16 @@ requires `jj file untrack <path>` and history rewriting to avoid pushing bloated
 **Format:** 16kHz mono 16-bit WAV, 2.8GB total
 **Backup:** `/home/li859/datasets/larynx-merged/` (4,877 fake + 33,302 real, all sources)
 
-## AGENT-BROWSER SETUP
+## BROWSER VERIFICATION
 
-Remote CDP architecture — zero Chromium on VM:
+Playwright MCP via `@playwright/mcp` connects to WSL Chrome via CDP. All rendering on WSL GPU.
 
 ```
-VM (100.123.15.7)  →  WSL (100.102.224.118:9222)  →  Chrome 145 (127.0.0.1:9223)
-  agent-browser          Node TCP proxy                headless, --no-sandbox
+VM (100.123.15.7) → WSL (100.102.224.118:9222) → Chrome 145 (127.0.0.1:9223)
 ```
 
-- **Chrome**: WSL host `gladdoncope2`, port 9223, `--no-sandbox` required for WSL
-- **Proxy**: `~/.local/bin/cdp-proxy.mjs` on `0.0.0.0:9222` → `127.0.0.1:9223` (Chrome 145 ignores `--remote-debugging-address`)
-- **Auto-start**: Both Chrome and proxy start from WSL bashrc on new interactive shells
-- **VM wrapper**: `~/.local/bin/agent-browser` auto-injects `--cdp ws://100.102.224.118:9222`
-- **Env var**: `AGENT_BROWSER_CDP_HOST=100.102.224.118` in VM bashrc
-- All rendering uses WSL GPU. No socat (no sudo), hence Node proxy.
+**MANDATORY** after any frontend change. Build-green does NOT guarantee runtime rendering.
+
+- **Vision mode** (default): PNG screenshots, pixel-coordinate clicks. Best for visual debugging.
+- **Snapshot mode**: Accessibility tree text, element ref clicks. Best for functional testing.
+- For WebGL/Canvas: screenshots + `look_at` (snapshot misses canvas content)

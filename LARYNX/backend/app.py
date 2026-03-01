@@ -29,6 +29,7 @@ larynx_image = (
         "pydantic==2.10.3",
     )
     .add_local_python_source("LARYNX.backend")  # Mount local package for relative imports
+    .add_local_file("LARYNX/backend/training_data/ensemble_model.pkl", "/root/LARYNX/backend/training_data/ensemble_model.pkl")  # Mount trained classifier model
 )
 
 app = modal.App("hackillinois-2026")

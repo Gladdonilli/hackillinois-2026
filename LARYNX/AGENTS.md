@@ -1,62 +1,155 @@
-# LARYNX — Project Knowledge
+# LARYNX — Subproject Knowledge Base
 
-## OVERVIEW
+**Updated:** 2026-03-01
 
-Deepfake voice detection via articulatory physics. Real human tongues move at 15-20 cm/s; TTS-generated speech shows impossible velocities (80+ cm/s) because mel-loss optimization doesn't enforce kinematic constraints. The "wow moment" = tongue punches through skull in 3D visualization.
+## WHAT IS LARYNX
 
-## DATA FLOW
+Deepfake voice detection via articulatory physics. Audio in → formant extraction → tongue/jaw kinematics → flag physically impossible velocities → 3D skull visualization showing the impossibility.
+
+**Core insight:** Real human articulators (tongue, jaw, lips) have biomechanical velocity limits (~20 cm/s for tongue tip). Deepfake generators don't model physics — their outputs imply articulatory movements that would require the tongue to clip through bone.
+
+## ARCHITECTURE
 
 ```
-Browser → CF Worker (R2 upload) → Modal (Parselmouth)
-  → F1/F2 formants at 100fps → 50ms median filter → velocity calc
-  → SSE stream → Zustand transient → useFrame (R3F morph targets)
-                                    → GSAP (camera choreography)
-                                    → Tone.js (velocity-reactive distortion)
+Audio File (16kHz mono WAV)
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│ Modal Backend (app.py)                  │
+│                                         │
+│ 1. Noise Gate (-40dB threshold)         │
+│ 2. Formant Extraction (Praat-Burg 100Hz)│
+│ 3. 5-frame median smoothing            │
+│ 4. EMA Mapping (F1→jaw, F2→tongue)     │
+│ 5. Velocity via np.diff                │
+│ 6. Anomaly detection (>20 cm/s)        │
+│ 7. Classifier (108 features → prob)    │
+│ 8. Ensemble (0.6×formant + 0.4×ML)     │
+│                                         │
+│ SSE Events: progress → frame → verdict  │
+└─────────┬───────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────┐
+│ CF Worker (Hono)                        │
+│ - Proxies SSE from Modal                │
+│ - Intercepts verdict → D1 + R2 + Vec   │
+│ - CORS: voxlarynx.tech, localhost:5173  │
+└─────────┬───────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────┐
+│ Frontend (React + R3F)                  │
+│                                         │
+│ State Machine:                          │
+│ Intro → Idle → Uploading → Analyzing    │
+│   → Complete → Compare → Technical      │
+│   → Closing                             │
+│                                         │
+│ Portal: idle → entering → warping → done│
+│ (Landing scene → Head model transition) │
+└─────────────────────────────────────────┘
 ```
 
-## WHERE TO LOOK
+## BACKEND FILES
 
-| Task | File | Notes |
-|------|------|-------|
-| System architecture + API shapes | ARCHITECTURE.md | 520 lines, source of truth |
-| Pinned dependency versions | STACK.md | Modal 1.3.4, Parselmouth 0.4.5 |
-| What needs building | TODO-FRONTEND.md | Tailwind/shadcn, GLB asset, shaders |
-| Demo choreography | DEMO-SCRIPT.md | 3-min timestamped script |
-| Risk mitigations | RISKS.md | Noise gate, dual-threshold, false positive prevention |
-| Scientific basis | README.md | USENIX 2022 (Logan Blue), AAI→Formant pivot rationale |
+| File | Lines | Purpose |
+|------|-------|---------|
+| `app.py` | 367 | Modal App definition, FastAPI SSE endpoints (/analyze, /compare), image config |
+| `pipeline.py` | 270 | Core analysis: noise gate → formant → EMA → velocity → anomaly |
+| `classifier.py` | 232 | Loads ensemble_model.pkl, 108-feature extraction, probability output |
+| `config.py` | 55 | Physics thresholds (T1: 20cm/s), Hz-to-mm mappings, audio constraints |
+| `models.py` | 50 | Pydantic schemas: EMAFrame, Verdict, AnalysisProgress |
+| `overnight_pipeline.py` | 894 | B200 GPU training pipeline, GroupKFold speaker-aware splits |
+| `train_classifier.py` | 366 | HistGradientBoosting ensemble training script |
+| `train_local.py` | 210 | Local CPU training alternative |
+| `download_datasets.py` | 425 | LibriSpeech / WaveFake dataset download scripts |
+| `rebuild_merged.py` | 460 | 5K balanced training set construction and verification |
+| `csis_modal.py` | 461 | Alternative AAI model (Peter Wu / ICASSP '23) |
+| `csis_validate.py` | 210 | Validation for CSIS approach |
+| `__init__.py` | 0 | Package marker |
 
-## CONVENTIONS (LARYNX-SPECIFIC)
+## FRONTEND STRUCTURE
 
-- **Formant preprocessing is MANDATORY**: noise gate at -40dB RMS → pitch filter rejecting <80Hz → 5-frame median filter (50ms at 100fps) on F1/F2 trajectories
-- **Velocity thresholds per sensor** (cm/s): TT=20, TB=15, TD=12, UL=15, LL=18, JAW=10
-- **Morph target mapping**: `Jaw_Drop = clamp(-Δy_JAW / 20mm)`, `Tongue_Out = Δx_T1 / 15mm`. Do NOT clamp at 1.0 — deepfake drives to 3.5+ for skull-clipping effect
-- **3D asset pipeline**: ARKit 52-blendshape head → Blender Boolean sagittal slice → `npx gltfjsx --transform --types`
-- **Material**: drei `MeshTransmissionMaterial` (transmission=0.9, chromaticAberration=0.5, thickness=2.5) for x-ray glass skull
-- **Post-processing**: Scanline (density=1.5) + Bloom (0.2→2.5 on deepfake) + ChromaticAberration (0.002→0.05)
+```
+src/
+├── components/          # 39 files
+│   ├── HeadModel.tsx    # R3F skull + morph targets
+│   ├── TongueModel.tsx  # Animated tongue with velocity-driven color
+│   ├── LandingScene.tsx # 387 lines — intro 3D scene with fog
+│   ├── WaveformDisplay.tsx  # 392 lines — audio waveform visualization
+│   ├── VelocityHUD.tsx  # 325 lines — real-time velocity graphs
+│   ├── TechnicalDetailPanel.tsx  # 378 lines — detailed analysis view
+│   ├── ConvergenceLines.tsx  # 8-beam TubeGeometry convergence effect
+│   ├── MouthGlow.tsx    # Warm white emission ring
+│   ├── PostProcessingEffects.tsx  # Vignette + noise
+│   ├── IntroSequence.tsx  # Animated intro text
+│   ├── UploadPanel.tsx  # File upload UI
+│   ├── CompareView.tsx  # Side-by-side comparison
+│   ├── ClosingScreen.tsx  # End state
+│   └── ...              # Supporting components
+├── hooks/               # 5 files
+│   ├── useAnalysisStream.ts   # SSE POST to /api/analyze
+│   ├── useComparisonStream.ts # SSE POST to /api/compare
+│   └── ...
+├── store/               # 2 files
+│   └── useLarynxStore.ts  # Zustand transient store (status, frames, comparison, tongue state)
+├── audio/               # 3 files
+│   └── SoundEngine.ts   # Module-scoped Tone.js singleton
+├── test-utils/          # 1 file
+│   └── mockStore.ts     # Zustand mock with createMockState()
+└── assets/              # Shaders, images
+```
 
-## ANTI-PATTERNS (LARYNX-SPECIFIC)
+## FRONTEND CONVENTIONS
 
-- **NEVER** use live microphone — >80dB ambient destroys formant extraction. Pre-recorded clean audio ONLY
-- **NEVER** use forced phoneme alignment — TTS systems align phonemes perfectly, destroying the deepfake velocity signal
-- **NEVER** skip formant preprocessing — raw Praat output on noisy audio generates false positives
-- **NEVER** clamp morph targets at 1.0 — the skull-clipping wow factor requires 3.5+
+### State Management
+- **Zustand transient store** — `useLarynxStore.ts` is the single source of truth
+- **NEVER `useState`** for animation/per-frame data — use `useRef` or `useStore.getState()`
+- Store selectors: `useLarynxStore((s) => s.field)` — NOT `useLarynxStore()`
+- For mocking: `mockImplementation((sel) => sel ? sel(state) : state)`
 
-## CRITICAL PATH
+### Animation
+- **GSAP**: Use `gsap.quickTo()` for real-time streams, NOT `gsap.to()`
+- **Tone.js**: Module-scoped singletons only. Never instantiate inside components (HMR duplication)
+- **Tone.js frequency**: Use `linearRampTo()`, NEVER `rampTo()` (exponentialRampTo throws RangeError)
+- **Delta clamping**: Always `Math.min(delta, 0.1)` before `current += (target - current) * factor * delta`
+- **useRef placement**: ALL `useRef` calls at component top level, never inside useFrame/callbacks
 
-1. Validate F2 velocity gap: OpenAI TTS vs real voice via Parselmouth (30 min, no GPU)
-2. Source + slice 3D head model (Blender, highest risk item)
-3. Modal endpoint: audio → formants → velocity → SSE stream
-4. R3F: morph target wiring + transmission material + post-processing
-5. GSAP: demo timeline (reveal → zoom → clip → data overlay)
+### 3D (R3F)
+- **Overlays**: `depthTest={false}` + `renderOrder` for anything in front of head mesh
+- **Thick lines**: Use TubeGeometry with CatmullRomCurve3 (WebGL LineBasicMaterial lineWidth always 1px)
+- **KTX2**: `useGLTF.preload()` incompatible with KTX2 — use custom loader config
+- **Teeth hiding**: Traverse scene clone, set `child.visible = false` when `child.name === 'teeth'`
 
-## STATUS
+### Testing
+- Vitest + React Testing Library
+- Mock store via `src/test-utils/mockStore.ts`
+- `vitest.config.ts` needs `mode: 'development'` (VM has NODE_ENV=production)
+- `vitest.setup.ts` must set `process.env.NODE_ENV = 'test'`
 
-Spec-complete. Zero implementation code. Highest risk = Blender sagittal slice of ARKit head (asset pipeline). Scientific basis validated by review agents (184 cm/s IS reproducible on standard TTS).
+## CLASSIFIER
 
-## TESTING REQUIREMENTS
+- **Type**: HistGradientBoostingClassifier (lr=0.05, depth=8, 400 iterations)
+- **Features**: 108 (6 articulators × 3 kinematic derivatives × 6 stats)
+- **Accuracy**: 76.75% cross-validated (GroupKFold, speaker-aware)
+- **Training data**: 43,210 real + 43,210 fake (balanced)
+- **Model file**: `training_data/ensemble_model.pkl` (1.66MB, whitelisted in .gitignore)
+- **Deepfake signature**: T1 (Tongue Tip) and F2 velocity jumps >22 cm/s
 
-- **MANDATORY**: After EVERY frontend visual change, verify with `agent-browser` before declaring done
-- Run `agent-browser open <url>` → `agent-browser snapshot -i` → verify render
-- For WebGL/Canvas changes, use `agent-browser screenshot` + `look_at` (snapshot misses canvas content)
-- Build-green does NOT guarantee runtime-visible rendering — always do visual verification
-- Sound engine + backend files are owned by parallel sessions — DO NOT edit those files from the frontend session
+## VISUAL POLISH STATUS
+
+The `visual-polish-isolated` branch (tkzuptzw) contains visual improvements NOT on main:
+- ConvergenceLines: 8 TubeGeometry beams, cool white/silver HDR
+- MouthGlow: warm white ring, emissiveIntensity 2.0
+- LandingScene: tightened fog [#030305, 5, 25], Vignette+Noise post-processing
+- Teeth hidden via scene traversal
+- Period removed from "LARYNX." title
+
+**These need merging to main before demo.**
+
+## SOUND ENGINE
+
+SoundEngine.ts is a module-scoped Tone.js singleton. The hardened version (1189 lines) exists on the `visual-polish` branch (wzlxmwkt) but may not be on main — verify before demo. The un-hardened version (1015 lines) is on `pipeline-run`/main.
+
+To restore: `jj restore --from wzlxmwkt -- LARYNX/frontend/src/audio/SoundEngine.ts`
