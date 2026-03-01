@@ -289,6 +289,12 @@ class LarynxInference:
                     from scipy.signal import resample
                     audio = resample(audio, int(len(audio) * 16000 / sr))
                 audio = audio.astype(np.float32)
+                # Filter out samples >= 15s — long audio produces noisy EMA trajectories
+                duration_s = len(audio) / 16000.0
+                if duration_s >= 15.0:
+                    print(f"    ⏭ Skipping {filename}: {duration_s:.1f}s >= 15s")
+                    results.append({"filename": filename, "error": f"duration {duration_s:.1f}s >= 15s"})
+                    continue
                 if np.max(np.abs(audio)) > 0:
                     audio = audio / np.max(np.abs(audio))
                 loaded_wavs.append((filename, audio))
